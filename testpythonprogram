@@ -1,0 +1,19 @@
+modest_response = raw_input("So you think you're the best at Python, huh? (y/n): ")
+while modest_response != 'y' and modest_response != 'n':
+    modest_response = raw_input("Not an acceptable answer. So, are you the best or not?! (y/n): ")
+
+if modest_response == 'y':
+    lab_members = ['Suraj','Dan','Chris','Kian','Ali']
+    for i in range(len(lab_members)):
+        prompt = "Better than " + lab_members[i] + "?!? (y/n): "
+        ans = raw_input(prompt)
+        while ans != 'y' and ans != 'n':
+            ans = raw_input("Answer the fucking question properly, dick!! (y/n): ")
+        if ans == 'n':
+            print "Thought so, bitch..."
+            break
+    else:
+        print "Bullshit, you liar..."
+else:
+    print "You will never amount to anything in life and everyone hates you..."
+    
