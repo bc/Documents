@@ -1,4 +1,3 @@
-from pylab import *
 modest_response = raw_input("So you think you're the best at Python, huh? (y/n): ")
 while modest_response != 'y' and modest_response != 'n':
     modest_response = raw_input("Not an acceptable answer. So, are you the best or not?! (y/n): ")
