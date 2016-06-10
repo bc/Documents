@@ -1,2 +1,2 @@
 # To Do List
-- [x] Test the Markdown To Do list functionality.
+* [ ] Test the Markdown To Do list functionality.
