@@ -1,2 +1,2 @@
 # To Do List
-- [ ] Test the Markdown To Do list functionality.
+This is an ongoing document that will have plenty of "*issues*" that will need to be solved.
