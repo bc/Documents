@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np 
 
-mu, sigma = 100, 15
+"""mu, sigma = 100, 15
 x = mu + sigma*np.random.randn(10000)
 
 n, bins, patches = plt.hist(x, 50, normed = 1, facecolor = 'g', alpha = 0.75)
@@ -18,4 +18,13 @@ plt.show()
 #person = raw_input("Enter your name: ")
 #string = "Hello " + person
 #print string
+"""
+
+x = np.array([1.0,5.0,2.0])
+y = np.array([7,4,1])
+z = x**y
+a = []
+for i in z:
+	a.append(int(i))
+print a
 
