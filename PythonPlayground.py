@@ -1,13 +1,8 @@
 import matplotlib.pyplot as plt 
 
 import numpy as np 
-<<<<<<< HEAD
-
-"""mu, sigma = 100, 15
-=======
 """
 mu, sigma = 100, 15
->>>>>>> 0bb26770a2cdc155f4574353641581cda1772adf
 x = mu + sigma*np.random.randn(10000)
 
 n, bins, patches = plt.hist(x, 50, normed = 1, facecolor = 'g', alpha = 0.75)
@@ -25,7 +20,7 @@ person = raw_input("Enter your name: ")
 string = "Hello " + person
 print string
 
-<<<<<<< HEAD
+"""
 #person = raw_input("Enter your name: ")
 #string = "Hello " + person
 #print string
@@ -51,7 +46,6 @@ plt.setp(plt.xticks()[1])
 plt.title(r'$\Gamma(\theta) = \mathrm{sin}(\theta) + \mathrm{sin}(2\theta)$', fontsize = 20)
 plt.show()
 """
->>>>>>> 0bb26770a2cdc155f4574353641581cda1772adf
 
 HeightInches = 71
 DegreesToRadianFactor = 3.14159/180
