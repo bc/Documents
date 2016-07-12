@@ -46,7 +46,7 @@ plt.setp(plt.xticks()[1])
 plt.title(r'$\Gamma(\theta) = \mathrm{sin}(\theta) + \mathrm{sin}(2\theta)$', fontsize = 20)
 plt.show()
 """
-
+"""
 HeightInches = 71
 DegreesToRadianFactor = 3.14159/180
 ReleaseAngle = 30*DegreesToRadianFactor
@@ -69,3 +69,7 @@ InitialProjectileVelocity = np.sqrt(-490*((434.3+0.152*Height-FinalPositionInX-1
 							/((((np.cos(ReleaseAngle))**2)*(304.8-0.87*Height-FinalPositionInY)) \
 							-(np.sin(ReleaseAngle)*np.cos(ReleaseAngle)*(434.3+0.152*Height-FinalPositionInX))))
 print "Final Velocity is " + str(InitialProjectileVelocity/100) + " m/s"
+"""
+import pickle
+
+y = pickle.load(open('test.pkl','rb'))
