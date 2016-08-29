@@ -9,8 +9,8 @@ import random
 import sympy as sp 
 
 random.seed()
-#MomentArm1, MomentArm2, MomentArm3, MomentArm4 = [random.uniform(0.0,2.0) for i in range(4)]
-MomentArm1, MomentArm2, MomentArm3, MomentArm4 = [1, 1.0001, 2, 1]
+MomentArm1, MomentArm2, MomentArm3, MomentArm4 = [random.uniform(0.0,2.0) for i in range(4)]
+#MomentArm1, MomentArm2, MomentArm3, MomentArm4 = [1, 1.0001, 2, 1]
 # Define Moment Arm Matrix (R) as 1X4 Matrix with two positive and two negative
 # Moment Arm values to reflect a single joint with two muscle on either side
 # of the joint.
