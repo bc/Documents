@@ -15,6 +15,7 @@ MomentArm1, MomentArm2, MomentArm3, MomentArm4 = [1, 1, 1, 1]
 # Moment Arm values to reflect a single joint with two muscle on either side
 # of the joint.
 R = np.matrix([MomentArm1, MomentArm2, -MomentArm3, -MomentArm4])
+"""
 def force_length_curve(NormalizedMuscleLength):
 	if NormalizedMuscleLength < -0.5:
 		result = 0
@@ -27,7 +28,10 @@ def force_length_curve(NormalizedMuscleLength):
 	#else: 
 	#	result = 2.4*NormalizedMuscleLength**2
 	return(result)
-#force_length_curve = lambda x: 1-(x/0.5)**2 if np.abs(x)<=0.5 else 0
+"""
+force_length_curve = lambda x: 1-(x/0.5)**2 if np.abs(x)<=0.5 else 0
+PassiveConstant = 1
+passive_force_length_curve = lambda x: np.exp(PassiveConstant*x)-1 if x > 0 else 0
 def force_velocity_curve(NormalizedMuscleVelocity,b):
 		"""
 		NormalizedMuscleVelocity is a scalar and b is a coefficient
@@ -54,7 +58,9 @@ def maximum_muscle_force(OptimalLengths, Angle, AngularVelocity, R, OptimalForce
 	# We subtract one from every Normalized Muscle Length to find the percentage 
 	# above and below the optimal length.
 	
-	MaximumMuscleForce_FL = np.identity(4)*[force_length_curve(NormalizedMuscleLengths[0,i]) for i in range(4)]
+	MaximumMuscleForce_FL = np.identity(4)*[force_length_curve(NormalizedMuscleLengths[0,i]) \
+												+ passive_force_length_curve(NormalizedMuscleLengths[0,i]) \
+													for i in range(4)]
 
 	# Force-Velocity Considerations
 	CurrentMuscleVelocity = -R.T*AngularVelocity
@@ -63,7 +69,7 @@ def maximum_muscle_force(OptimalLengths, Angle, AngularVelocity, R, OptimalForce
 	MaximumMuscleForce_FV = np.identity(4)* \
 								[force_velocity_curve(NormalizedMuscleVelocity[i],1) \
 									for i in range(4)]
-	MaximumMuscleForce = MaximumMuscleForce_FL*MaximumMuscleForce_FV*[elem for elem in OptimalForces]
+	MaximumMuscleForce = (MaximumMuscleForce_FL+MaximumMuscleForce_FV)*[elem for elem in OptimalForces]
 	return(MaximumMuscleForce)
 
 def create_trajectory_and_derivatives(Amplitude, FrequencyOfOscillations, Time):
@@ -76,9 +82,9 @@ def create_trajectory_and_derivatives(Amplitude, FrequencyOfOscillations, Time):
 	AngularAcceleration = np.array([angular_acceleration.subs([(time,elem)]) for elem in Time])
 	return(Angle,AngularVelocity,AngularAcceleration)
 
-Time = np.arange(0,10,0.01)
+Time = np.arange(0,4,0.01)
 Amplitude = np.pi/4
-FrequencyOfOscillations = 2
+FrequencyOfOscillations = 1
 Angle, AngularVelocity, AngularAcceleration = create_trajectory_and_derivatives(Amplitude,FrequencyOfOscillations,Time)
 Mass = 10
 LinkLength = 1
