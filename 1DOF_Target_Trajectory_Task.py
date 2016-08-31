@@ -9,13 +9,25 @@ import random
 import sympy as sp 
 
 random.seed()
-MomentArm1, MomentArm2, MomentArm3, MomentArm4 = [random.uniform(0.0,2.0) for i in range(4)]
-#MomentArm1, MomentArm2, MomentArm3, MomentArm4 = [1, 1.0001, 2, 1]
+#MomentArm1, MomentArm2, MomentArm3, MomentArm4 = [random.uniform(0.0,2.0) for i in range(4)]
+MomentArm1, MomentArm2, MomentArm3, MomentArm4 = [1, 1, 1, 1]
 # Define Moment Arm Matrix (R) as 1X4 Matrix with two positive and two negative
 # Moment Arm values to reflect a single joint with two muscle on either side
 # of the joint.
 R = np.matrix([MomentArm1, MomentArm2, -MomentArm3, -MomentArm4])
-force_length_curve = lambda x: 1-(x/0.5)**2 if np.abs(x)<=0.5 else 0
+def force_length_curve(NormalizedMuscleLength):
+	if NormalizedMuscleLength < -0.5:
+		result = 0
+	elif NormalizedMuscleLength < 0:
+		sigma = 1
+		result = (1 + (1/(np.exp(1/(8*sigma**2))-1)))*np.exp(-NormalizedMuscleLength**2/(2*sigma**2)) - (1/(np.exp(1/(8*sigma**2))-1))
+		#1 - (NormalizedMuscleLength/0.5)**2
+	else:
+		result = np.exp(-NormalizedMuscleLength**2/0.036191) + 2.4*NormalizedMuscleLength**2
+	#else: 
+	#	result = 2.4*NormalizedMuscleLength**2
+	return(result)
+#force_length_curve = lambda x: 1-(x/0.5)**2 if np.abs(x)<=0.5 else 0
 def force_velocity_curve(NormalizedMuscleVelocity,b):
 		"""
 		NormalizedMuscleVelocity is a scalar and b is a coefficient
@@ -52,7 +64,7 @@ def maximum_muscle_force(OptimalLengths, Angle, AngularVelocity, R, OptimalForce
 								[force_velocity_curve(NormalizedMuscleVelocity[i],1) \
 									for i in range(4)]
 	MaximumMuscleForce = MaximumMuscleForce_FL*MaximumMuscleForce_FV*[elem for elem in OptimalForces]
-	return(MaximumMuscleForce,MaximumMuscleForce_FL,MaximumMuscleForce_FV)
+	return(MaximumMuscleForce)
 
 def create_trajectory_and_derivatives(Amplitude, FrequencyOfOscillations, Time):
 	time = sp.symbols('time',real = True)
@@ -66,18 +78,19 @@ def create_trajectory_and_derivatives(Amplitude, FrequencyOfOscillations, Time):
 
 Time = np.arange(0,10,0.01)
 Amplitude = np.pi/4
-FrequencyOfOscillations = 1
+FrequencyOfOscillations = 2
 Angle, AngularVelocity, AngularAcceleration = create_trajectory_and_derivatives(Amplitude,FrequencyOfOscillations,Time)
 Mass = 10
 LinkLength = 1
 OptimalLengths = np.matrix([10,10,10,10])
-OptimalForces = np.matrix([200,200,200,200])
+OptimalForces = [3500,3500,3500,3500]
+#OptimalForces = [random.uniform(3000.0,4000.0) for i in range(4)]
 Inertia = (1/3)*Mass*LinkLength**2
 TorqueDueToGravity = [-0.5*Mass*9.8*LinkLength*np.cos(float(theta)) for theta in Angle]
 SumOfMuscleTorques = [Inertia*float(AngularAcceleration[i]) - TorqueDueToGravity[i] for i in range(len(Time))]
 
 def construct_A_matrix(OptimalLengths, Angle, AngularVelocity, R, OptimalForces):
-	MaximumForceMatrix,_,_ = maximum_muscle_force(OptimalLengths, Angle, AngularVelocity, R, OptimalForces)
+	MaximumForceMatrix = maximum_muscle_force(OptimalLengths, Angle, AngularVelocity, R, OptimalForces)
 	A = np.concatenate((R*MaximumForceMatrix,-R*MaximumForceMatrix),axis=0)
 	return(np.array(A))
 def construct_b_vector(SumOfMuscleTorques, Epsilon):
@@ -99,8 +112,8 @@ plt.plot(Time,a_star)
 plt.xlabel('Time (s)')
 plt.ylabel('Muscle Activation')
 plt.legend(['Muscle 1','Muscle 2','Muscle 3','Muscle 4'])
-plt.title("R = [{}, {}, {}, {}]"\
-		.format(R[0,0],R[0,1],R[0,2],R[0,3]))
+plt.title("R = [{}, {}, {}, {}]\nF_max = [{}, {}, {}, {}]"\
+		.format(R[0,0],R[0,1],R[0,2],R[0,3],OptimalForces[0], OptimalForces[1], OptimalForces[2], OptimalForces[3]))
 
 plt.figure()
 ax2 = plt.gca()
