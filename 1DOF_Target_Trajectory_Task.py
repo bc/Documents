@@ -86,13 +86,13 @@ Time = np.arange(0,4,0.01)
 Amplitude = np.pi/4
 FrequencyOfOscillations = 1
 Angle, AngularVelocity, AngularAcceleration = create_trajectory_and_derivatives(Amplitude,FrequencyOfOscillations,Time)
-Mass = 10
+Mass = 100
 LinkLength = 1
 OptimalLengths = np.matrix([10,10,10,10])
 OptimalForces = [3500,3500,3500,3500]
 #OptimalForces = [random.uniform(3000.0,4000.0) for i in range(4)]
 Inertia = (1/3)*Mass*LinkLength**2
-TorqueDueToGravity = [-0.5*Mass*9.8*LinkLength*np.cos(float(theta)) for theta in Angle]
+TorqueDueToGravity = [-0.5*Mass*9.8*LinkLength*np.cos(float(np.pi/2)) for theta in Angle]
 SumOfMuscleTorques = [Inertia*float(AngularAcceleration[i]) - TorqueDueToGravity[i] for i in range(len(Time))]
 
 def construct_A_matrix(OptimalLengths, Angle, AngularVelocity, R, OptimalForces):
@@ -115,6 +115,8 @@ a_star = np.concatenate([[a[i]['x'] for i in range(len(Time))]])
 plt.figure()
 ax1 = plt.gca()
 plt.plot(Time,a_star)
+plt.plot(Time,Angle)
+plt.plot(Time,sum(a_star.T))
 plt.xlabel('Time (s)')
 plt.ylabel('Muscle Activation')
 plt.legend(['Muscle 1','Muscle 2','Muscle 3','Muscle 4'])
