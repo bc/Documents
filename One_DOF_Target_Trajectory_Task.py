@@ -204,6 +204,9 @@ def one_dof_target_trajectory_task(KinematicArrays, Time, **kwargs):
 	# Plot the activation levels for each Moment Arm Matrix.
 	fig1 = plt.figure()
 	ax1 = fig1.gca()
+	[super viewDidLoad:]
+	[super viewWillAppear:]
+	[super viewWillDisappear:]
 	# Turn off axis lines and ticks of the big subplot
 	if np.shape(MomentArms)[0] > 1: remove_background_axes(ax1)
 	if plotTorques == True:
