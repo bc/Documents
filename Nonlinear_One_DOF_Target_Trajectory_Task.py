@@ -72,6 +72,9 @@ def one_dof_target_trajectory_task_nonlinear(KinematicArrays, Time, **kwargs):
 
 	plotMaxTorques must be a boolean. If set to True, this will plot the maximum torques each muscle 
 	can produce during the motion. Default is set to False.
+
+	optimization is a string. Either 'linear' or 'quadratic' is acceptable and describes the solver used.
+	Default is set to 'linear'
 	~~~~~~~~~~~~~~~~~~
 	"""
 
@@ -88,11 +91,12 @@ def one_dof_target_trajectory_task_nonlinear(KinematicArrays, Time, **kwargs):
 	MomentArms = np.matrix(kwargs.get('MomentArms',np.matrix([1,1,-1,-1])))
 	OptimalLengths = np.matrix(kwargs.get('OptimalLengths',np.matrix([10,10,10,10])))
 	OptimalForces = np.matrix(kwargs.get('OptimalForces',np.matrix([3500,3500,3500,3500])))
-	Cost = kwargs.get('Cost',np.array([1,1,1,1]))
+	Cost = kwargs.get('Cost',[1.0,1.0,1.0,1.0])
 	plotFLV = kwargs.get('plotFLV', False)
 	plotTorques = kwargs.get('plotTorques', False)
 	plotMuscleForces = kwargs.get('plotMuscleForces', False)
 	plotMaxTorques = kwargs.get('plotMaxTorques', False)
+	optimization = kwargs.get('optimization','linear')
 
 	assert Mass > 0, "Mass must be greater than zero"
 	assert LinkLength > 0, "LinkLength must be greater than zero"
@@ -107,13 +111,14 @@ def one_dof_target_trajectory_task_nonlinear(KinematicArrays, Time, **kwargs):
 	assert np.shape(OptimalForces) == (1,4), "OptimalForces must be a 1x4 matrix"
 	assert 0 not in OptimalForces, "OptimalForces must have all nonzero entries"
 	assert False not in (OptimalForces>0), "OptimalForces must have all positive entries"
-	assert np.shape(Cost) == (4,), "Cost must be a 1x4 array"
+	assert np.shape(Cost) == (4,), "Cost must be a 1x4 list"
 	assert 0 not in Cost, "Cost must have all nonzero entries"
-	assert type(Cost) == np.ndarray, "In order to use linprog(), Cost must be a numpy array"
+	assert type(Cost) == list, "In order to use solver.qp(), Cost must be a list"
 	assert type(plotFLV) == bool, "plotFLV must be a boolean to determine if you want to plot FLV or not"
 	assert type(plotTorques) == bool, "plotTorques must be a boolean to determine if you want to plot torque levels"
 	assert type(plotMuscleForces) == bool, "plotMuscleForces must be a boolean to determine if you want to plot muscle force levels"
 	assert type(plotMaxTorques) == bool, "plotMaxTorques must be a boolean to determine if you want to plot maximum torques each muscle can produce"
+	assert optimization == 'linear' or optimization == 'quadratic', "optimization must either be 'linear' or 'quadratic'"
 
 	# Define remaining parameters
 	Angle, AngularVelocity, AngularAcceleration = KinematicArrays[0],KinematicArrays[1],KinematicArrays[2]
@@ -205,10 +210,14 @@ def one_dof_target_trajectory_task_nonlinear(KinematicArrays, Time, **kwargs):
 	def construct_b_vector(SumOfMuscleTorques, Epsilon):
 		b = co.matrix(SumOfMuscleTorques+Epsilon)
 		return(b)
-
-	QWeights = [1,1,1,1]
+	if optimization == 'linear':
+		QWeights = [0.0,0.0,0.0,0.0]
+		pWeights = Cost
+	else:
+		QWeights = Cost
+		pWeights = [0.0,0.0,0.0,0.0]
 	Q = construct_Q_matrix(QWeights)	
-	p = co.matrix([0.0]*len(QWeights))
+	p = co.matrix(pWeights)
 	G = construct_G_matrix(len(QWeights))
 	h = construct_h_array(len(QWeights))
 
