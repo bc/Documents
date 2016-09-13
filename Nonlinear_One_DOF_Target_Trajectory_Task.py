@@ -127,6 +127,7 @@ def one_dof_target_trajectory_task_nonlinear(KinematicArrays, Time, **kwargs):
 	SumOfMuscleTorques = [Inertia*float(AngularAcceleration[i]) - TorqueDueToGravity[i] for i in range(len(Time))]
 	Epsilon = 0.01	
 
+	"""
 	def force_length_curve(NormalizedMuscleLength):
 		if NormalizedMuscleLength < -0.5:
 			result = 0
@@ -140,7 +141,13 @@ def one_dof_target_trajectory_task_nonlinear(KinematicArrays, Time, **kwargs):
 		#else: 
 		#	result = 2.4*NormalizedMuscleLength**2
 		return(result)
-
+	"""
+	def force_length_curve(NormalizedMuscleLength):
+		w = 1.26
+		b = 2.30
+		p = 1.62
+		result = np.exp(-np.abs(((NormalizedMuscleLength+1)**b - 1)/w)**p) 
+		return(result)
 	#force_length_curve = lambda x: 1-(x/0.5)**2 if np.abs(x)<=0.5 else 0
 
 	def passive_force_length_curve(NormalizedMuscleLength):
@@ -148,12 +155,12 @@ def one_dof_target_trajectory_task_nonlinear(KinematicArrays, Time, **kwargs):
 		PassiveConstant = 9
 		result = PassiveAmplitudeAtZero*np.exp(PassiveConstant*NormalizedMuscleLength)
 		return(result)
-
+	"""	
 	def force_velocity_curve(NormalizedMuscleVelocity,b):
-		"""
+		""" """
 		NormalizedMuscleVelocity is a scalar and b is a coefficient
 		that can be changed to adjust the shape of the curve.
-		"""
+		""" """
 		if NormalizedMuscleVelocity < -5:
 			result = 0
 		elif NormalizedMuscleVelocity < 0:
@@ -161,7 +168,28 @@ def one_dof_target_trajectory_task_nonlinear(KinematicArrays, Time, **kwargs):
 		else:
 			result = (1.8 - 0.8*np.exp(-(b+5)*NormalizedMuscleVelocity/(4*b**2)))
 		return(result)
+	"""
+	def force_velocity_curve(NormalizedMuscleLength, NormalizedMuscleVelocity):
+		"""
+		NormalizedMuscleVelocity is a scalar.
+		"""
+		p = -5.34
+		q = 8.41
+		r = -4.70
 
+		a1 = 0.17
+		b1 = -0.69
+
+		a2 = p*(NormalizedMuscleLength+1)**2 + q*(NormalizedMuscleLength+1) + r
+		b2 = 0.18
+
+		if NormalizedMuscleVelocity < b1/a1:
+			result = 0
+		elif NormalizedMuscleVelocity <= 0:
+			result = (b1 - a1*NormalizedMuscleVelocity)/(b1 + NormalizedMuscleVelocity)
+		else:
+			result = (b2 - a2*NormalizedMuscleVelocity)/(b2 + NormalizedMuscleVelocity)
+		return(result)
 	def maximum_muscle_force(OptimalLengths, Angle, AngularVelocity, R, OptimalForces):
 		"""
 		OptimalLengths must be a 1X4 Matrix with optimal muscle lengths for 4 muscles.
@@ -185,7 +213,7 @@ def one_dof_target_trajectory_task_nonlinear(KinematicArrays, Time, **kwargs):
 		NormalizedMuscleVelocity = [CurrentMuscleVelocity[i,0]/OptimalLengths.T[i,0] for i in range(4)]
 		
 		MaximumMuscleForce_FV = np.identity(4)* \
-									[force_velocity_curve(NormalizedMuscleVelocity[i],1) \
+									[force_velocity_curve(NormalizedMuscleLengths[0,i],NormalizedMuscleVelocity[i]) \
 										for i in range(4)]
 		MaximumMuscleForce = (MaximumMuscleForce_FL+MaximumMuscleForce_FV)*[OptimalForces[0,i] for i in range(4)]
 		return(MaximumMuscleForce)
@@ -341,18 +369,18 @@ def one_dof_target_trajectory_task_nonlinear(KinematicArrays, Time, **kwargs):
 
 		plt.figure()
 		ax7 = plt.gca(projection = '3d')
-		l = np.arange(-0.6,0.6,0.05)
-		v = np.arange(-6,6,0.5)
+		l = np.arange(-0.4,0.2,0.05)
+		v = np.arange(-3,3,0.5)
 		F_L_Curve = [force_length_curve(x) for x in l]
 		Passive_F_L_Curve = [passive_force_length_curve(x) for x in l]
-		F_V_Curve = [force_velocity_curve(x,1) for x in v]
+		F_V_Curve = np.matrix([[force_velocity_curve(L,V) for V in v] for L in l])
 		L,V = np.meshgrid(l,v)
 		F = np.zeros((len(l),len(v)))
-		for i in range(len(l)):
-			for j in range(len(v)):
-				F[j,i] = F_L_Curve[i]+Passive_F_L_Curve[i]+F_V_Curve[j]
-		ax7.plot_surface(L, V, F, rstride=1, cstride=1, cmap=cm.coolwarm,
-		                       linewidth=0, antialiased=False)
+		for j in range(len(v)):
+			for i in range(len(l)):
+				F[i,j] = (F_L_Curve[i])*F_V_Curve[i,j]
+		ax7.plot_surface(L, V, F.T, rstride=1, cstride=1, cmap=cm.coolwarm,
+		                   linewidth=0, antialiased=False)
 
 
 	plt.figure()
