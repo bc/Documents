@@ -4,45 +4,9 @@ import matplotlib.pyplot as plt
 import warnings
 from math import isnan
 import time
+from scipy.io import loadmat
+import danpy.stuff as dp 
 
-def statusbar(i,N,**kwargs):
-    """
-    i is the current iteration (must be an int) and N is the length of 
-    the range (must be an int). i must also be in [0,N). 
-    
-    ~~~~~~~~~~~~~~
-    **kwargs
-    ~~~~~~~~~~~~~~
-    
-    StartTime should equal time.time() and should be defined before your
-    loop to ensure that you get an accurate representation of elapsed time.
-
-    Title should be a str that will be displayed before the statusbar. Title
-    should be no longer than 25 characters.
-
-    ~~~~~~~~~~~~~~
-
-    NOTE: you should place a print('\n') after the loop to ensure you
-    begin printing on the next line.
-
-    """
-    import time
-    StartTime = kwargs.get("StartTime",False)
-    Title = kwargs.get("Title",'')
-
-    assert type(i)==int, "i must be an int"
-    assert type(N)==int, "N must be an int"
-    assert N>i, "N must be greater than i"
-    assert N>0, "N must be a positive integer"
-    assert i>=0, "i must not be negative (can be zero)"
-    assert type(Title) == str, "Title should be a string"
-    assert len(Title) <= 25, "Title should be less than 25 characters"
-    if Title != '': Title = ' '*(25-len(Title)) + Title + ': '
-    statusbar = Title +'[' + '\u25a0'*int((i+1)/(N/50)) + '\u25a1'*(50-int((i+1)/(N/50))) + '] '
-    if StartTime != False:
-        print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) + 'sec        \r', end='')
-    else:
-        print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete           \r',end = '')
 def nan_test(x,xname):
 	assert type(xname)==str,'xname must be a string'
 	if type(x)==np.ndarray or type(x)==list: 
@@ -62,7 +26,7 @@ def generate_target_force_trajectory(TrajectoryType,Time,Amplitude,AmplitudeModu
 	    TargetForceTrajectory = AmplitudeModulation*np.sin(2*np.pi*FrequencyModulation*Time)+Amplitude
 	elif TrajectoryType == 'constant':
 		SamplingFrequency = 10000
-		TargetForceTrajectory = np.concatenate((np.zeros(SamplingFrequency), (Amplitude)*1/2*Time[:2*SamplingFrequency], Amplitude*np.ones(len(Time)-3*SamplingFrequency), Amplitude*np.ones(5000)))
+		TargetForceTrajectory = np.concatenate((np.zeros(SamplingFrequency), (Amplitude)*(1/2)*Time[:2*SamplingFrequency], Amplitude*np.ones(len(Time)-3*SamplingFrequency), Amplitude*np.ones(5000)))
 		TargetForceTrajectory = smooth(TargetForceTrajectory,500)
 		TargetForceTrajectory = TargetForceTrajectory[:-5000]
 	    #TargetForceTrajectory = [Amplitude*np.ones(1,len(Time))]
@@ -96,7 +60,14 @@ def generate_target_force_trajectory(TrajectoryType,Time,Amplitude,AmplitudeModu
 		# 3%MVC + 10s hold => 
 	"""
 	return(TargetForceTrajectory)
-def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,TargetTrajectory,CorticalInput,**kwargs):
+def test_generate_target_force_trajectory():
+	SamplingFrequency = 10000
+	Time = np.arange(0,15,1/SamplingFrequency) #0:1/SamplingFrequency:15
+	targetType = 'constant' #'triangle','sinwave','trapezoid' (Still need to do Trap)
+	TargetForceTrajectory = generate_target_force_trajectory(targetType,Time,0.3,0,0) # has shape (150000,)
+	MatlabTargetForceTrajectory = loadmat('targetTrajectory.mat')['targetTrajectory'][:-1,0] # targetTrajectory has shape (150001,1)
+	Error=(TargetForceTrajectory-MatlabTargetForceTrajectory)**2	
+def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,TargetForceTrajectory,CorticalInput,**kwargs):
 	"""
 	muscle_parameters must be a dictionary with "Pennation Angle", "Muscle Mass",
 	"Optimal Length", "Tendon Length", "Initial Muscle Length", and "Initial Tendon Length"
@@ -146,6 +117,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 
 	import numpy as np 
 	from scipy import signal
+	import control
 	import random
 	import matplotlib.pyplot as plt
 
@@ -169,7 +141,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	MuscleRateConstant = 0.046 #0.04, 0.056
 	RestingMuscleLength = 1.17  #1.35, 1.41
 	PassiveMuscleForce = MuscleConstant * MuscleRateConstant * np.log(np.exp((1 - RestingMuscleLength)/MuscleRateConstant)+1)
-	NormalizedSeriesElasticLength = TendonRateConstant*np.log(np.exp(PassiveMuscleForce/TendonConstant/TendonRateConstant)+1)+NormalizedRestingTendonLength        
+	NormalizedSeriesElasticLength = TendonRateConstant*np.log(np.exp(PassiveMuscleForce/TendonConstant/TendonRateConstant)-1)+NormalizedRestingTendonLength        
 	SeriesElasticLength = TendonLength * NormalizedSeriesElasticLength
 
 	MaximumMusculoTendonLength = OptimalLength * np.cos(PennationAngle) + TendonLength + 0.5
@@ -211,16 +183,16 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 
 	SamplingFrequency = 10000
 	FeedbackSamplingFrequency = 1000
-	Time = np.arange(0,len(TargetTrajectory)/SamplingFrequency,1/SamplingFrequency) # 0:1/SamplingFrequency:(length(TargetTrajectory)-1)/SamplingFrequency
+	Time = np.arange(0,len(TargetForceTrajectory)/SamplingFrequency,1/SamplingFrequency) # 0:1/SamplingFrequency:(length(TargetForceTrajectory)-1)/SamplingFrequency
 
 	# parameter initialization
 	empty = np.zeros(len(Time))
-	ContractileElementVelocity = 0
-	ContractileElementAcceleration = 0
+	ContractileElementVelocity = 0 # Normalized by optimal lenth
+	ContractileElementAcceleration = 0 # Normalized by optimal lenth
 	MuscleAcceleration = empty
 	MuscleVelocity = empty
 	MuscleLength = np.concatenate((np.array([ContractileElementLength*OptimalLength/100]),np.zeros(len(Time)-1)))
-	SeriesElasticElementForce = 0.105
+	SeriesElasticElementForce = 0.105 # zero activation force from SEE
 
 	# filter parameters for Noise
 	BButtersCoefficients,AButtersCoefficients = signal.butter(4,100/(SamplingFrequency/2),'low')
@@ -238,8 +210,8 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	ActivationFrequency = 0
 	EffectiveNeuralDrive = 0
 
-	DynamicSpindleForce = 0
-	StaticSpindleForce = 0
+	DynamicSpindleFrequency = 0
+	StaticSpindleFrequency = 0
 	Bag1TensionSecondDeriv = 0
 	Bag1TensionFirstDeriv = 0
 	Bag1Tension = 0
@@ -255,7 +227,12 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	GTOConstant2 = 4
 
 	Num,Den = [1.7,2.58,0.4],[1,2.2,0.4]
-	TransferFunction = signal.TransferFunction(Num,Den)
+	ContinuousTransferFunction = control.tf(Num,Den)
+	DiscreteTransferFunction = control.matlab.c2d(ContinuousTransferFunction,1/FeedbackSamplingFrequency)
+	Num,Den = control.matlab.tfdata(DiscreteTransferFunction)
+	Num,Den = Num[0][0],Den[0][0]
+
+
 	#Hd = signal.TransferFunction(Num,Den,dt = 1/FeedbackSamplingFrequency) #c2d(TransferFunction,1/FeedbackSamplingFrequency)
 
 	## Transcortical loop
@@ -278,9 +255,9 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	Count = 0
 
 	# Convert force trajectory to unit of newton
-	TargetForceTrajectory = TargetTrajectory*MaximumContractileElementForce
+	TargetForceTrajectory = TargetForceTrajectory*MaximumContractileElementForce
 
-	def bag1_model(Length,LengthFirstDeriv,LengthSecondDeriv,DynamicSpindleForce,Bag1TensionFirstDeriv,Bag1Tension):
+	def bag1_model(Length,LengthFirstDeriv,LengthSecondDeriv,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension):
 		## Feedback system parameters
 		## Spindle Model
 		p = 2
@@ -299,15 +276,15 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		else:
 		    C = 0.42       
 		
-		DynamicSpindleForceFirstDeriv = (GammaDynamicGain**p/(GammaDynamicGain**p+Bag1Frequency**p) - DynamicSpindleForce)\
+		DynamicSpindleForceFirstDeriv = (GammaDynamicGain**p/(GammaDynamicGain**p+Bag1Frequency**p) - DynamicSpindleFrequency)\
 											/ Bag1TimeConstant
-		DynamicSpindleForce = (1/SamplingFrequency)*DynamicSpindleForceFirstDeriv + DynamicSpindleForce
+		DynamicSpindleFrequency = (1/SamplingFrequency)*DynamicSpindleForceFirstDeriv + DynamicSpindleFrequency
 
 		#nan_test(DynamicSpindleForceFirstDeriv,'DynamicSpindleForceFirstDeriv')
-		#nan_test(DynamicSpindleForce,'DynamicSpindleForce')
+		#nan_test(DynamicSpindleFrequency,'DynamicSpindleFrequency')
 
-		Bag1Beta = Bag1BetaNot + Bag1Beta * DynamicSpindleForce
-		Bag1Gamma = Bag1Gamma * DynamicSpindleForce
+		Bag1Beta = Bag1BetaNot + Bag1Beta * DynamicSpindleFrequency
+		Bag1Gamma = Bag1Gamma * DynamicSpindleFrequency
 
 		R = 0.46 #length dependency of the force-velocity relationship
 		a = 0.3
@@ -338,148 +315,10 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 
 		#nan_test(Bag1AP,'Bag1AP')
 
-		return(Bag1AP,DynamicSpindleForce,Bag1TensionFirstDeriv,Bag1Tension)
-	def bag2_model(Length,LengthFirstDeriv,LengthSecondDeriv,StaticSpindleForce,Bag2TensionFirstDeriv,Bag2Tension):
-		## Feedback system parameters
-		## spindle_model Model
-		p = 2
-
-		Bag2TimeConstant = 0.205
-		Bag2Frequency = 60
-
-		Bag2BetaNot = 0.0822
-		Bag2Beta = -0.046
-		Bag2Gamma = 0.0636
-
-		if LengthFirstDeriv >= 0:
-		    C = 1 #constant describing the np.experimentally observed asymmetric effect of velocity on force production during lengthening and shortening
-		else:
-		    C = 0.42
-
-		G = 10000 #7250 #3800
-
-		StaticSpindleForceFirstDeriv = (GammaStaticGain**p/(GammaStaticGain**p+Bag2Frequency**p)-StaticSpindleForce) \
-											/ Bag2TimeConstant
-		StaticSpindleForce = (1/SamplingFrequency)*StaticSpindleForceFirstDeriv + StaticSpindleForce
-
-		#nan_test(StaticSpindleForceFirstDeriv,'StaticSpindleForceFirstDeriv')
-		#nan_test(StaticSpindleForce,'StaticSpindleForce')
-
-		Bag2Beta = Bag2BetaNot + Bag2Beta * StaticSpindleForce
-		Bag2Gamma = Bag2Gamma * StaticSpindleForce
-
-		R = 0.46 #length dependency of the force-velocity relationship
-		a = 0.3
-		K_SR = 10.4649
-		K_PR = 0.15
-		M = 0.0002 # intrafusal fiber mass
-
-		LN_SR = 0.0423
-		LN_PR = 0.89
-
-		L0_SR = 0.04 #in units of L0
-		L0_PR = 0.76 #polar region rest length
-
-		L_secondary = 0.04
-		X = 0.7
-
-		Bag2TensionSecondDeriv = (K_SR/M)*(	(C*Bag2Beta*np.sign(LengthFirstDeriv-Bag2TensionFirstDeriv/K_SR)  \
-												*((abs(LengthFirstDeriv-Bag2TensionFirstDeriv/K_SR))**a)  \
-												*(Length-L0_SR-Bag2Tension/K_SR-R)+K_PR  \
-												*(Length-L0_SR-Bag2Tension/K_SR-L0_PR))  \
-											+ M*LengthSecondDeriv \
-											+ Bag2Gamma \
-											- Bag2Tension )
-		Bag2TensionFirstDeriv = Bag2TensionSecondDeriv*(1/SamplingFrequency) + Bag2TensionFirstDeriv
-		Bag2Tension = Bag2TensionFirstDeriv*(1/SamplingFrequency) + Bag2Tension
-
-		#nan_test(Bag2TensionSecondDeriv,'Bag2TensionSecondDeriv')
-		#nan_test(Bag2TensionFirstDeriv,'Bag2TensionFirstDeriv')
-		#nan_test(Bag2Tension,'Bag2Tension')
-
-		Bag2APPrimary = G*(Bag2Tension/K_SR-(LN_SR-L0_SR))
-		Bag2APSecondary = G*(	X*(L_secondary/L0_SR)*(Bag2Tension/K_SR-(LN_SR-L0_SR)) \
-								+(1-X)*(L_secondary/L0_PR)*(Length-Bag2Tension/K_SR-(L0_SR+LN_PR))	)
-
-		#nan_test(Bag2APPrimary,'Bag2APPrimary')
-		#nan_test(Bag2APSecondary,'Bag2APSecondary')
-
-		return(Bag2APPrimary,Bag2APSecondary,StaticSpindleForce,Bag2TensionFirstDeriv,Bag2Tension)
-	def chain_model(Length,LengthFirstDeriv,LengthSecondDeriv,ChainTensionFirstDeriv,ChainTension):
-		## Feedback system parameters
-		## spindle_model Model
-		p = 2
-
-		ChainFrequency = 90
-
-		ChainBetaNot = 0.0822
-		ChainBeta = - 0.069
-		ChainGamma = 0.0954
-
-		if LengthFirstDeriv >= 0:
-		    C = 1 #constant describing the np.experimentally observed asymmetric effect of velocity on force production during lengthening and shortening
-		else:
-		    C = 0.42
-
-		G = 10000 #7250    #3000
-
-		ChainStaticSpindleForce = GammaStaticGain**p/(GammaStaticGain**p+ChainFrequency**p)
-
-		#nan_test(ChainStaticSpindleForce,'ChainStaticSpindleForce')
-
-		ChainBeta = ChainBetaNot + ChainBeta * ChainStaticSpindleForce
-		ChainGamma = ChainGamma * StaticSpindleForce
-
-		R = 0.46 #length dependency of the force-velocity relationship
-		a = 0.3
-		K_SR = 10.4649
-		K_PR = 0.15
-		M = 0.0002 # intrafusal fiber mass
-
-		LN_SR = 0.0423
-		LN_PR = 0.89
-
-		L0_SR = 0.04 #in units of L0
-		L0_PR = 0.76 #polar region rest length
-
-		L_secondary = 0.04
-		X = 0.7
-
-		ChainTensionSecondDeriv = K_SR/M * (C * ChainBeta * np.sign(LengthFirstDeriv-ChainTensionFirstDeriv/K_SR)*((abs(LengthFirstDeriv-ChainTensionFirstDeriv/K_SR))**a)*(Length-L0_SR-ChainTension/K_SR-R)+K_PR*(Length-L0_SR-ChainTension/K_SR-L0_PR)+M*LengthSecondDeriv+ChainGamma-ChainTension)
-		ChainTensionFirstDeriv = ChainTensionSecondDeriv*1/SamplingFrequency + ChainTensionFirstDeriv
-		ChainTension = ChainTensionFirstDeriv*1/SamplingFrequency + ChainTension
-
-		#nan_test(ChainTensionSecondDeriv,'ChainTensionSecondDeriv')
-		#nan_test(ChainTensionFirstDeriv,'ChainTensionFirstDeriv')
-		#nan_test(ChainTension,'ChainTension')
-
-		ChainAPPrimary = G*(ChainTension/K_SR-(LN_SR-L0_SR))
-		ChainAPSecondary = G*(	X*(L_secondary/L0_SR)*(ChainTension/K_SR-(LN_SR-L0_SR)) \
-									+ (1-X)*(L_secondary/L0_PR)*(Length-ChainTension/K_SR-(L0_SR+LN_PR))	)
-
-		#nan_test(ChainAPPrimary,'ChainAPPrimary')
-		#nan_test(ChainAPSecondary,'ChainAPSecondary')
-
-		return(ChainAPPrimary,ChainAPSecondary,ChainTensionFirstDeriv,ChainTension)
-	def spindle_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,\
-		DynamicSpindleForce,Bag1TensionFirstDeriv,Bag1Tension,\
-		StaticSpindleForce,Bag2TensionFirstDeriv,Bag2Tension,\
-		ChainTensionFirstDeriv,ChainTension):
-
-		S = 0.156
-
-		Bag1AP,DynamicSpindleForce,Bag1TensionFirstDeriv,Bag1Tension = bag1_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,DynamicSpindleForce,Bag1TensionFirstDeriv,Bag1Tension)
-		Bag2APPrimary,Bag2APSecondary,StaticSpindleForce,Bag2TensionFirstDeriv,Bag2Tension = bag2_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,StaticSpindleForce,Bag2TensionFirstDeriv,Bag2Tension)
-		ChainAPPrimary,ChainAPSecondary,ChainTensionFirstDeriv,ChainTension = chain_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,ChainTensionFirstDeriv,ChainTension)
-
-		if Bag1AP < 0: Bag1AP = 0 
-		if Bag2APPrimary < 0: Bag2APPrimary = 0
-		if ChainAPPrimary < 0: ChainAPPrimary = 0
-		if Bag2APSecondary < 0: Bag2APSecondary = 0
-		if ChainAPSecondary < 0: ChainAPSecondary = 0	        
-
-		if Bag1AP > (Bag2APPrimary+ChainAPPrimary):
-		    Larger = Bag1AP
+		return(Bag1AP,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension)
+	def bag2_model(Length,LengthFirstDeriv,LengthSecondDeriv,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tensiorequency,Bag2TensionFirstDeriv,Bag2Tension)
+	def chain_model(Length,LengthFirstDeriv,LengthSecondDeriv,ChainTensionFirstDeriv,ChainTensiorequencyinAPSecondary,ChainTensionFirstDeriv,ChainTension)
+	def spindle_model(ContractileElementLength,ContractieElementVelocity,CotractileElementAcceleratiorequencyr = Bag1AP
 		    Smaller = Bag2APPrimary+ChainAPPrimary
 		else:
 		    Larger = Bag2APPrimary+ChainAPPrimary
@@ -673,8 +512,8 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 			IbInput[i] = 0
 		elif FeedbackOption == 'servo_control': # Servo control (feedforward + spindle and GTO)
 			PrimaryOutput,SecondaryOutput = spindle_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,\
-													DynamicSpindleForce,Bag1TensionFirstDeriv,Bag1Tension,\
-													StaticSpindleForce,Bag2TensionFirstDeriv,Bag2Tension,\
+													DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
+													StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
 													ChainTensionFirstDeriv,ChainTension)
 			IaInput[i] = PrimaryOutput
 			IIInput[i] = SecondaryOutput
@@ -735,8 +574,8 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	
 		elif FeedbackOption == 'fb_control': # Feedback control (proprioceptive systems + supraspinal loop)
 			PrimaryOutput,SecondaryOutput = spindle_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,\
-													DynamicSpindleForce,Bag1TensionFirstDeriv,Bag1Tension,\
-													StaticSpindleForce,Bag2TensionFirstDeriv,Bag2Tension,\
+													DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
+													StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
 													ChainTensionFirstDeriv,ChainTension)
 			IaInput[i] = PrimaryOutput
 			IIInput[i] = SecondaryOutput
@@ -943,7 +782,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		OutputForcePassive1[i] = ForcePassive1
 		OutputForcePassive2[i] = ForcePassive2
 		#OptimalLength = OptimalLength_initial*(0.15*(1-act)+1)
-		statusbar(i,len(Time),StartTime=StartTime,Title = 'afferented_muscle_model')
+		dp.statusbar(i,len(Time),StartTime=StartTime,Title = 'afferented_muscle_model')
 
 	plt.figure()
 	plt.plot(Time,OutputForceTendon)
@@ -999,21 +838,21 @@ gain_parameters = {"Gamma Dynamic Gain" : 70, \
 SamplingFrequency = 10000
 Time = np.arange(0,15,1/SamplingFrequency) #0:1/SamplingFrequency:15
 targetType = 'constant' #'triangle','sinwave','trapezoid' (Still need to do Trap)
-targetTrajectory = generate_target_force_trajectory(targetType,Time,0.3,0,0) # in unit of #MVC
+TargetForceTrajectory = generate_target_force_trajectory(targetType,Time,0.3,0,0) # in unit of #MVC
 
 # Define additional input to muscle (e.g., 20 Hz oscillatory input)
-# amplitude = 1/10*targetTrajectory' # in unit of #MVC
+# amplitude = 1/10*TargetForceTrajectory' # in unit of #MVC
 # frequency = 20 # in unit of Hz
 # CorticalInput = amplitude.*sin(2*pi*requency*Time)
-CorticalInput = np.zeros(len(targetTrajectory))
+CorticalInput = np.zeros(len(TargetForceTrajectory))
 
 FeedbackOption = 'fb_control'
 if FeedbackOption == 'ff_only':
     FeedbackOptionString = 'FF'
-    targetTrajectory = 1.028*targetTrajectory
+    TargetForceTrajectory = 1.028*TargetForceTrajectory
 elif FeedbackOption == 'servo_control':
     FeedbackOptionString = 'SC'
-    targetTrajectory = 0.9285*targetTrajectory
+    TargetForceTrajectory = 0.9285*TargetForceTrajectory
 elif FeedbackOption == 'fb_control':
     FeedbackOptionString = 'FB'
 elif FeedbackOption == 'option_4':
@@ -1026,7 +865,7 @@ PXX = []
 Range = np.zeros(NumberOfTrials)
 for i in range(NumberOfTrials): #trialN = 1:10
 	#rng('shufle')
-	output = afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,targetTrajectory,CorticalInput,FeedbackOption = FeedbackOption)    
+	output = afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,TargetForceTrajectory,CorticalInput,FeedbackOption = FeedbackOption)    
 	Output = np.concatenate((Output,[output]))
 	#f,pxx = welch(output['ForceTendon'][-10*SamplingFrequency-1:]-np.average(output['ForceTendon'][-10*SamplingFrequency-1:]),window = gaussian(5*SamplingFrequency,(5*SamplingFrequency-1)/(2*2.5)),\
 	#							noverlap = SamplingFrequency,nperseg = len(gaussian(5*SamplingFrequency,(5*SamplingFrequency-1)/(2*2.5))), fs = SamplingFrequency) 
