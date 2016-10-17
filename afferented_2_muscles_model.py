@@ -3,10 +3,9 @@ from scipy.signal import sawtooth,square,gaussian,welch
 import matplotlib.pyplot as plt
 import time
 import ipdb
-import danpy.stuff as dp
 from amm_functions import smooth, generate_target_force_trajectory
 
-def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
+def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 							delay_1_parameters,delay_2_parameters,\
 							gain_1_parameters,gain_2_parameters,
 							TargetTrajectory1,TargetTrajectory2,\
@@ -107,120 +106,6 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 	InitialTendonLength2 = muscle_2_parameters['Initial Tendon Length']
 	InitialMusculoTendonLength2 = InitialMuscleLength2*np.cos(PennationAngle2)+InitialTendonLength2
 
-	def return_initial_values(PennationAngle,MuscleMass,OptimalLength,OptimalTendonLength,\
-		InitialMuscleLength,InitialTendonLength,InitialMusculoTendonLength):
-
-		# calculate initial length based on balance between stiffness of muscle and
-		# tendon
-		TendonConstant = 27.8
-		TendonRateConstant = 0.0047
-		NormalizedRestingTendonLength = 0.964
-
-		MuscleConstant = 23.0  #355, 67.1
-		MuscleRateConstant = 0.046 #0.04, 0.056
-		RestingMuscleLength = 1.17  #1.35, 1.41
-		PassiveMuscleForce = float(MuscleConstant * MuscleRateConstant * np.log(np.exp((1 - RestingMuscleLength)/MuscleRateConstant)+1))
-		NormalizedSeriesElasticLength = float(TendonRateConstant*np.log(np.exp(PassiveMuscleForce/TendonConstant/TendonRateConstant)-1)+NormalizedRestingTendonLength)
-		SeriesElasticLength = float(TendonLength * NormalizedSeriesElasticLength)
-
-		# dp.compare(PassiveMuscleForce,0.0260)
-		# dp.compare(NormalizedSeriesElasticLength,0.9677)
-
-		MaximumMusculoTendonLength = float(OptimalLength * np.cos(PennationAngle) + TendonLength + 0.5)
-		NormalizedMaximumFascicleLength = float((MaximumMusculoTendonLength - SeriesElasticLength)/OptimalLength)
-		MaximumContractileElementLength = float(NormalizedMaximumFascicleLength/np.cos(PennationAngle)) # Contractile Element = Muscle
-
-		# dp.compare(MaximumMusculoTendonLength,34.0616)
-		# dp.compare(NormalizedSeriesElasticLength,0.9677)
-
-		# dp.nan_test(PassiveMuscleForce,'PassiveMuscleForce')
-		# dp.nan_test(NormalizedSeriesElasticLength,'NormalizedSeriesElasticLength')
-		# dp.nan_test(MaximumMusculoTendonLength,'MaximumMusculoTendonLength')
-		# dp.nan_test(SeriesElasticLength,'SeriesElasticLength')
-		# dp.nan_test(NormalizedMaximumFascicleLength,'NormalizedMaximumFascicleLength')
-		# dp.nan_test(MaximumContractileElementLength,'MaximumContractileElementLength')
-
-		InitialLength = float((InitialMusculoTendonLength+OptimalTendonLength\
-								*((TendonRateConstant/MuscleRateConstant)*RestingMuscleLength-NormalizedRestingTendonLength\
-								- TendonRateConstant*np.log((MuscleConstant/TendonConstant)*(MuscleRateConstant/TendonRateConstant))))\
-								/(100*(1+TendonRateConstant/MuscleRateConstant*OptimalTendonLength/MaximumContractileElementLength*(1/OptimalLength))*np.cos(PennationAngle)))
-		ContractileElementLength = float(InitialLength/(OptimalLength/100)) # initializing CE Length
-		SeriesElasticElementLength = float((InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength) # MTU - initial muscle = initial SEE length
-
-		# dp.compare(InitialLength,0.1066)
-		# dp.nan_test(InitialLength,'InitialLength')
-		# dp.nan_test(ContractileElementLength,'ContractileElementLength')
-		# dp.nan_test(SeriesElasticElementLength,'SeriesElasticElementLength')
-
-		# calculate maximal force output of the muscle based on PCSA
-		MuscleDensity = 1.06 #g/cm**3
-		PCSA = (MuscleMass*1000)/MuscleDensity/OptimalLength #physionp.logical cross-sectional area
-		SpecificTension = 31.4 # WHERE DOES THIS COME FROM AND WHAT DOES IT MEAN? N/
-		MaximumContractileElementForce = PCSA * SpecificTension
-
-		# parameter initialization
-		ContractileElementVelocity = 0
-		ContractileElementAcceleration = 0
-		MuscleAcceleration = [0]
-		MuscleVelocity = [0]
-		MuscleLength = [ContractileElementLength*OptimalLength/100]
-		SeriesElasticElementForce = 0.105
-
-		# Activation dynamics parameters
-		Y_dot = 0
-		Y = 0
-		Saf_dot = 0
-		Saf = 0
-		fint_dot = 0
-		fint = 0
-		feff_dot = 0
-		feff = 0
-
-		ActivationFrequency = 0
-		EffectiveMuscleActivation = 0
-
-		DynamicSpindleFrequency = 0
-		StaticSpindleFrequency = 0
-		Bag1TensionSecondDeriv = 0
-		Bag1TensionFirstDeriv = 0
-		Bag1Tension = 0
-		Bag2TensionSecondDeriv = 0
-		Bag2TensionFirstDeriv = 0
-		Bag2Tension = 0
-		ChainTensionSecondDeriv = 0
-		ChainTensionFirstDeriv = 0
-		ChainTension = 0
-
-		Input, IaInput, IIInput = [],[],[]
-		IbInput, x, TemporaryIbInput = [],[],[]
-		Noise, FilteredNoise, LongInput = [],[],[]
-		OutputForceMuscle,OutputForceTendon,OutputForceLength = [], [], []
-		OutputForceVelocity,OutputForcePassive1,OutputForcePassive2 = [], [], []
-		OutputSeriesElasticElementLength,OutputContractileElementVelocity = [(InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength], []
-		OutputContractileElementLength = [InitialLength/(OptimalLength/100)]
-		OutputContractileElementAcceleration,OutputActivationFrequency,OutputEffectiveMuscleActivation = [], [], []
-
-		return(PassiveMuscleForce,NormalizedSeriesElasticLength,SeriesElasticLength,\
-				MaximumMusculoTendonLength,NormalizedMaximumFascicleLength,MaximumContractileElementLength, \
-				InitialLength,ContractileElementLength,SeriesElasticElementLength, \
-				MaximumContractileElementForce,ContractileElementVelocity,ContractileElementAcceleration, \
-				MuscleAcceleration,MuscleVelocity,MuscleLength, \
-				SeriesElasticElementForce,Y_dot,Y, \
-				Saf_dot,Saf,fint_dot, \
-				fint,feff_dot,feff, \
-				ActivationFrequency,EffectiveMuscleActivation,DynamicSpindleFrequency, \
-				StaticSpindleFrequency,Bag1TensionSecondDeriv,Bag1TensionFirstDeriv, \
-				Bag1Tension,Bag2TensionSecondDeriv,Bag2TensionFirstDeriv, \
-				Bag2Tension,ChainTensionSecondDeriv,ChainTensionFirstDeriv, \
-				ChainTension,Input, IaInput, \
-				IIInput, IbInput, x, \
-				TemporaryIbInput, Noise, FilteredNoise, \
-				LongInput,OutputForceMuscle,OutputForceTendon,\
-				OutputForceLength,OutputForceVelocity,OutputForcePassive1,\
-				OutputForcePassive2,OutputSeriesElasticElementLength,OutputContractileElementVelocity,\
-				OutputContractileElementLength,OutputContractileElementAcceleration,OutputActivationFrequency,\
-				OutputEffectiveMuscleActivation)
-
 	PassiveMuscleForce1,NormalizedSeriesElasticLength1,SeriesElasticLength1,\
 			MaximumMusculoTendonLength1,NormalizedMaximumFascicleLength1,MaximumContractileElementLength1, \
 			InitialLength1,ContractileElementLength1,SeriesElasticElementLength1, \
@@ -265,7 +150,7 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 			OutputEffectiveMuscleActivation2 \
 				= return_initial_values(PennationAngle2,MuscleMass2,OptimalLength2,OptimalTendonLength2,\
 										InitialMuscleLength2,InitialTendonLength2,InitialMusculoTendonLength2)
-	#dp.nan_test(PCSA,'PCSA')
+	#nan_test(PCSA,'PCSA')
 
 	# visnp.cosity of muscle (ref: Elias et al. 2014)
 	MuscleViscosity = 0.005 #0.001
@@ -292,8 +177,8 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 	# filter parameters for Noise
 	BButtersCoefficients,AButtersCoefficients = signal.butter(4,100/(SamplingFrequency/2),'low')
 
-	# dp.compare(BButtersCoefficients,np.array([0.0898e-05, 0.3594e-05, 0.5391e-05, 0.3594e-05, 0.0898e-05]))
-	# dp.compare(AButtersCoefficients,np.array([1.0000, -3.8358,  5.5208, -3.5335,  0.8486]))
+	# compare(BButtersCoefficients,np.array([0.0898e-05, 0.3594e-05, 0.5391e-05, 0.3594e-05, 0.0898e-05]))
+	# compare(AButtersCoefficients,np.array([1.0000, -3.8358,  5.5208, -3.5335,  0.8486]))
 
 	## GTO model
 	GTOConstant1 = 60
@@ -305,8 +190,8 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 	Num,Den = control.matlab.tfdata(DiscreteTransferFunction)
 	Num,Den = Num[0][0],Den[0][0]
 
-	# dp.compare(Num,np.array([1.7000,-3.3974, 1.6974]))
-	# dp.compare(Den,np.array([1.0000,-1.9978,0.9978]))
+	# compare(Num,np.array([1.7000,-3.3974, 1.6974]))
+	# compare(Den,np.array([1.0000,-1.9978,0.9978]))
 
 	## Transcortical loop
 	TransCorticalLoopConstant = 0.01
@@ -347,7 +232,7 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 	# assert IIAfferentDelayTimeStep2 == IIAfferentDelay2*SamplingRatio, "Delay Time Step Mismatch!"
 	# assert IbAfferentDelayTimeStep2 == IbAfferentDelay2*SamplingRatio, "Delay Time Step Mismatch!"
 	# assert CorticalDelayTimeStep2 == CorticalDelay2*SamplingRatio, "Delay Time Step Mismatch!"
-	# assert EfferentDelayTimeStep2 == EfferentDelay2*SamplingRatio, "Delay Time Step Mismatch!"
+	# assert EfferentDelayTimeStep12 == EfferentDelay2*SamplingRatio, "Delay Time Step Mismatch!"
 
 	FeedbackInput1, FeedbackInput2 = 0,0
 	Count = 0
@@ -358,377 +243,6 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 	FeedforwardInput1 = TargetForceTrajectory1/MaximumContractileElementForce1
 	FeedforwardInput2 = TargetForceTrajectory2/MaximumContractileElementForce2
 
-	def bag1_model(Length,LengthFirstDeriv,LengthSecondDeriv,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension):
-		## Feedback system parameters
-		## Spindle Model
-		p = 2
-
-		Bag1TimeConstant = 0.149
-		Bag1Frequency = 60
-
-		Bag1BetaNot = 0.0605
-		Bag1Beta = 0.2592
-		Bag1Gamma = 0.0289
-
-		G = 20000  #7000
-
-		C = 0.58*(LengthFirstDeriv >= 0) + 0.42 # when true C = 1 else, C = 0.42       
-		
-		DynamicSpindleFrequencyFirstDeriv = (GammaDynamicGain**p/(GammaDynamicGain**p+Bag1Frequency**p) - DynamicSpindleFrequency)\
-										/ Bag1TimeConstant
-		DynamicSpindleFrequency = (SamplingPeriod)*DynamicSpindleFrequencyFirstDeriv + DynamicSpindleFrequency
-
-		#dp.nan_test(DynamicSpindleFrequencyFirstDeriv,'DynamicSpindleFrequencyFirstDeriv')
-		#dp.nan_test(DynamicSpindleFrequency,'DynamicSpindleFrequency')
-
-		Bag1Beta = Bag1BetaNot + Bag1Beta * DynamicSpindleFrequency
-		Bag1Gamma = Bag1Gamma * DynamicSpindleFrequency
-
-		R = 0.46 #length dependency of the force-velocity relationship
-		a = 0.3
-		K_SR = 10.4649
-		K_PR = 0.15
-		M = 0.0002 # intrafusal fiber mass
-
-		LN_SR = 0.0423
-
-		L0_SR = 0.04 #in units of L0
-		L0_PR = 0.76 #polar region rest length
-
-		Bag1TensionSecondDeriv = (K_SR/M)*(	(C*Bag1Beta*np.sign(LengthFirstDeriv-Bag1TensionFirstDeriv/K_SR) \
-											* ((abs(LengthFirstDeriv-Bag1TensionFirstDeriv/K_SR))**a)  \
-											* (Length-L0_SR-Bag1Tension/K_SR-R)) \
-											+ K_PR*(Length-L0_SR-Bag1Tension/K_SR-L0_PR) \
-											+ M*LengthSecondDeriv \
-											+ Bag1Gamma \
-											- Bag1Tension 	)
-		Bag1TensionFirstDeriv = Bag1TensionSecondDeriv*(SamplingPeriod) + Bag1TensionFirstDeriv
-		Bag1Tension = Bag1TensionFirstDeriv*(SamplingPeriod) + Bag1Tension
-
-		#dp.nan_test(Bag1TensionSecondDeriv,'Bag1TensionSecondDeriv')
-		#dp.nan_test(Bag1TensionFirstDeriv,'Bag1TensionFirstDeriv')
-		#dp.nan_test(Bag1Tension,'Bag1Tension')
-
-		Bag1AfferentPotential = G*(Bag1Tension/K_SR-(LN_SR-L0_SR))
-
-		#dp.nan_test(Bag1AfferentPotential,'Bag1AfferentPotential')
-
-		return(Bag1AfferentPotential,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension)
-	def bag2_model(Length,LengthFirstDeriv,LengthSecondDeriv,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension):
-		## Feedback system parameters
-		## spindle_model Model
-		p = 2
-
-		Bag2TimeConstant = 0.205
-		Bag2Frequency = 60
-
-		Bag2BetaNot = 0.0822
-		Bag2Beta = -0.046
-		Bag2Gamma = 0.0636
-
-		if LengthFirstDeriv >= 0:
-			C = 1 #constant describing the np.experimentally observed asymmetric effect of velocity on force production during lengthening and shortening
-		else:
-			C = 0.42
-
-		G = 10000 #7250 #3800
-
-		StaticSpindleFrequencyFirstDeriv = (GammaStaticGain**p/(GammaStaticGain**p+Bag2Frequency**p)-StaticSpindleFrequency) \
-										/ Bag2TimeConstant
-		StaticSpindleFrequency = (SamplingPeriod)*StaticSpindleFrequencyFirstDeriv + StaticSpindleFrequency
-
-		#dp.nan_test(StaticSpindleFrequencyFirstDeriv,'StaticSpindleFrequencyFirstDeriv')
-		#dp.nan_test(StaticSpindleFrequency,'StaticSpindleFrequency')
-
-		Bag2Beta = Bag2BetaNot + Bag2Beta * StaticSpindleFrequency
-		Bag2Gamma = Bag2Gamma * StaticSpindleFrequency
-
-		R = 0.46 #length dependency of the force-velocity relationship
-		a = 0.3
-		K_SR = 10.4649
-		K_PR = 0.15
-		M = 0.0002 # intrafusal fiber mass
-
-		LN_SR = 0.0423
-		LN_PR = 0.89
-
-		L0_SR = 0.04 #in units of L0
-		L0_PR = 0.76 #polar region rest length
-
-		L_secondary = 0.04
-		X = 0.7
-
-		Bag2TensionSecondDeriv = (K_SR/M)*(	(C*Bag2Beta*np.sign(LengthFirstDeriv-Bag2TensionFirstDeriv/K_SR)  \
-											*((abs(LengthFirstDeriv-Bag2TensionFirstDeriv/K_SR))**a)  \
-											*(Length-L0_SR-Bag2Tension/K_SR-R)+K_PR  \
-											*(Length-L0_SR-Bag2Tension/K_SR-L0_PR))  \
-											+ M*LengthSecondDeriv \
-											+ Bag2Gamma \
-											- Bag2Tension )
-		Bag2TensionFirstDeriv = Bag2TensionSecondDeriv*(SamplingPeriod) + Bag2TensionFirstDeriv
-		Bag2Tension = Bag2TensionFirstDeriv*(SamplingPeriod) + Bag2Tension
-
-		#dp.nan_test(Bag2TensionSecondDeriv,'Bag2TensionSecondDeriv')
-		#dp.nan_test(Bag2TensionFirstDeriv,'Bag2TensionFirstDeriv')
-		#dp.nan_test(Bag2Tension,'Bag2Tension')
-
-		Bag2PrimaryAfferentPotential = G*(Bag2Tension/K_SR-(LN_SR-L0_SR))
-		Bag2SecondaryAfferentPotential = G*(	X*(L_secondary/L0_SR)*(Bag2Tension/K_SR-(LN_SR-L0_SR)) \
-							+(1-X)*(L_secondary/L0_PR)*(Length-Bag2Tension/K_SR-(L0_SR+LN_PR))	)
-
-		#dp.nan_test(Bag2PrimaryAfferentPotential,'Bag2PrimaryAfferentPotential')
-		#dp.nan_test(Bag2SecondaryAfferentPotential,'Bag2SecondaryAfferentPotential')
-
-		return(Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension)
-	def chain_model(Length,LengthFirstDeriv,LengthSecondDeriv,ChainTensionFirstDeriv,ChainTension):
-		## Feedback system parameters
-		## spindle_model Model
-		p = 2
-
-		ChainFrequency = 90
-
-		ChainBetaNot = 0.0822
-		ChainBeta = - 0.069
-		ChainGamma = 0.0954
-
-		if LengthFirstDeriv >= 0:
-			C = 1 #constant describing the np.experimentally observed asymmetric effect of velocity on force production during lengthening and shortening
-		else:
-			C = 0.42
-
-		G = 10000 #7250    #3000
-
-		ChainStaticSpindleFrequency = GammaStaticGain**p/(GammaStaticGain**p+ChainFrequency**p)
-
-		#dp.nan_test(ChainStaticSpindleFrequency,'ChainStaticSpindleFrequency')
-
-		ChainBeta = ChainBetaNot + ChainBeta * ChainStaticSpindleFrequency
-		ChainGamma = ChainGamma * StaticSpindleFrequency
-
-		R = 0.46 #length dependency of the force-velocity relationship
-		a = 0.3
-		K_SR = 10.4649
-		K_PR = 0.15
-		M = 0.0002 # intrafusal fiber mass
-
-		LN_SR = 0.0423
-		LN_PR = 0.89
-
-		L0_SR = 0.04 #in units of L0
-		L0_PR = 0.76 #polar region rest length
-
-		L_secondary = 0.04
-		X = 0.7
-
-		ChainTensionSecondDeriv = K_SR/M * (C * ChainBeta * np.sign(LengthFirstDeriv-ChainTensionFirstDeriv/K_SR)*((abs(LengthFirstDeriv-ChainTensionFirstDeriv/K_SR))**a)*(Length-L0_SR-ChainTension/K_SR-R)+K_PR*(Length-L0_SR-ChainTension/K_SR-L0_PR)+M*LengthSecondDeriv+ChainGamma-ChainTension)
-		ChainTensionFirstDeriv = ChainTensionSecondDeriv*SamplingPeriod + ChainTensionFirstDeriv
-		ChainTension = ChainTensionFirstDeriv*SamplingPeriod + ChainTension
-
-		#dp.nan_test(ChainTensionSecondDeriv,'ChainTensionSecondDeriv')
-		#dp.nan_test(ChainTensionFirstDeriv,'ChainTensionFirstDeriv')
-		#dp.nan_test(ChainTension,'ChainTension')
-
-		ChainPrimaryAfferentPotential = G*(ChainTension/K_SR-(LN_SR-L0_SR))
-		ChainSecondaryAfferentPotential = G*(	X*(L_secondary/L0_SR)*(ChainTension/K_SR-(LN_SR-L0_SR)) \
-							+ (1-X)*(L_secondary/L0_PR)*(Length-ChainTension/K_SR-(L0_SR+LN_PR))	)
-
-		#dp.nan_test(ChainPrimaryAfferentPotential,'ChainPrimaryAfferentPotential')
-		#dp.nan_test(ChainSecondaryAfferentPotential,'ChainSecondaryAfferentPotential')
-
-		return(ChainPrimaryAfferentPotential,ChainSecondaryAfferentPotential,ChainTensionFirstDeriv,ChainTension)
-	def spindle_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,\
-		DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
-		StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
-		ChainTensionFirstDeriv,ChainTension):
-
-		S = 0.156
-
-		Bag1AfferentPotential,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension = bag1_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension)
-		Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension = bag2_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension)
-		ChainPrimaryAfferentPotential,ChainSecondaryAfferentPotential,ChainTensionFirstDeriv,ChainTension = chain_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,ChainTensionFirstDeriv,ChainTension)
-
-		if Bag1AfferentPotential < 0: Bag1AfferentPotential = 0 
-		if Bag2PrimaryAfferentPotential < 0: Bag2PrimaryAfferentPotential = 0
-		if ChainPrimaryAfferentPotential < 0: ChainPrimaryAfferentPotential = 0
-		if Bag2SecondaryAfferentPotential < 0: Bag2SecondaryAfferentPotential = 0
-		if ChainSecondaryAfferentPotential < 0: ChainSecondaryAfferentPotential = 0	        
-
-		if Bag1AfferentPotential > (Bag2PrimaryAfferentPotential+ChainPrimaryAfferentPotential):
-			Larger = Bag1AfferentPotential
-			Smaller = Bag2PrimaryAfferentPotential+ChainPrimaryAfferentPotential
-		else:
-			Larger = Bag2PrimaryAfferentPotential+ChainPrimaryAfferentPotential
-			Smaller = Bag1AfferentPotential
-
-		PrimaryOutput = Larger + S * Smaller
-		SecondaryOutput = Bag2SecondaryAfferentPotential + ChainSecondaryAfferentPotential
-
-		if PrimaryOutput < 0:
-			PrimaryOutput = 0
-		elif PrimaryOutput > 100000:
-			PrimaryOutput = 100000
-		if SecondaryOutput < 0:
-			SecondaryOutput = 0
-		elif SecondaryOutput > 100000:
-			SecondaryOutput = 100000
-
-		#dp.nan_test(PrimaryOutput,'PrimaryOutput')
-		#dp.nan_test(SecondaryOutput,'SecondaryOutput')
-
-		return(PrimaryOutput,SecondaryOutput)
-	def activation_frequency_slow(Activation,Length,LengthFirstDeriv,Y,fint,feff_dot,feff,SamplingFrequency,ActivationFrequencySlow):
-	
-		Uth = 0.001
-		f_half = 8.5 #f_half = 34 #can be found in Table 2 of Brown and Loeb 2000
-		fmin = 4 #fmin = 15
-		fmax = 2*f_half #fmin = 0.5*f_half #can be found in Song et al. 2008
-		af = 0.56
-		nf0 = 2.11
-		nf1 = 5
-		cy = 0.35
-		Vy = 0.1
-		Ty = 0.2
-
-		Tf1 = 0.0484
-		Tf2 = 0.032
-		Tf3 = 0.0664
-		Tf4 = 0.0356
-
-		Y_dot = (1 - cy*(1-np.exp(-abs(LengthFirstDeriv)/Vy))-Y)/Ty
-		Y = Y_dot*SamplingPeriod + Y 
-
-		#dp.nan_test(Y_dot,'Y_dot')
-		#dp.nan_test(Y,'Y')
-
-		fenv = (fmax-fmin)/(1-Uth)*Activation+fmin-(fmax-fmin)*Uth
-		fenv = fenv/f_half
-
-		#dp.nan_test(fenv,'fenv')
-
-		if feff_dot >= 0:
-		    Tf = Tf1 * Length**2 + Tf2 * fenv
-		else:
-		    Tf = (Tf3 + Tf4*ActivationFrequencySlow)/Length
-
-		#dp.nan_test(Tf,'Tf')
-
-		fint_dot = (fenv - fint)/Tf
-		fint = fint_dot*SamplingPeriod + fint
-		feff_dot = (fint - feff)/Tf
-		feff = feff_dot*SamplingPeriod + feff
-
-		#dp.nan_test(fint_dot,'fint_dot')
-		#dp.nan_test(fint,'fint')
-		#dp.nan_test(feff_dot,'feff_dot')
-		#dp.nan_test(feff,'feff')
-
-		nf = nf0 + nf1*(1/Length-1)
-		ActivationFrequencySlow = 1 - np.exp(-(Y*feff/(af*nf))**nf)
-
-		#dp.nan_test(nf,'nf')
-		#dp.nan_test(ActivationFrequencySlow,'ActivationFrequencySlow')
-
-		return(ActivationFrequencySlow,Y,fint,feff_dot,feff)
-	def activation_frequency_fast(Activation,Length,Saf,fint,feff_dot,feff,SamplingFrequency,ActivationFrequencyFast):
-		
-		Uth = 0.001
-		f_half = 34 #f_half = 34 #can be found in Table 2 of Brown and Loeb 2000
-		fmin = 15 #fmin = 15
-		fmax = 2*f_half #fmin = 0.5*f_half #can be found in Song et al. 2008
-		af = 0.56
-		nf0 = 2.11
-		nf1 = 3.3
-		as1 = 1.76
-		as2 = 0.96
-		Ts = 0.043
-
-		Tf1 = 0.0206
-		Tf2 = 0.0136
-		Tf3 = 0.0282
-		Tf4 = 0.0151
-
-		fenv = (fmax-fmin)/(1-Uth)*Activation+fmin-(fmax-fmin)*Uth
-		fenv = fenv/f_half
-
-		#dp.nan_test(fenv,'fenv')
-
-		if feff_dot >= 0:
-			Tf = Tf1 * Length**2 + Tf2 * fenv
-		elif feff_dot < 0:
-			Tf = (Tf3 + Tf4*ActivationFrequencyFast)/Length
-
-		#dp.nan_test(Tf,'Tf')
-
-		if feff < 0.1:
-			AS = as1
-		elif feff >= 0.1:
-			AS = as2
-
-		#dp.nan_test(AS,'AS')
-
-		Saf_dot = (AS - Saf)/Ts
-		Saf = Saf_dot*SamplingPeriod + Saf
-		fint_dot = (fenv - fint)/Tf
-		fint = fint_dot*SamplingPeriod + fint
-		feff_dot = (fint - feff)/Tf
-		feff = feff_dot*SamplingPeriod + feff
-		nf = nf0 + nf1*(1/Length-1)
-		ActivationFrequencyFast = 1 - np.exp(-(S_af*feff/(af*nf))**nf)
-
-		#dp.nan_test(Saf_dot,'Saf_dot')
-		#dp.nan_test(Saf,'Saf')
-		#dp.nan_test(fint_dot,'fint_dot')
-		#dp.nan_test(fint,'fint')
-		#dp.nan_test(feff_dot,'feff_dot')
-		#dp.nan_test(feff,'feff')
-		#dp.nan_test(nf,'nf')
-		#dp.nan_test(ActivationFrequencyFast,'ActivationFrequencyFast')
-
-		return(ActivationFrequencyFast,fint,feff_dot,feff,Saf)
-	def force_length(Length):
-		beta = 2.3
-		omega = 1.12
-		rho = 1.62
-		ForceLength = np.exp(-abs((Length**beta - 1)/omega)**rho)
-		#dp.nan_test(ForceLength,'ForceLength')
-		return(ForceLength)
-	def concentric_force_velocity(Length,V):
-		Vmax = -7.88
-		cv0 = 5.88
-		cv1 = 0
-		ConcentricForceVelocity = (Vmax - V)/(Vmax + (cv0 + cv1*Length)*V)
-		#dp.nan_test(ConcentricForceVelocity,'ConcentricForceVelocity')
-		return(ConcentricForceVelocity)
-	def eccentric_force_velocity(Length,V):
-		av0 = -4.7
-		av1 = 8.41
-		av2 = -5.34
-		bv = 0.35
-		EccentricForceVelocity = (bv - (av0 + av1*Length + av2*Length**2)*V)/(bv+V)
-		#dp.nan_test(EccentricForceVelocity,'EccentricForceVelocity')
-		return(EccentricForceVelocity)
-	def parallel_elastic_element_force_1(Length,MaximumContractileElementLength):
-		c1_pe1 = 23.0  #355, 67.1
-		k1_pe1 = 0.046 #0.04, 0.056
-		Lr1_pe1 = 1.17  #1.35, 1.41
-		ParallelElasticElementForce1 = c1_pe1 * k1_pe1 * np.log(np.exp((Length/MaximumContractileElementLength - Lr1_pe1)/k1_pe1)+1)
-		#dp.nan_test(ParallelElasticElementForce1,'ParallelElasticElementForce1')
-		return(ParallelElasticElementForce1)
-	def parallel_elastic_element_force_2(Length):
-		c2_pe2 = -0.02 #0.01  -0.1
-		k2_pe2 = -21
-		Lr2_pe2 = 0.70 #0.79 0.59
-		ParallelElasticElementForce2 = c2_pe2*np.exp((k2_pe2*(Length-Lr2_pe2))-1)
-		#dp.nan_test(ParallelElasticElementForce2,'ParallelElasticElementForce2')
-		return(ParallelElasticElementForce2)
-	def normalized_series_elastic_element_force(LT):
-		cT_se = 27.8
-		kT_se = 0.0047
-		LrT_se = 0.964
-		NormalizedSeriesElasticElementForce = cT_se * kT_se * np.log(np.exp((LT - LrT_se)/kT_se)+1)
-		#dp.nan_test(NormalizedSeriesElasticElementForce,'NormalizedSeriesElasticElementForce')
-		return(NormalizedSeriesElasticElementForce)
-	
 	StartTime = time.time()
 	for i in range(len(Time)): #= 1:length(Time)
 		if FeedbackOption == 'ff_only': # Feedforward input onl
@@ -833,7 +347,7 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 			IIInput1.append(SecondaryOutput1)
 			IaInput2.append(PrimaryOutput2)
 			IIInput2.append(SecondaryOutput2)
-			# if i == 0: dp.compare([PrimaryOutput,SecondaryOutput],[0,7.5646])
+			# if i == 0: compare([PrimaryOutput,SecondaryOutput],[0,7.5646])
 
 			if i == Count:
 				# Get spindle primary and secondary afferent activity
@@ -864,10 +378,10 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 				IbInput1.append(TemporaryIbInput1[-1]*(TemporaryIbInput1[-1]>0))
 				IbInput2.append(TemporaryIbInput2[-1]*(TemporaryIbInput2[-1]>0))
 
-				# if i == 0: dp.compare(float(IbInput[-1]),1.554682907070062)
-				# if i == 2*SamplingRatio: dp.compare(float(IbInput[-1]),1.554682907070062)
-				# if i == 3*SamplingRatio: dp.compare(float(IbInput[-1]),1.554682907070062)
-				# if i == 4*SamplingRatio: dp.compare(float(IbInput[-1]),1.554682907070062)
+				# if i == 0: compare(float(IbInput[-1]),1.554682907070062)
+				# if i == 2*SamplingRatio: compare(float(IbInput[-1]),1.554682907070062)
+				# if i == 3*SamplingRatio: compare(float(IbInput[-1]),1.554682907070062)
+				# if i == 4*SamplingRatio: compare(float(IbInput[-1]),1.554682907070062)
 				if i in range(IaAfferentDelayTimeStep1-1,IbAfferentDelayTimeStep1):
 					Input1.append(IaInput1[i-IaAfferentDelayTimeStep1-1]/IaSpindleGain1 \
 								+FeedforwardInput1[i]) #input to the muscle
@@ -919,55 +433,76 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 
 		elif FeedbackOption == 'cortical_fb_only': # STILL NEED TO DO THIS ONE!
 			if i > CorticalDelayTimeStep-1:
-				FeedbackInput = TransCorticalLoopConstant*(TargetForceTrajectory[i]-OutputForceTendon[i-CorticalDelayTimeStep-1])/MaximumContractileElementForce + FeedbackInput  # feedback input through cortical pathway
-				Input.append(FeedbackInput) #input to the muscle
+				FeedbackInput1 = TransCorticalLoopConstant1*(TargetForceTrajectory1[i]-OutputForceTendon1[i-CorticalDelayTimeStep1-1])/MaximumContractileElementForce1 + FeedbackInput1 # feedback input through cortical pathway
+				FeedbackInput2 = TransCorticalLoopConstant2*(TargetForceTrajectory2[i]-OutputForceTendon2[i-CorticalDelayTimeStep1-1])/MaximumContractileElementForce2 + FeedbackInput2 # feedback input through cortical pathway
+				Input1.append(FeedbackInput1) #input to the muscle
+				Input2.append(FeedbackInput2) #input to the muscle
+
 			else:
-				Input.append(FeedforwardInput[i])
+				Input1.append(FeedforwardInput1[i])
+				Input2.append(FeedforwardInput2[i])
 
-			IaInput.append(0)
-			IIInput.append(0)
-			IbInput.append(0)
+			IaInput1.append(0)
+			IIInput1.append(0)
+			IbInput1.append(0)
+			IaInput2.append(0)
+			IIInput2.append(0)
+			IbInput2.append(0)
 
-		\ended here on 10/14/16
 
 		# Feedforward only
 		# Input[i] = input[i] #TargetForceTrajectory[i]/MaximumContractileElementForce
 		## Noise + additional input
-		if Input[-1] < 0:
-			Input[-1] = 0
-		elif Input[-1] > 1:
-			Input[-1] = 1
-
-		#dp.nan_test(Input[-1],'Input')
-
-		#dp.nan_test(CorticalInput[-1],'CorticalInput')
+		if Input1[-1] < 0:
+			Input1[-1] = 0
+		elif Input1[-1] > 1:
+			Input1[-1] = 1
+		if Input2[-1] < 0:
+			Input2[-1] = 0
+		elif Input2[-1] > 1:
+			Input2[-1] = 1
 
 		if i > 4:
-			Noise.append(2*(random.random()-0.5)*(np.sqrt(0.01*Input[i])*np.sqrt(3)))
-			FilteredNoise.append((BButtersCoefficients[4]*Noise[i-4] + BButtersCoefficients[3]*Noise[i-3] + BButtersCoefficients[2]*Noise[i-2] + BButtersCoefficients[1]*Noise[i-1] + BButtersCoefficients[0]*Noise[i] \
-									- AButtersCoefficients[4]*FilteredNoise[i-4] - AButtersCoefficients[3]*FilteredNoise[i-3] - AButtersCoefficients[2]*FilteredNoise[i-2] - AButtersCoefficients[1]*FilteredNoise[i-1])/AButtersCoefficients[0])
-			#dp.nan_test(Noise[i],'Noise')
-			#dp.nan_test(FilteredNoise[-1],'FilteredNoise')
+			Noise1.append(2*(random.random()-0.5)*(np.sqrt(0.01*Input1[i])*np.sqrt(3)))
+			FilteredNoise1.append((BButtersCoefficients[4]*Noise1[i-4] + BButtersCoefficients[3]*Noise1[i-3] + BButtersCoefficients[2]*Noise1[i-2] + BButtersCoefficients[1]*Noise1[i-1] + BButtersCoefficients[0]*Noise1[i] \
+									- AButtersCoefficients[4]*FilteredNoise1[i-4] - AButtersCoefficients[3]*FilteredNoise1[i-3] - AButtersCoefficients[2]*FilteredNoise1[i-2] - AButtersCoefficients[1]*FilteredNoise1[i-1])/AButtersCoefficients[0])
+			Noise2.append(2*(random.random()-0.5)*(np.sqrt(0.01*Input1[i])*np.sqrt(3)))
+			FilteredNoise2.append((BButtersCoefficients[4]*Noise2[i-4] + BButtersCoefficients[3]*Noise2[i-3] + BButtersCoefficients[2]*Noise2[i-2] + BButtersCoefficients[1]*Noise2[i-1] + BButtersCoefficients[0]*Noise2[i] \
+									- AButtersCoefficients[4]*FilteredNoise2[i-4] - AButtersCoefficients[3]*FilteredNoise2[i-3] - AButtersCoefficients[2]*FilteredNoise2[i-2] - AButtersCoefficients[1]*FilteredNoise2[i-1])/AButtersCoefficients[0])
+			#nan_test(Noise[i],'Noise')
+			#nan_test(FilteredNoise[-1],'FilteredNoise')
 		else:
-			Noise.append(0)
-			FilteredNoise.append(0)
-			#dp.nan_test(Noise[i],'Noise')
-			#dp.nan_test(FilteredNoise[-1],'FilteredNoise')
+			Noise1.append(0)
+			FilteredNoise1.append(0)
+			Noise2.append(0)
+			FilteredNoise2.append(0)
+			#nan_test(Noise[i],'Noise')
+			#nan_test(FilteredNoise[-1],'FilteredNoise')
 
-		Input[-1] = Input[-1] + FilteredNoise[-1] + CorticalInput[-1]
+		Input1[-1] = Input1[-1] + FilteredNoise1[-1] + CorticalInput1[-1]
+		Input2[-1] = Input2[-1] + FilteredNoise2[-1] + CorticalInput2[-1]
 
-		if Input[-1] < 0:
-			Input[-1] = 0
-		elif Input[-1] > 1:
-			Input[-1] = 1
+		if Input1[-1] < 0:
+			Input1[-1] = 0
+		elif Input1[-1] > 1:
+			Input1[-1] = 1
+		if Input2[-1] < 0:
+			Input2[-1] = 0
+		elif Input2[-1] > 1:
+			Input2[-1] = 1
 
 		# add delay along efferent pathway
-		if i > EfferentDelayTimeStep:
-			LongInput.append(Input[i-EfferentDelayTimeStep])
+		if i > EfferentDelayTimeStep1:
+			LongInput1.append(Input1[i-EfferentDelayTimeStep1])
 		else:
-			LongInput.append(0)
+			LongInput1.append(0)
+		if i > EfferentDelayTimeStep2:
+			LongInput2.append(Input2[i-EfferentDelayTimeStep2])
+		else:
+			LongInput2.append(0)
 
-		#dp.nan_test(LongInput[i],'LongInput')
+		\ended here on 10/17/16
+		#nan_test(LongInput[i],'LongInput')
 
 		# add activation filter
 		TU = 0.12*(LongInput[-1] < EffectiveMuscleActivation) + 0.03 # When true TU = 0.15, else TU = 0.03
@@ -975,8 +510,8 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 		EffectiveMuscleActivationFirstDeriv = (LongInput[-1] - EffectiveMuscleActivation)/TU
 		EffectiveMuscleActivation = EffectiveMuscleActivationFirstDeriv*(SamplingPeriod) + EffectiveMuscleActivation # effective neural drive
 
-		#dp.nan_test(EffectiveMuscleActivationFirstDeriv,'EffectiveMuscleActivationFirstDeriv')
-		#dp.nan_test(EffectiveMuscleActivation,'EffectiveMuscleActivation')
+		#nan_test(EffectiveMuscleActivationFirstDeriv,'EffectiveMuscleActivationFirstDeriv')
+		#nan_test(EffectiveMuscleActivation,'EffectiveMuscleActivation')
 
 		# ActivationFrequency,Y,fint,feff_dot,feff = activation_frequency_slow(EffectiveMuscleActivation,ContractileElementLength,ContractileElementVelocity,Y,fint,feff_dot,feff,SamplingFrequency,ActivationFrequency) # not used
 
@@ -998,12 +533,12 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 		ForceTotal = (EffectiveMuscleActivation*(ContractileElementForce + ForcePassive2) + ForcePassive1 + ForceViscocity)*MaximumContractileElementForce
 		ForceTotal = ForceTotal*(ForceTotal>=0.0)
 
-		#dp.nan_test(ForceTotal,'ForceTotal')
+		#nan_test(ForceTotal,'ForceTotal')
 
 		# force from series elastic element
 		SeriesElasticElementForce = normalized_series_elastic_element_force(SeriesElasticElementLength) * MaximumContractileElementForce
 
-		#dp.nan_test(SeriesElasticElementForce,'SeriesElasticElementForce')
+		#nan_test(SeriesElasticElementForce,'SeriesElasticElementForce')
 
 		# calculate muscle excursion acceleration based on the difference
 		# between muscle force and tendon force
@@ -1017,9 +552,9 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 			MuscleLength.append((MuscleVelocity[-1]+ \
 				MuscleVelocity[-2])/2*(SamplingPeriod)+MuscleLength[-1])
 
-			#dp.nan_test(MuscleAcceleration[i+1],'MuscleAcceleration')
-			#dp.nan_test(MuscleVelocity[i+1],'MuscleVelocity')
-			#dp.nan_test(MuscleLength[i+1],'MuscleLength')
+			#nan_test(MuscleAcceleration[i+1],'MuscleAcceleration')
+			#nan_test(MuscleVelocity[i+1],'MuscleVelocity')
+			#nan_test(MuscleLength[i+1],'MuscleLength')
 
 			# normalize each variable to optimal muscle length or tendon legnth
 			ContractileElementAcceleration = MuscleAcceleration[-1]/(OptimalLength/100)
@@ -1027,10 +562,10 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 			ContractileElementLength = MuscleLength[-1]/(OptimalLength/100)
 			SeriesElasticElementLength = (InitialMusculoTendonLength - ContractileElementLength*OptimalLength*np.cos(PennationAngle))/OptimalTendonLength
 
-			#dp.nan_test(ContractileElementAcceleration,'ContractileElementAcceleration')
-			#dp.nan_test(ContractileElementVelocity,'ContractileElementVelocity')
-			#dp.nan_test(ContractileElementLength,'ContractileElementLength')
-			#dp.nan_test(SeriesElasticElementLength,'SeriesElasticElementLength')
+			#nan_test(ContractileElementAcceleration,'ContractileElementAcceleration')
+			#nan_test(ContractileElementVelocity,'ContractileElementVelocity')
+			#nan_test(ContractileElementLength,'ContractileElementLength')
+			#nan_test(SeriesElasticElementLength,'SeriesElasticElementLength')
 
 			# store data
 			OutputSeriesElasticElementLength.append(SeriesElasticElementLength)
@@ -1046,7 +581,7 @@ def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
 		OutputForceVelocity.append(ForceVelocity)
 		OutputForcePassive1.append(ForcePassive1)
 		OutputForcePassive2.append(ForcePassive2)
-		dp.statusbar(i,len(Time),StartTime=StartTime,Title = 'afferented_muscle_model')
+		statusbar(i,len(Time),StartTime=StartTime,Title = 'afferented_muscle_model')
 
 	plt.figure()
 	plt.plot(Time,OutputForceTendon)
@@ -1128,7 +663,7 @@ PXX = []
 Range = []
 for i in range(NumberOfTrials): #trialN = 1:10
 	#rng('shufle')
-	output = afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,TargetTrajectory,CorticalInput,FeedbackOption = FeedbackOption)    
+	output = afferented_2_muscles_model(muscle_parameters,delay_parameters,gain_parameters,TargetTrajectory,CorticalInput,FeedbackOption = FeedbackOption)    
 	Output.append(output)
 	f,pxx = welch(output['ForceTendon'][-int(10*SamplingFrequency)-1:]-np.average(output['ForceTendon'][int(-10*SamplingFrequency-1):]),window = gaussian(5*SamplingFrequency,(5*SamplingFrequency-1)/(2*2.5)),\
 		noverlap = SamplingFrequency,nperseg = len(gaussian(5*SamplingFrequency,(5*SamplingFrequency-1)/(2*2.5))), fs = SamplingFrequency) 
