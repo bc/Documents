@@ -6,50 +6,12 @@ import ipdb
 import danpy.stuff as dp
 from amm_functions import smooth, generate_target_force_trajectory
 
-# def generate_target_force_trajectory(TrajectoryType,Time,Amplitude,AmplitudeModulation,FrequencyModulation):
-# 	if TrajectoryType == 'triangle':
-# 		delay = (1/FrequencyModulation)/4
-# 		triangle = 2*sawtooth(2*np.pi*(Time-Delay),0.5)-1
-# 		TargetForceTrajectory = AmplitudeModulation*triangle+Amplitude
-# 	elif TrajectoryType == 'sinewave':
-# 		TargetForceTrajectory = AmplitudeModulation*np.sin(2*np.pi*FrequencyModulation*Time)+Amplitude
-# 	elif TrajectoryType == 'constant':
-# 		SamplingFrequency = 10000
-# 		TargetForceTrajectory = np.concatenate((np.zeros(SamplingFrequency), (Amplitude)*1/2*Time[:2*SamplingFrequency], Amplitude*np.ones(len(Time)-3*SamplingFrequency), Amplitude*np.ones(5000)))
-# 		TargetForceTrajectory = smooth(TargetForceTrajectory,500)
-# 		TargetForceTrajectory = TargetForceTrajectory[:-5000]
-# 			#TargetForceTrajectory = [Amplitude*np.ones(1,len(Time))]
-# 	"""
-# 	elif strcmp(type,'trapezoid')
-# 		SamplingFrequency = 10000
-# 		offset = 0.01 % in %MVC
-# 		slope = Amplitude/5 % %MVC/s
-# 		%Amplitude = 30 % in %MVC
-# 		holdtime = 0
-# 		interval = 5 % in seconds
-# 		ramp_up = offset/interval*(Time(1:interval*SamplingFrequency))
-# 		delay_rise_start = SamplingFrequency*interval
-# 		delay_rise_end = SamplingFrequency*(Amplitude/slope)+delay_rise_start
-# 		delay_decay_start = delay_rise_end + SamplingFrequency*holdtime
-# 		delay_decay_end = delay_rise_end + SamplingFrequency*holdtime + SamplingFrequency*(Amplitude/slope)
-# 		y1 = slope*(Time(delay_rise_start:delay_rise_end)-interval)
-# 		y2 = -slope*(Time(delay_decay_start:delay_decay_end)-delay_decay_end/SamplingFrequency)
-# 		%zeros(1,interval*SamplingFrequency)
-# 		Trapezoidal_Pulse = [zeros(1,interval*SamplingFrequency) y1 ...
-# 		Amplitude*ones(1,holdtime*SamplingFrequency) y2 zeros(1,interval*SamplingFrequency)]+offset
-# 		N = floor(Time(end)/(len(Trapezoidal_Pulse)/SamplingFrequency))
-# 		TargetForceTrajectory = repmat(Trapezoidal_Pulse,1,N)
-# 		TargetForceTrajectory = [TargetForceTrajectory zeros(1,len(Time)-len(TargetForceTrajectory))+offset]
-# 		TargetForceTrajectory(1:interval*SamplingFrequency) = ramp_up
-
-# 		# 6%MVC => 0.0667
-# 		# 3%MVC => 0.05
-# 		# 1.5%MVC => 0.033
-# 		# 3%MVC + 5s hold => 0.04
-# 		# 3%MVC + 10s hold => 
-# 	"""
-# 	return(TargetForceTrajectory)
-def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,TargetTrajectory,CorticalInput,**kwargs):
+def afferented_muscle_model(muscle_1_parameters,muscle_2_parameters,\
+							delay_1_parameters,delay_2_parameters,\
+							gain_1_parameters,gain_2_parameters,
+							TargetTrajectory1,TargetTrajectory2,\
+							CorticalInput1,CorticalInput2,\
+							**kwargs):
 	"""
 	muscle_parameters must be a dictionary with "Pennation Angle", "Muscle Mass",
 	"Optimal Length", "Tendon Length", "Initial Muscle Length", and "Initial Tendon Length"
@@ -74,14 +36,37 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	FeedbackOption = kwargs.get("FeedbackOption",'ff_only')
 	assert FeedbackOption in ['ff_only','servo_control','fb_control','cortical_fb_only'],\
 	"FeedbackOption must be either 'ff_only', 'servo_control', 'fb_control', or 'cortical_fb_only'"
-	assert type(muscle_parameters)==dict, "muscle_parameters must be a dictionary"
-	assert len(muscle_parameters)==6, "dict muscle_parameters can only have 6 entries"
-	assert 'Pennation Angle' in muscle_parameters, "'Pennation Angle' missing in muscle_parameters"
-	assert 'Muscle Mass' in muscle_parameters, "'Muscle Mass' missing in muscle_parameters"
-	assert 'Optimal Length' in muscle_parameters, "'Optimal Length' missing in muscle_parameters"
-	assert 'Tendon Length' in muscle_parameters, "'Tendon Length' missing in muscle_parameters"
-	assert 'Initial Muscle Length' in muscle_parameters, "'Initial Muscle Length' missing in muscle_parameters"
-	assert 'Initial Tendon Length' in muscle_parameters, "'Initial Tendon Length' missing in muscle_parameters"
+	assert type(muscle_1_parameters)==dict, "muscle_1_parameters must be a dictionary"
+	assert len(muscle_1_parameters)==6, "dict muscle_1_parameters can only have 6 entries"
+	assert 'Pennation Angle' in muscle_1_parameters, "'Pennation Angle' missing in muscle_1_parameters"
+	assert 'Muscle Mass' in muscle_1_parameters, "'Muscle Mass' missing in muscle_1_parameters"
+	assert 'Optimal Length' in muscle_1_parameters, "'Optimal Length' missing in muscle_1_parameters"
+	assert 'Tendon Length' in muscle_1_parameters, "'Tendon Length' missing in muscle_1_parameters"
+	assert 'Initial Muscle Length' in muscle_1_parameters, "'Initial Muscle Length' missing in muscle_1_parameters"
+	assert 'Initial Tendon Length' in muscle_1_parameters, "'Initial Tendon Length' missing in muscle_1_parameters"
+	assert type(delay_parameters)==dict, "delay_parameters must be a dictionary"
+	assert len(delay_parameters)==5, "dict delay_parameters can only have 5 entries"
+	assert 'Efferent Delay' in delay_parameters, "'Efferent Delay' missing in delay_parameters"
+	assert 'Ia Delay' in delay_parameters, "'Ia Delay' missing in delay_parameters"
+	assert 'II Delay' in delay_parameters, "'II Delay' missing in delay_parameters"
+	assert 'Ib Delay' in delay_parameters, "'Ib Delay' missing in delay_parameters"
+	assert 'Cortical Delay' in delay_parameters, "'Cortical Delay' missing in delay_parameters"
+	assert type(gain_parameters)==dict, "gain_parameters must be a dictionary"
+	assert len(gain_parameters)==5, "dict gain_parameters can only have 5 entries"
+	assert 'Gamma Dynamic Gain' in gain_parameters, "'Gamma Dynamic Gain' missing in gain_parameters"
+	assert 'Gamma Static Gain' in gain_parameters, "'Gamma Static Gain' missing in gain_parameters"
+	assert 'Ia Gain' in gain_parameters, "'Ia Gain' missing in gain_parameters"
+	assert 'II Gain' in gain_parameters, "'II Gain' missing in gain_parameters"
+	assert 'Ib Gain' in gain_parameters, "'Ib Gain' missing in gain_parameters"
+
+	assert type(muscle_2_parameters)==dict, "muscle_2_parameters must be a dictionary"
+	assert len(muscle_2_parameters)==6, "dict muscle_2_parameters can only have 6 entries"
+	assert 'Pennation Angle' in muscle_2_parameters, "'Pennation Angle' missing in muscle_2_parameters"
+	assert 'Muscle Mass' in muscle_2_parameters, "'Muscle Mass' missing in muscle_2_parameters"
+	assert 'Optimal Length' in muscle_2_parameters, "'Optimal Length' missing in muscle_2_parameters"
+	assert 'Tendon Length' in muscle_2_parameters, "'Tendon Length' missing in muscle_2_parameters"
+	assert 'Initial Muscle Length' in muscle_2_parameters, "'Initial Muscle Length' missing in muscle_2_parameters"
+	assert 'Initial Tendon Length' in muscle_2_parameters, "'Initial Tendon Length' missing in muscle_2_parameters"
 	assert type(delay_parameters)==dict, "delay_parameters must be a dictionary"
 	assert len(delay_parameters)==5, "dict delay_parameters can only have 5 entries"
 	assert 'Efferent Delay' in delay_parameters, "'Efferent Delay' missing in delay_parameters"
@@ -104,74 +89,199 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	import matplotlib.pyplot as plt
 
 	# muscle architectural parameters
-	PennationAngle = muscle_parameters['Pennation Angle']
-	MuscleMass = muscle_parameters['Muscle Mass']
-	OptimalLength = muscle_parameters['Optimal Length']
-	TendonLength = muscle_parameters['Tendon Length']
-	OptimalTendonLength = TendonLength*1.05
-	InitialMuscleLength = muscle_parameters['Initial Muscle Length']
-	InitialTendonLength = muscle_parameters['Initial Tendon Length']
-	InitialMusculoTendonLength = InitialMuscleLength*np.cos(PennationAngle)+InitialTendonLength
+	PennationAngle1 = muscle_1_parameters['Pennation Angle']
+	MuscleMass1 = muscle_1_parameters['Muscle Mass']
+	OptimalLength1 = muscle_1_parameters['Optimal Length']
+	TendonLength1 = muscle_1_parameters['Tendon Length']
+	OptimalTendonLength1 = TendonLength*1.05
+	InitialMuscleLength1 = muscle_1_parameters['Initial Muscle Length']
+	InitialTendonLength1 = muscle_1_parameters['Initial Tendon Length']
+	InitialMusculoTendonLength1 = InitialMuscleLength1*np.cos(PennationAngle1)+InitialTendonLength1
 
-	# calculate initial length based on balance between stiffness of muscle and
-	# tendon
-	TendonConstant = 27.8
-	TendonRateConstant = 0.0047
-	NormalizedRestingTendonLength = 0.964
+	PennationAngle2 = muscle_2_parameters['Pennation Angle']
+	MuscleMass2 = muscle_2_parameters['Muscle Mass']
+	OptimalLength2 = muscle_2_parameters['Optimal Length']
+	TendonLength2 = muscle_2_parameters['Tendon Length']
+	OptimalTendonLength2 = TendonLength*1.05
+	InitialMuscleLength2 = muscle_2_parameters['Initial Muscle Length']
+	InitialTendonLength2 = muscle_2_parameters['Initial Tendon Length']
+	InitialMusculoTendonLength2 = InitialMuscleLength2*np.cos(PennationAngle2)+InitialTendonLength2
 
-	MuscleConstant = 23.0  #355, 67.1
-	MuscleRateConstant = 0.046 #0.04, 0.056
-	RestingMuscleLength = 1.17  #1.35, 1.41
-	PassiveMuscleForce = float(MuscleConstant * MuscleRateConstant * np.log(np.exp((1 - RestingMuscleLength)/MuscleRateConstant)+1))
-	NormalizedSeriesElasticLength = float(TendonRateConstant*np.log(np.exp(PassiveMuscleForce/TendonConstant/TendonRateConstant)-1)+NormalizedRestingTendonLength)
-	SeriesElasticLength = float(TendonLength * NormalizedSeriesElasticLength)
+	def return_initial_values(PennationAngle,MuscleMass,OptimalLength,OptimalTendonLength,\
+		InitialMuscleLength,InitialTendonLength,InitialMusculoTendonLength):
 
-	# dp.compare(PassiveMuscleForce,0.0260)
-	# dp.compare(NormalizedSeriesElasticLength,0.9677)
+		# calculate initial length based on balance between stiffness of muscle and
+		# tendon
+		TendonConstant = 27.8
+		TendonRateConstant = 0.0047
+		NormalizedRestingTendonLength = 0.964
 
-	MaximumMusculoTendonLength = float(OptimalLength * np.cos(PennationAngle) + TendonLength + 0.5)
-	NormalizedMaximumFascicleLength = float((MaximumMusculoTendonLength - SeriesElasticLength)/OptimalLength)
-	MaximumContractileElementLength = float(NormalizedMaximumFascicleLength/np.cos(PennationAngle)) # Contractile Element = Muscle
+		MuscleConstant = 23.0  #355, 67.1
+		MuscleRateConstant = 0.046 #0.04, 0.056
+		RestingMuscleLength = 1.17  #1.35, 1.41
+		PassiveMuscleForce = float(MuscleConstant * MuscleRateConstant * np.log(np.exp((1 - RestingMuscleLength)/MuscleRateConstant)+1))
+		NormalizedSeriesElasticLength = float(TendonRateConstant*np.log(np.exp(PassiveMuscleForce/TendonConstant/TendonRateConstant)-1)+NormalizedRestingTendonLength)
+		SeriesElasticLength = float(TendonLength * NormalizedSeriesElasticLength)
 
-	# dp.compare(MaximumMusculoTendonLength,34.0616)
-	# dp.compare(NormalizedSeriesElasticLength,0.9677)
+		# dp.compare(PassiveMuscleForce,0.0260)
+		# dp.compare(NormalizedSeriesElasticLength,0.9677)
 
-	# dp.nan_test(PassiveMuscleForce,'PassiveMuscleForce')
-	# dp.nan_test(NormalizedSeriesElasticLength,'NormalizedSeriesElasticLength')
-	# dp.nan_test(MaximumMusculoTendonLength,'MaximumMusculoTendonLength')
-	# dp.nan_test(SeriesElasticLength,'SeriesElasticLength')
-	# dp.nan_test(NormalizedMaximumFascicleLength,'NormalizedMaximumFascicleLength')
-	# dp.nan_test(MaximumContractileElementLength,'MaximumContractileElementLength')
+		MaximumMusculoTendonLength = float(OptimalLength * np.cos(PennationAngle) + TendonLength + 0.5)
+		NormalizedMaximumFascicleLength = float((MaximumMusculoTendonLength - SeriesElasticLength)/OptimalLength)
+		MaximumContractileElementLength = float(NormalizedMaximumFascicleLength/np.cos(PennationAngle)) # Contractile Element = Muscle
 
-	InitialLength = float((InitialMusculoTendonLength+OptimalTendonLength\
-							*((TendonRateConstant/MuscleRateConstant)*RestingMuscleLength-NormalizedRestingTendonLength\
-							- TendonRateConstant*np.log((MuscleConstant/TendonConstant)*(MuscleRateConstant/TendonRateConstant))))\
-							/(100*(1+TendonRateConstant/MuscleRateConstant*OptimalTendonLength/MaximumContractileElementLength*(1/OptimalLength))*np.cos(PennationAngle)))
-	ContractileElementLength = float(InitialLength/(OptimalLength/100)) # initializing CE Length
-	SeriesElasticElementLength = float((InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength) # MTU - initial muscle = initial SEE length
+		# dp.compare(MaximumMusculoTendonLength,34.0616)
+		# dp.compare(NormalizedSeriesElasticLength,0.9677)
 
-	# dp.compare(InitialLength,0.1066)
-	# dp.nan_test(InitialLength,'InitialLength')
-	# dp.nan_test(ContractileElementLength,'ContractileElementLength')
-	# dp.nan_test(SeriesElasticElementLength,'SeriesElasticElementLength')
+		# dp.nan_test(PassiveMuscleForce,'PassiveMuscleForce')
+		# dp.nan_test(NormalizedSeriesElasticLength,'NormalizedSeriesElasticLength')
+		# dp.nan_test(MaximumMusculoTendonLength,'MaximumMusculoTendonLength')
+		# dp.nan_test(SeriesElasticLength,'SeriesElasticLength')
+		# dp.nan_test(NormalizedMaximumFascicleLength,'NormalizedMaximumFascicleLength')
+		# dp.nan_test(MaximumContractileElementLength,'MaximumContractileElementLength')
 
-	# calculate maximal force output of the muscle based on PCSA
-	MuscleDensity = 1.06 #g/cm**3
-	PCSA = (MuscleMass*1000)/MuscleDensity/OptimalLength #physionp.logical cross-sectional area
-	SpecificTension = 31.4 # WHERE DOES THIS COME FROM AND WHAT DOES IT MEAN? N/
-	MaximumContractileElementForce = PCSA * SpecificTension
+		InitialLength = float((InitialMusculoTendonLength+OptimalTendonLength\
+								*((TendonRateConstant/MuscleRateConstant)*RestingMuscleLength-NormalizedRestingTendonLength\
+								- TendonRateConstant*np.log((MuscleConstant/TendonConstant)*(MuscleRateConstant/TendonRateConstant))))\
+								/(100*(1+TendonRateConstant/MuscleRateConstant*OptimalTendonLength/MaximumContractileElementLength*(1/OptimalLength))*np.cos(PennationAngle)))
+		ContractileElementLength = float(InitialLength/(OptimalLength/100)) # initializing CE Length
+		SeriesElasticElementLength = float((InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength) # MTU - initial muscle = initial SEE length
 
+		# dp.compare(InitialLength,0.1066)
+		# dp.nan_test(InitialLength,'InitialLength')
+		# dp.nan_test(ContractileElementLength,'ContractileElementLength')
+		# dp.nan_test(SeriesElasticElementLength,'SeriesElasticElementLength')
+
+		# calculate maximal force output of the muscle based on PCSA
+		MuscleDensity = 1.06 #g/cm**3
+		PCSA = (MuscleMass*1000)/MuscleDensity/OptimalLength #physionp.logical cross-sectional area
+		SpecificTension = 31.4 # WHERE DOES THIS COME FROM AND WHAT DOES IT MEAN? N/
+		MaximumContractileElementForce = PCSA * SpecificTension
+
+		# parameter initialization
+		ContractileElementVelocity = 0
+		ContractileElementAcceleration = 0
+		MuscleAcceleration = [0]
+		MuscleVelocity = [0]
+		MuscleLength = [ContractileElementLength*OptimalLength/100]
+		SeriesElasticElementForce = 0.105
+
+		# Activation dynamics parameters
+		Y_dot = 0
+		Y = 0
+		Saf_dot = 0
+		Saf = 0
+		fint_dot = 0
+		fint = 0
+		feff_dot = 0
+		feff = 0
+
+		ActivationFrequency = 0
+		EffectiveMuscleActivation = 0
+
+		DynamicSpindleFrequency = 0
+		StaticSpindleFrequency = 0
+		Bag1TensionSecondDeriv = 0
+		Bag1TensionFirstDeriv = 0
+		Bag1Tension = 0
+		Bag2TensionSecondDeriv = 0
+		Bag2TensionFirstDeriv = 0
+		Bag2Tension = 0
+		ChainTensionSecondDeriv = 0
+		ChainTensionFirstDeriv = 0
+		ChainTension = 0
+
+		Input, IaInput, IIInput = [],[],[]
+		IbInput, x, TemporaryIbInput = [],[],[]
+		Noise, FilteredNoise, LongInput = [],[],[]
+		OutputForceMuscle,OutputForceTendon,OutputForceLength = [], [], []
+		OutputForceVelocity,OutputForcePassive1,OutputForcePassive2 = [], [], []
+		OutputSeriesElasticElementLength,OutputContractileElementVelocity = [(InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength], []
+		OutputContractileElementLength = [InitialLength/(OptimalLength/100)]
+		OutputContractileElementAcceleration,OutputActivationFrequency,OutputEffectiveMuscleActivation = [], [], []
+
+		return(PassiveMuscleForce,NormalizedSeriesElasticLength,SeriesElasticLength,\
+				MaximumMusculoTendonLength,NormalizedMaximumFascicleLength,MaximumContractileElementLength, \
+				InitialLength,ContractileElementLength,SeriesElasticElementLength, \
+				MaximumContractileElementForce,ContractileElementVelocity,ContractileElementAcceleration, \
+				MuscleAcceleration,MuscleVelocity,MuscleLength, \
+				SeriesElasticElementForce,Y_dot,Y, \
+				Saf_dot,Saf,fint_dot, \
+				fint,feff_dot,feff, \
+				ActivationFrequency,EffectiveMuscleActivation,DynamicSpindleFrequency, \
+				StaticSpindleFrequency,Bag1TensionSecondDeriv,Bag1TensionFirstDeriv, \
+				Bag1Tension,Bag2TensionSecondDeriv,Bag2TensionFirstDeriv, \
+				Bag2Tension,ChainTensionSecondDeriv,ChainTensionFirstDeriv, \
+				ChainTension,Input, IaInput, \
+				IIInput, IbInput, x, \
+				TemporaryIbInput, Noise, FilteredNoise, \
+				LongInput,OutputForceMuscle,OutputForceTendon,\
+				OutputForceLength,OutputForceVelocity,OutputForcePassive1,\
+				OutputForcePassive2,OutputSeriesElasticElementLength,OutputContractileElementVelocity,\
+				OutputContractileElementLength,OutputContractileElementAcceleration,OutputActivationFrequency,\
+				OutputEffectiveMuscleActivation)
+
+	PassiveMuscleForce1,NormalizedSeriesElasticLength1,SeriesElasticLength1,\
+			MaximumMusculoTendonLength1,NormalizedMaximumFascicleLength1,MaximumContractileElementLength1, \
+			InitialLength1,ContractileElementLength1,SeriesElasticElementLength1, \
+			MaximumContractileElementForce1,ContractileElementVelocity1,ContractileElementAcceleration1, \
+			MuscleAcceleration1,MuscleVelocity1,MuscleLength1, \
+			SeriesElasticElementForce1,Y_dot1,Y1, \
+			Saf_dot1,Saf1,fint_dot1, \
+			fint1,feff_dot1,feff1, \
+			ActivationFrequency1,EffectiveMuscleActivation1,DynamicSpindleFrequency1, \
+			StaticSpindleFrequency1,Bag1TensionSecondDeriv1,Bag1TensionFirstDeriv1, \
+			Bag1Tension1,Bag2TensionSecondDeriv1,Bag2TensionFirstDeriv1, \
+			Bag2Tension1,ChainTensionSecondDeriv1,ChainTensionFirstDeriv1, \
+			ChainTension1, Input1, IaInput1, \
+			IIInput1, IbInput1, x1, \
+			TemporaryIbInput1, Noise1, FilteredNoise1, \
+			LongInput1,OutputForceMuscle1,OutputForceTendon1,\
+			OutputForceLength1,OutputForceVelocity1,OutputForcePassive1_1,\
+			OutputForcePassive2_1,OutputSeriesElasticElementLength1,OutputContractileElementVelocity1,\
+			OutputContractileElementLength1,OutputContractileElementAcceleration1,OutputActivationFrequency1,\
+			OutputEffectiveMuscleActivation1 \
+				= return_initial_values(PennationAngle1,MuscleMass1,OptimalLength1,OptimalTendonLength1,\
+										InitialMuscleLength1,InitialTendonLength1,InitialMusculoTendonLength1)
+	PassiveMuscleForce2,NormalizedSeriesElasticLength2,SeriesElasticLength2,\
+			MaximumMusculoTendonLength2,NormalizedMaximumFascicleLength2,MaximumContractileElementLength2, \
+			InitialLength2,ContractileElementLength2,SeriesElasticElementLength2, \
+			MaximumContractileElementForce2,ContractileElementVelocity2,ContractileElementAcceleration2, \
+			MuscleAcceleration2,MuscleVelocity2,MuscleLength2, \
+			SeriesElasticElementForce2,Y_dot2,Y2, \
+			Saf_dot2,Saf2,fint_dot2, \
+			fint2,feff_dot2,feff2, \
+			ActivationFrequency2,EffectiveMuscleActivation2,DynamicSpindleFrequency2, \
+			StaticSpindleFrequency2,Bag2TensionSecondDeriv2,Bag2TensionFirstDeriv2, \
+			Bag2Tension2,Bag2TensionSecondDeriv2,Bag2TensionFirstDeriv2, \
+			Bag2Tension2,ChainTensionSecondDeriv2,ChainTensionFirstDeriv2, \
+			ChainTension2, Input2, IaInput2, \
+			IIInput2, IbInput2, x2, \
+			TemporaryIbInput2, Noise2, FilteredNoise2, \
+			LongInput2,OutputForceMuscle2,OutputForceTendon2,\
+			OutputForceLength2,OutputForceVelocity2,OutputForcePassive1_2,\
+			OutputForcePassive2_2,OutputSeriesElasticElementLength2,OutputContractileElementVelocity2,\
+			OutputContractileElementLength2,OutputContractileElementAcceleration2,OutputActivationFrequency2,\
+			OutputEffectiveMuscleActivation2 \
+				= return_initial_values(PennationAngle2,MuscleMass2,OptimalLength2,OptimalTendonLength2,\
+										InitialMuscleLength2,InitialTendonLength2,InitialMusculoTendonLength2)
 	#dp.nan_test(PCSA,'PCSA')
 
 	# visnp.cosity of muscle (ref: Elias et al. 2014)
 	MuscleViscosity = 0.005 #0.001
 
 	# assign delays
-	EfferentDelay = delay_parameters['Efferent Delay']
-	IaAfferentDelay = delay_parameters['Ia Delay']
-	IIAfferentDelay = delay_parameters['II Delay']
-	IbAfferentDelay = delay_parameters['Ib Delay']
-	CorticalDelay = delay_parameters['Cortical Delay']
+	EfferentDelay1 = delay_1_parameters['Efferent Delay']
+	IaAfferentDelay1 = delay_1_parameters['Ia Delay']
+	IIAfferentDelay1 = delay_1_parameters['II Delay']
+	IbAfferentDelay1 = delay_1_parameters['Ib Delay']
+	CorticalDelay1 = delay_1_parameters['Cortical Delay']
+
+	EfferentDelay2 = delay_2_parameters['Efferent Delay']
+	IaAfferentDelay2 = delay_2_parameters['Ia Delay']
+	IIAfferentDelay2 = delay_2_parameters['II Delay']
+	IbAfferentDelay2 = delay_2_parameters['Ib Delay']
+	CorticalDelay2 = delay_2_parameters['Cortical Delay']
 
 	SamplingFrequency = 10000
 	FeedbackSamplingFrequency = 1000
@@ -179,44 +289,11 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	SamplingPeriod = 1/SamplingFrequency
 	Time = np.arange(0,len(TargetTrajectory)*SamplingPeriod,SamplingPeriod) # 0:SamplingPeriod:(length(TargetTrajectory)-1)/SamplingFrequency
 
-	# parameter initialization
-	ContractileElementVelocity = 0
-	ContractileElementAcceleration = 0
-	MuscleAcceleration = [0]
-	MuscleVelocity = [0]
-	MuscleLength = [ContractileElementLength*OptimalLength/100]
-	SeriesElasticElementForce = 0.105
-
 	# filter parameters for Noise
 	BButtersCoefficients,AButtersCoefficients = signal.butter(4,100/(SamplingFrequency/2),'low')
 
 	# dp.compare(BButtersCoefficients,np.array([0.0898e-05, 0.3594e-05, 0.5391e-05, 0.3594e-05, 0.0898e-05]))
 	# dp.compare(AButtersCoefficients,np.array([1.0000, -3.8358,  5.5208, -3.5335,  0.8486]))
-
-	# Activation dynamics parameters
-	Y_dot = 0
-	Y = 0
-	Saf_dot = 0
-	Saf = 0
-	fint_dot = 0
-	fint = 0
-	feff_dot = 0
-	feff = 0
-
-	ActivationFrequency = 0
-	EffectiveMuscleActivation = 0
-
-	DynamicSpindleFrequency = 0
-	StaticSpindleFrequency = 0
-	Bag1TensionSecondDeriv = 0
-	Bag1TensionFirstDeriv = 0
-	Bag1Tension = 0
-	Bag2TensionSecondDeriv = 0
-	Bag2TensionFirstDeriv = 0
-	Bag2Tension = 0
-	ChainTensionSecondDeriv = 0
-	ChainTensionFirstDeriv = 0
-	ChainTension = 0
 
 	## GTO model
 	GTOConstant1 = 60
@@ -228,35 +305,58 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	Num,Den = control.matlab.tfdata(DiscreteTransferFunction)
 	Num,Den = Num[0][0],Den[0][0]
 
-	dp.compare(Num,np.array([1.7000,-3.3974, 1.6974]))
-	dp.compare(Den,np.array([1.0000,-1.9978,0.9978]))
+	# dp.compare(Num,np.array([1.7000,-3.3974, 1.6974]))
+	# dp.compare(Den,np.array([1.0000,-1.9978,0.9978]))
+
 	## Transcortical loop
 	TransCorticalLoopConstant = 0.01
 
 	## Gains
-	GammaDynamicGain = gain_parameters['Gamma Dynamic Gain']
-	GammaStaticGain = gain_parameters['Gamma Static Gain']
-	IaSpindleGain = gain_parameters['Ia Gain']
-	IISpindleGain = gain_parameters['II Gain']
-	IbGTOGain = gain_parameters['Ib Gain']
+	GammaDynamicGain1 = gain_1_parameters['Gamma Dynamic Gain']
+	GammaStaticGain1 = gain_1_parameters['Gamma Static Gain']
+	IaSpindleGain1 = gain_1_parameters['1Ia Gain']
+	IISpindleGain1 = gain_1_parameters['II Gain']
+1	IbGTOGain1 =1 gain_1_parameters['Ib Gain']1
 
-	# Convert delays in ms to samples
-	IaAfferentDelayTimeStep = int(IaAfferentDelay*SamplingRatio)   #Ia + II 30
-	# assert IaAfferentDelayTimeStep == IaAfferentDelay*SamplingRatio, "Delay Time Step Mismatch!"
-	IIAfferentDelayTimeStep = int(IIAfferentDelay*SamplingRatio)
-	# assert IIAfferentDelayTimeStep == IIAfferentDelay*SamplingRatio, "Delay Time Step Mismatch!"
-	IbAfferentDelayTimeStep = int(IbAfferentDelay*SamplingRatio)   #Ib 40
-	# assert IbAfferentDelayTimeStep == IbAfferentDelay*SamplingRatio, "Delay Time Step Mismatch!"
-	CorticalDelayTimeStep = int(CorticalDelay*SamplingRatio)   #cortical 50
-	# assert CorticalDelayTimeStep == CorticalDelay*SamplingRatio, "Delay Time Step Mismatch!"
-	EfferentDelayTimeStep = int(EfferentDelay*SamplingRatio)
-	# assert EfferentDelayTimeStep == EfferentDelay*SamplingRatio, "Delay Time Step Mismatch!"
+1	GammaDynamicGain2 = gain_2_parameters1['Gamma Dynamic Gain1']1
+	GammaStaticGain2 =1 gain_2_parameters['Gamma Static1 Gain']
+	IaSpindleGain2 = gain_2_parameters['Ia Gain']
+	IISpindleGain21 = gain_2_parameters1['II Gain']
+	IbGTOGain21 = gain_2_parameters1['Ib Gain'1]
 
-	FeedbackInput = 0
+1	# Convert1 delays in ms1 to samples
+1	IaAfferentDelayTimeStep1 =1 int(IaAfferentDelay1*SamplingRatio1)   #Ia +1 II 30
+	IIAfferentDelayTimeStep1 = int(IIAfferentDelay1*SamplingRatio)
+	IbAfferentDelayTimeStep1 = int(IbAfferentDelay1*SamplingRatio)   #Ib 40
+	CorticalDelayTimeStep1 = int(CorticalDelay1*SamplingRatio)   #cortical 50
+	EfferentDelayTimeStep1 = int(EfferentDelay1*SamplingRatio)
+
+	IaAfferentDelayTimeStep2 = int(IaAfferentDelay2*SamplingRatio)   #Ia + II 30
+	IIAfferentDelayTimeStep2 = int(IIAfferentDelay2*SamplingRatio)
+	IbAfferentDelayTimeStep2 = int(IbAfferentDelay2*SamplingRatio)   #Ib 40
+	CorticalDelayTimeStep2 = int(CorticalDelay2*SamplingRatio)   #cortical 50
+	EfferentDelayTimeStep2 = int(EfferentDelay2*SamplingRatio)
+
+	# assert IaAfferentDelayTimeStep1 == IaAfferentDelay1*SamplingRatio, "Delay Time Step Mismatch!"
+	# assert IIAfferentDelayTimeStep1 == IIAfferentDelay1*SamplingRatio, "Delay Time Step Mismatch!"
+	# assert IbAfferentDelayTimeStep1 == IbAfferentDelay1*SamplingRatio, "Delay Time Step Mismatch!"
+	# assert CorticalDelayTimeStep1 == CorticalDelay1*SamplingRatio, "Delay Time Step Mismatch!"
+	# assert EfferentDelayTimeStep1 == EfferentDelay1*SamplingRatio, "Delay Time Step Mismatch!"
+
+	# assert IaAfferentDelayTimeStep2 == IaAfferentDelay2*SamplingRatio, "Delay Time Step Mismatch!"
+	# assert IIAfferentDelayTimeStep2 == IIAfferentDelay2*SamplingRatio, "Delay Time Step Mismatch!"
+	# assert IbAfferentDelayTimeStep2 == IbAfferentDelay2*SamplingRatio, "Delay Time Step Mismatch!"
+	# assert CorticalDelayTimeStep2 == CorticalDelay2*SamplingRatio, "Delay Time Step Mismatch!"
+	# assert EfferentDelayTimeStep2 == EfferentDelay2*SamplingRatio, "Delay Time Step Mismatch!"
+
+	FeedbackInput1, FeedbackInput2 = 0,0
 	Count = 0
 
 	# Convert force trajectory to unit of newton
-	TargetForceTrajectory = TargetTrajectory*MaximumContractileElementForce
+	TargetForceTrajectory1 = TargetTrajectory1*MaximumContractileElementForce1
+	TargetForceTrajectory2 = TargetTrajectory2*MaximumContractileElementForce2
+	FeedforwardInput1 = TargetForceTrajectory1/MaximumContractileElementForce1
+	FeedforwardInput2 = TargetForceTrajectory2/MaximumContractileElementForce2
 
 	def bag1_model(Length,LengthFirstDeriv,LengthSecondDeriv,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension):
 		## Feedback system parameters
@@ -628,136 +728,196 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		NormalizedSeriesElasticElementForce = cT_se * kT_se * np.log(np.exp((LT - LrT_se)/kT_se)+1)
 		#dp.nan_test(NormalizedSeriesElasticElementForce,'NormalizedSeriesElasticElementForce')
 		return(NormalizedSeriesElasticElementForce)
-	# def generate_Ib_input(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,\
-	# 						DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
-	# 						StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
-	# 						ChainTensionFirstDeriv,ChainTension,x,i):
-
-	
-	Input, IaInput, IIInput = [],[],[]
-	IbInput, x, TemporaryIbInput = [],[],[]
-	Noise, FilteredNoise, LongInput = [],[],[]
-	OutputForceMuscle,OutputForceTendon,OutputForceLength = [], [], []
-	OutputForceVelocity,OutputForcePassive1,OutputForcePassive2 = [], [], []
-	OutputSeriesElasticElementLength,OutputContractileElementVelocity = [(InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength], []
-	OutputContractileElementLength = [InitialLength/(OptimalLength/100)]
-	OutputContractileElementAcceleration,OutputActivationFrequency,OutputEffectiveMuscleActivation = [], [], []
 	
 	StartTime = time.time()
-	FeedforwardInput = TargetForceTrajectory/MaximumContractileElementForce
-
 	for i in range(len(Time)): #= 1:length(Time)
 		if FeedbackOption == 'ff_only': # Feedforward input onl
-			Input.append(FeedforwardInput[i])
-			IaInput.append(0)
-			IIInput.append(0)
-			IbInput.append(0)
+			Input1.append(FeedforwardInput1[i])
+			IaInput1.append(0)
+			IIInput1.append(0)
+			IbInput1.append(0)
+
+			Input2.append(FeedforwardInput2[i])
+			IaInput2.append(0)
+			IIInput2.append(0)
+			IbInput2.append(0)
 		elif FeedbackOption == 'servo_control': # Servo control (feedforward + spindle and GTO)
-			PrimaryOutput,SecondaryOutput = spindle_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,\
-				DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
-				StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
-				ChainTensionFirstDeriv,ChainTension)
-			IaInput.append(PrimaryOutput)
-			IIInput.append(SecondaryOutput)
+			PrimaryOutput1,SecondaryOutput1 = spindle_model(ContractileElementLength1,ContractileElementVelocity1,ContractileElementAcceleration1,\
+				DynamicSpindleFrequency1,Bag1TensionFirstDeriv1,Bag1Tension1,\
+				StaticSpindleFrequency1,Bag2TensionFirstDeriv1,Bag2Tension1,\
+				ChainTensionFirstDeriv1,ChainTension1)
+			PrimaryOutput2,SecondaryOutput2 = spindle_model(ContractileElementLength2,ContractileElementVelocity2,ContractileElementAcceleration2,\
+				DynamicSpindleFrequency2,Bag1TensionFirstDeriv2,Bag1Tension2,\
+				StaticSpindleFrequency2,Bag2TensionFirstDeriv2,Bag2Tension2,\
+				ChainTensionFirstDeriv2,ChainTension2)
+			IaInput1.append(PrimaryOutput1)
+			IIInput1.append(SecondaryOutput1)
+			IaInput2.append(PrimaryOutput2)
+			IIInput2.append(SecondaryOutput2)
 			if i == Count:
 				# Get spindle primary and secondary afferent activity
 
 				# Get Ib activity
-				x.append(GTOConstant1*np.log(SeriesElasticElementForce/GTOConstant2+1))
+				x1.append(GTOConstant1*np.log(SeriesElasticElementForce1/GTOConstant2+1))
+				x2.append(GTOConstant1*np.log(SeriesElasticElementForce2/GTOConstant2+1))
 				if i == 0:
-					TemporaryIbInput.append(x[-1])
+					TemporaryIbInput1.append(x1[-1])
+					TemporaryIbInput2.append(x2[-1])
 				elif i == 1*SamplingRatio:
-					TemporaryIbInput.append(x[-1])
+					TemporaryIbInput1.append(x1[-1])
+					TemporaryIbInput2.append(x2[-1])
 				elif i == 2*SamplingRatio:
-					TemporaryIbInput.append((Num[0]*x[-1])/Den[0])
+					TemporaryIbInput1.append((Num[0]*x1[-1])/Den[0])
+					TemporaryIbInput2.append((Num[0]*x2[-1])/Den[0])
 				elif i == 3*SamplingRatio:
-					TemporaryIbInput.append((Num[1]*x[-2] + Num[0]*x[-1] \
-						- Den[1]*TemporaryIbInput[-2])/Den[0])
+					TemporaryIbInput1.append((Num[1]*x1[-2] + Num[0]*x1[-1] \
+						- Den[1]*TemporaryIbInput1[-2])/Den[0])
+					TemporaryIbInput2.append((Num[1]*x2[-2] + Num[0]*x2[-1] \
+						- Den[1]*TemporaryIbInput2[-2])/Den[0])
 				elif i >= 3*SamplingRatio:
-					TemporaryIbInput.append((Num[2]*x[-3] + Num[1]*x[-2] + Num[0]*x[-1] \
-						- Den[2]*TemporaryIbInput[-3] - Den[1]*TemporaryIbInput[-2])/Den[0])
+					TemporaryIbInput1.append((Num[2]*x1[-3] + Num[1]*x1[-2] + Num[0]*x1[-1] \
+						- Den[2]*TemporaryIbInput1[-3] - Den[1]*TemporaryIbInput1[-2])/Den[0])
+					TemporaryIbInput2.append((Num[2]*x2[-3] + Num[1]*x2[-2] + Num[0]*x2[-1] \
+						- Den[2]*TemporaryIbInput2[-3] - Den[1]*TemporaryIbInput2[-2])/Den[0])
 
-				IbInput.append(TemporaryIbInput[-1]*(TemporaryIbInput[-1]>0))
+				IbInput1.append(TemporaryIbInput1[-1]*(TemporaryIbInput1[-1]>0))
+				IbInput2.append(TemporaryIbInput2[-1]*(TemporaryIbInput2[-1]>0))
 			
-				if i in range(IaAfferentDelayTimeStep-1,IbAfferentDelayTimeStep):
-					Input.append(IaInput[i-IaAfferentDelayTimeStep-1]/IaSpindleGain \
-								+FeedforwardInput[i]) #input to the muscle
-				elif i in range(IbAfferentDelayTimeStep, IIAfferentDelayTimeStep):
-					Input.append(IaInput[i-IaAfferentDelayTimeStep-1]/IaSpindleGain \
-								-IbInput[i-IbAfferentDelayTimeStep-1]/IbGTOGain \
-								+FeedforwardInput[i]) #input to the muscle
-				elif i in range(IIAfferentDelayTimeStep, CorticalDelayTimeStep):
-					Input.append(IaInput[i-IaAfferentDelayTimeStep-1]/IaSpindleGain \
-								+IIInput[i-IIAfferentDelayTimeStep-1]/IISpindleGain \
-								-IbInput[i-IbAfferentDelayTimeStep-1]/IbGTOGain \
-								+FeedforwardInput[i]) #input to the muscle
+				if i in range(IaAfferentDelayTimeStep1-1,IbAfferentDelayTimeStep1):
+					Input1.append(IaInput1[i-IaAfferentDelayTimeStep1-1]/IaSpindleGain1 \
+								+FeedforwardInput1[i]) #input to the muscle
+				elif i in range(IbAfferentDelayTimeStep1, IIAfferentDelayTimeStep1):
+					Input1.append(IaInput1[i-IaAfferentDelayTimeStep1-1]/IaSpindleGain1 \
+								-IbInput1[i-IbAfferentDelayTimeStep1-1]/IbGTOGain1 \
+								+FeedforwardInput1[i]) #input to the muscle
+				elif i in range(IIAfferentDelayTimeStep1, CorticalDelayTimeStep1):
+					Input1.append(IaInput1[i-IaAfferentDelayTimeStep1-1]/IaSpindleGain1 \
+								+IIInput1[i-IIAfferentDelayTimeStep1-1]/IISpindleGain1 \
+								-IbInput1[i-IbAfferentDelayTimeStep1-1]/IbGTOGain1 \
+								+FeedforwardInput1[i]) #input to the muscle
 				else:	
-					Input.append(FeedforwardInput[i])
+					Input1.append(FeedforwardInput1[i])
+
+				if i in range(IaAfferentDelayTimeStep2-1,IbAfferentDelayTimeStep2):
+					Input2.append(IaInput2[i-IaAfferentDelayTimeStep2-1]/IaSpindleGain2 \
+								+FeedforwardInput2[i]) #input to the muscle
+				elif i in range(IbAfferentDelayTimeStep2, IIAfferentDelayTimeStep2):
+					Input2.append(IaInput2[i-IaAfferentDelayTimeStep2-1]/IaSpindleGain2 \
+								-IbInput2[i-IbAfferentDelayTimeStep2-1]/IbGTOGain2 \
+								+FeedforwardInput2[i]) #input to the muscle
+				elif i in range(IIAfferentDelayTimeStep2, CorticalDelayTimeStep2):
+					Input2.append(IaInput2[i-IaAfferentDelayTimeStep2-1]/IaSpindleGain2 \
+								+IIInput2[i-IIAfferentDelayTimeStep2-1]/IISpindleGain2 \
+								-IbInput2[i-IbAfferentDelayTimeStep2-1]/IbGTOGain2 \
+								+FeedforwardInput2[i]) #input to the muscle
+				else:	
+					Input2.append(FeedforwardInput2[i])
 				
 				Count = SamplingRatio+Count
 			else:
-				IbInput.append(IbInput[-1])
-				Input.append(Input[-1])
+				IbInput1.append(IbInput1[-1])
+				Input1.append(Input1[-1])
+				IbInput2.append(IbInput2[-1])
+				Input2.append(Input2[-1])
 		
 		elif FeedbackOption == 'fb_control': # Feedback control (proprioceptive systems + supraspinal loop)
-			PrimaryOutput,SecondaryOutput = spindle_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,\
-															DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
-															StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
-															ChainTensionFirstDeriv,ChainTension)
+			PrimaryOutput1,SecondaryOutput1 = spindle_model(ContractileElementLength1,ContractileElementVelocity1,ContractileElementAcceleration1,\
+				DynamicSpindleFrequency1,Bag1TensionFirstDeriv1,Bag1Tension1,\
+				StaticSpindleFrequency1,Bag2TensionFirstDeriv1,Bag2Tension1,\
+				ChainTensionFirstDeriv1,ChainTension1)
+			PrimaryOutput2,SecondaryOutput2 = spindle_model(ContractileElementLength2,ContractileElementVelocity2,ContractileElementAcceleration2,\
+				DynamicSpindleFrequency2,Bag1TensionFirstDeriv2,Bag1Tension2,\
+				StaticSpindleFrequency2,Bag2TensionFirstDeriv2,Bag2Tension2,\
+				ChainTensionFirstDeriv2,ChainTension2)
+			IaInput1.append(PrimaryOutput1)
+			IIInput1.append(SecondaryOutput1)
+			IaInput2.append(PrimaryOutput2)
+			IIInput2.append(SecondaryOutput2)
 			# if i == 0: dp.compare([PrimaryOutput,SecondaryOutput],[0,7.5646])
-			IaInput.append(PrimaryOutput)
-			IIInput.append(SecondaryOutput)
+
 			if i == Count:
 				# Get spindle primary and secondary afferent activity
 				
 				# Get Ib activity
-				x.append(GTOConstant1*np.log((SeriesElasticElementForce/GTOConstant2+1)))
+				x1.append(GTOConstant1*np.log((SeriesElasticElementForce1/GTOConstant2+1)))
+				x2.append(GTOConstant1*np.log((SeriesElasticElementForce2/GTOConstant2+1)))
 				if i == 0:
-					TemporaryIbInput.append(x[-1])
+					TemporaryIbInput1.append(x1[-1])
+					TemporaryIbInput2.append(x2[-1])
 				elif i == 1*SamplingRatio:
-					TemporaryIbInput.append(x[-1])
+					TemporaryIbInput1.append(x1[-1])
+					TemporaryIbInput2.append(x2[-1])
 				elif i == 2*SamplingRatio:
-					TemporaryIbInput.append((Num[0]*x[-1])/Den[0])
+					TemporaryIbInput1.append((Num[0]*x1[-1])/Den[0])
+					TemporaryIbInput2.append((Num[0]*x2[-1])/Den[0])
 				elif i == 3*SamplingRatio:
-					TemporaryIbInput.append((Num[1]*x[-2] + Num[0]*x[-1]- Den[1]*TemporaryIbInput[-1])/Den[0])
-				elif i > 3*SamplingRatio:
-					TemporaryIbInput.append((Num[2]*x[-3] + Num[1]*x[-2] + Num[0]*x[-1] \
-														- Den[2]*TemporaryIbInput[-2] - Den[1]*TemporaryIbInput[-1])/Den[0])
+					TemporaryIbInput1.append((Num[1]*x1[-2] + Num[0]*x1[-1] \
+						- Den[1]*TemporaryIbInput1[-2])/Den[0])
+					TemporaryIbInput2.append((Num[1]*x2[-2] + Num[0]*x2[-1] \
+						- Den[1]*TemporaryIbInput2[-2])/Den[0])
+				elif i >= 3*SamplingRatio:
+					TemporaryIbInput1.append((Num[2]*x1[-3] + Num[1]*x1[-2] + Num[0]*x1[-1] \
+						- Den[2]*TemporaryIbInput1[-2] - Den[1]*TemporaryIbInput1[-1])/Den[0])
+					TemporaryIbInput2.append((Num[2]*x2[-3] + Num[1]*x2[-2] + Num[0]*x2[-1] \
+						- Den[2]*TemporaryIbInput2[-2] - Den[1]*TemporaryIbInput2[-1])/Den[0])
 
-				IbInput.append(TemporaryIbInput[-1]*(TemporaryIbInput[-1]>0))
+				IbInput1.append(TemporaryIbInput1[-1]*(TemporaryIbInput1[-1]>0))
+				IbInput2.append(TemporaryIbInput2[-1]*(TemporaryIbInput2[-1]>0))
 
 				# if i == 0: dp.compare(float(IbInput[-1]),1.554682907070062)
 				# if i == 2*SamplingRatio: dp.compare(float(IbInput[-1]),1.554682907070062)
 				# if i == 3*SamplingRatio: dp.compare(float(IbInput[-1]),1.554682907070062)
 				# if i == 4*SamplingRatio: dp.compare(float(IbInput[-1]),1.554682907070062)
-
-				if i in range(IaAfferentDelayTimeStep-1,IbAfferentDelayTimeStep):
-					Input.append(IaInput[i-IaAfferentDelayTimeStep-1]/IaSpindleGain\
-								+ FeedforwardInput[i]	) #input to the muscle
-				elif i in range(IbAfferentDelayTimeStep, IIAfferentDelayTimeStep):
-					Input.append(IaInput[i-IaAfferentDelayTimeStep-1]/IaSpindleGain \
-								- IbInput[i-IbAfferentDelayTimeStep-1]/IbGTOGain \
-								+ FeedforwardInput[i] ) #input to the muscle
-				elif i in range(IIAfferentDelayTimeStep, CorticalDelayTimeStep):
-					Input.append(IaInput[i-IaAfferentDelayTimeStep-1]/IaSpindleGain \
-								+ IIInput[i-IIAfferentDelayTimeStep-1]/IISpindleGain \
-								- IbInput[i-IbAfferentDelayTimeStep-1]/IbGTOGain \
-								+ FeedforwardInput[i]	) #input to the muscle
-				elif i > CorticalDelayTimeStep-1:
-					FeedbackInput = TransCorticalLoopConstant*(TargetForceTrajectory[i]-OutputForceTendon[i-CorticalDelayTimeStep-1])/MaximumContractileElementForce + FeedbackInput  # feedback input through cortical pathway
-					Input.append(IaInput[i-IaAfferentDelayTimeStep]/IaSpindleGain \
-								+IIInput[i-IIAfferentDelayTimeStep]/IISpindleGain \
-								-IbInput[i-IbAfferentDelayTimeStep]/IbGTOGain \
-								+FeedbackInput	) #input to the muscle
+				if i in range(IaAfferentDelayTimeStep1-1,IbAfferentDelayTimeStep1):
+					Input1.append(IaInput1[i-IaAfferentDelayTimeStep1-1]/IaSpindleGain1 \
+								+FeedforwardInput1[i]) #input to the muscle
+				elif i in range(IbAfferentDelayTimeStep1, IIAfferentDelayTimeStep1):
+					Input1.append(IaInput1[i-IaAfferentDelayTimeStep1-1]/IaSpindleGain1 \
+								-IbInput1[i-IbAfferentDelayTimeStep1-1]/IbGTOGain1 \
+								+FeedforwardInput1[i]) #input to the muscle
+				elif i in range(IIAfferentDelayTimeStep1, CorticalDelayTimeStep1):
+					Input1.append(IaInput1[i-IaAfferentDelayTimeStep1-1]/IaSpindleGain1 \
+								+IIInput1[i-IIAfferentDelayTimeStep1-1]/IISpindleGain1 \
+								-IbInput1[i-IbAfferentDelayTimeStep1-1]/IbGTOGain1 \
+								+FeedforwardInput1[i]) #input to the muscle
+				elif i > CorticalDelayTimeStep1-1:
+					FeedbackInput1 = TransCorticalLoopConstant1*(TargetForceTrajectory1[i]-OutputForceTendon1[i-CorticalDelayTimeStep1-1])/MaximumContractileElementForce1 + FeedbackInput1  # feedback input through cortical pathway
+					Input1.append(IaInput1[i-IaAfferentDelayTimeStep1]/IaSpindleGain1 \
+								+IIInput1[i-IIAfferentDelayTimeStep1]/IISpindleGain1 \
+								-IbInput1[i-IbAfferentDelayTimeStep1]/IbGTOGain1 \
+								+FeedbackInput1	) #input to the muscle
 				else:	
-					Input.append(FeedforwardInput[i])
+					Input1.append(FeedforwardInput1[i])
+
+				if i in range(IaAfferentDelayTimeStep2-1,IbAfferentDelayTimeStep2):
+					Input2.append(IaInput2[i-IaAfferentDelayTimeStep2-1]/IaSpindleGain2 \
+								+FeedforwardInput2[i]) #input to the muscle
+				elif i in range(IbAfferentDelayTimeStep2, IIAfferentDelayTimeStep2):
+					Input2.append(IaInput2[i-IaAfferentDelayTimeStep2-1]/IaSpindleGain2 \
+								-IbInput2[i-IbAfferentDelayTimeStep2-1]/IbGTOGain2 \
+								+FeedforwardInput2[i]) #input to the muscle
+				elif i in range(IIAfferentDelayTimeStep2, CorticalDelayTimeStep2):
+					Input2.append(IaInput2[i-IaAfferentDelayTimeStep2-1]/IaSpindleGain2 \
+								+IIInput2[i-IIAfferentDelayTimeStep2-1]/IISpindleGain2 \
+								-IbInput2[i-IbAfferentDelayTimeStep2-1]/IbGTOGain2 \
+								+FeedforwardInput2[i]) #input to the muscle
+				elif i > CorticalDelayTimeStep1-1:
+					FeedbackInput2 = TransCorticalLoopConstant2*(TargetForceTrajectory2[i]-OutputForceTendon2[i-CorticalDelayTimeStep2-1])/MaximumContractileElementForce2 + FeedbackInput2  # feedback input through cortical pathway
+					Input2.append(IaInput2[i-IaAfferentDelayTimeStep2]/IaSpindleGain2 \
+								+IIInput2[i-IIAfferentDelayTimeStep2]/IISpindleGain2 \
+								-IbInput2[i-IbAfferentDelayTimeStep2]/IbGTOGain2 \
+								+FeedbackInput2	) #input to the muscle
+				else:	
+					Input2.append(FeedforwardInput2[i])
 				
 				Count = SamplingRatio+Count
 			else:
-				IbInput.append(IbInput[-1])
-				Input.append(Input[-1])
+				IbInput1.append(IbInput1[-1])
+				Input1.append(Input1[-1])
+				IbInput2.append(IbInput2[-1])
+				Input2.append(Input2[-1])
 
-		elif FeedbackOption == 'cortical_fb_only':
+		elif FeedbackOption == 'cortical_fb_only': # STILL NEED TO DO THIS ONE!
 			if i > CorticalDelayTimeStep-1:
 				FeedbackInput = TransCorticalLoopConstant*(TargetForceTrajectory[i]-OutputForceTendon[i-CorticalDelayTimeStep-1])/MaximumContractileElementForce + FeedbackInput  # feedback input through cortical pathway
 				Input.append(FeedbackInput) #input to the muscle
@@ -767,6 +927,8 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 			IaInput.append(0)
 			IIInput.append(0)
 			IbInput.append(0)
+
+		\ended here on 10/14/16
 
 		# Feedforward only
 		# Input[i] = input[i] #TargetForceTrajectory[i]/MaximumContractileElementForce
