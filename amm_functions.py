@@ -148,3 +148,495 @@ def generate_target_force_trajectory(TrajectoryType,Time,Amplitude,AmplitudeModu
 		# 3%MVC + 10s hold => 
 	"""
 	return(TargetForceTrajectory)
+
+
+	def bag1_model(Length,LengthFirstDeriv,LengthSecondDeriv,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension):
+		## Feedback system parameters
+		## Spindle Model
+		p = 2
+
+		Bag1TimeConstant = 0.149
+		Bag1Frequency = 60
+
+		Bag1BetaNot = 0.0605
+		Bag1Beta = 0.2592
+		Bag1Gamma = 0.0289
+
+		G = 20000  #7000
+
+		C = 0.58*(LengthFirstDeriv >= 0) + 0.42 # when true C = 1 else, C = 0.42       
+		
+		DynamicSpindleFrequencyFirstDeriv = (GammaDynamicGain**p/(GammaDynamicGain**p+Bag1Frequency**p) - DynamicSpindleFrequency)\
+										/ Bag1TimeConstant
+		DynamicSpindleFrequency = (SamplingPeriod)*DynamicSpindleFrequencyFirstDeriv + DynamicSpindleFrequency
+
+		#nan_test(DynamicSpindleFrequencyFirstDeriv,'DynamicSpindleFrequencyFirstDeriv')
+		#nan_test(DynamicSpindleFrequency,'DynamicSpindleFrequency')
+
+		Bag1Beta = Bag1BetaNot + Bag1Beta * DynamicSpindleFrequency
+		Bag1Gamma = Bag1Gamma * DynamicSpindleFrequency
+
+		R = 0.46 #length dependency of the force-velocity relationship
+		a = 0.3
+		K_SR = 10.4649
+		K_PR = 0.15
+		M = 0.0002 # intrafusal fiber mass
+
+		LN_SR = 0.0423
+
+		L0_SR = 0.04 #in units of L0
+		L0_PR = 0.76 #polar region rest length
+
+		Bag1TensionSecondDeriv = (K_SR/M)*(	(C*Bag1Beta*np.sign(LengthFirstDeriv-Bag1TensionFirstDeriv/K_SR) \
+											* ((abs(LengthFirstDeriv-Bag1TensionFirstDeriv/K_SR))**a)  \
+											* (Length-L0_SR-Bag1Tension/K_SR-R)) \
+											+ K_PR*(Length-L0_SR-Bag1Tension/K_SR-L0_PR) \
+											+ M*LengthSecondDeriv \
+											+ Bag1Gamma \
+											- Bag1Tension 	)
+		Bag1TensionFirstDeriv = Bag1TensionSecondDeriv*(SamplingPeriod) + Bag1TensionFirstDeriv
+		Bag1Tension = Bag1TensionFirstDeriv*(SamplingPeriod) + Bag1Tension
+
+		#nan_test(Bag1TensionSecondDeriv,'Bag1TensionSecondDeriv')
+		#nan_test(Bag1TensionFirstDeriv,'Bag1TensionFirstDeriv')
+		#nan_test(Bag1Tension,'Bag1Tension')
+
+		Bag1AfferentPotential = G*(Bag1Tension/K_SR-(LN_SR-L0_SR))
+
+		#nan_test(Bag1AfferentPotential,'Bag1AfferentPotential')
+
+		return(Bag1AfferentPotential,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension)
+	def bag2_model(Length,LengthFirstDeriv,LengthSecondDeriv,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension):
+		## Feedback system parameters
+		## spindle_model Model
+		p = 2
+
+		Bag2TimeConstant = 0.205
+		Bag2Frequency = 60
+
+		Bag2BetaNot = 0.0822
+		Bag2Beta = -0.046
+		Bag2Gamma = 0.0636
+
+		if LengthFirstDeriv >= 0:
+			C = 1 #constant describing the np.experimentally observed asymmetric effect of velocity on force production during lengthening and shortening
+		else:
+			C = 0.42
+
+		G = 10000 #7250 #3800
+
+		StaticSpindleFrequencyFirstDeriv = (GammaStaticGain**p/(GammaStaticGain**p+Bag2Frequency**p)-StaticSpindleFrequency) \
+										/ Bag2TimeConstant
+		StaticSpindleFrequency = (SamplingPeriod)*StaticSpindleFrequencyFirstDeriv + StaticSpindleFrequency
+
+		#nan_test(StaticSpindleFrequencyFirstDeriv,'StaticSpindleFrequencyFirstDeriv')
+		#nan_test(StaticSpindleFrequency,'StaticSpindleFrequency')
+
+		Bag2Beta = Bag2BetaNot + Bag2Beta * StaticSpindleFrequency
+		Bag2Gamma = Bag2Gamma * StaticSpindleFrequency
+
+		R = 0.46 #length dependency of the force-velocity relationship
+		a = 0.3
+		K_SR = 10.4649
+		K_PR = 0.15
+		M = 0.0002 # intrafusal fiber mass
+
+		LN_SR = 0.0423
+		LN_PR = 0.89
+
+		L0_SR = 0.04 #in units of L0
+		L0_PR = 0.76 #polar region rest length
+
+		L_secondary = 0.04
+		X = 0.7
+
+		Bag2TensionSecondDeriv = (K_SR/M)*(	(C*Bag2Beta*np.sign(LengthFirstDeriv-Bag2TensionFirstDeriv/K_SR)  \
+											*((abs(LengthFirstDeriv-Bag2TensionFirstDeriv/K_SR))**a)  \
+											*(Length-L0_SR-Bag2Tension/K_SR-R)+K_PR  \
+											*(Length-L0_SR-Bag2Tension/K_SR-L0_PR))  \
+											+ M*LengthSecondDeriv \
+											+ Bag2Gamma \
+											- Bag2Tension )
+		Bag2TensionFirstDeriv = Bag2TensionSecondDeriv*(SamplingPeriod) + Bag2TensionFirstDeriv
+		Bag2Tension = Bag2TensionFirstDeriv*(SamplingPeriod) + Bag2Tension
+
+		#nan_test(Bag2TensionSecondDeriv,'Bag2TensionSecondDeriv')
+		#nan_test(Bag2TensionFirstDeriv,'Bag2TensionFirstDeriv')
+		#nan_test(Bag2Tension,'Bag2Tension')
+
+		Bag2PrimaryAfferentPotential = G*(Bag2Tension/K_SR-(LN_SR-L0_SR))
+		Bag2SecondaryAfferentPotential = G*(	X*(L_secondary/L0_SR)*(Bag2Tension/K_SR-(LN_SR-L0_SR)) \
+							+(1-X)*(L_secondary/L0_PR)*(Length-Bag2Tension/K_SR-(L0_SR+LN_PR))	)
+
+		#nan_test(Bag2PrimaryAfferentPotential,'Bag2PrimaryAfferentPotential')
+		#nan_test(Bag2SecondaryAfferentPotential,'Bag2SecondaryAfferentPotential')
+
+		return(Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension)
+	def chain_model(Length,LengthFirstDeriv,LengthSecondDeriv,ChainTensionFirstDeriv,ChainTension):
+		## Feedback system parameters
+		## spindle_model Model
+		p = 2
+
+		ChainFrequency = 90
+
+		ChainBetaNot = 0.0822
+		ChainBeta = - 0.069
+		ChainGamma = 0.0954
+
+		if LengthFirstDeriv >= 0:
+			C = 1 #constant describing the np.experimentally observed asymmetric effect of velocity on force production during lengthening and shortening
+		else:
+			C = 0.42
+
+		G = 10000 #7250    #3000
+
+		ChainStaticSpindleFrequency = GammaStaticGain**p/(GammaStaticGain**p+ChainFrequency**p)
+
+		#nan_test(ChainStaticSpindleFrequency,'ChainStaticSpindleFrequency')
+
+		ChainBeta = ChainBetaNot + ChainBeta * ChainStaticSpindleFrequency
+		ChainGamma = ChainGamma * StaticSpindleFrequency
+
+		R = 0.46 #length dependency of the force-velocity relationship
+		a = 0.3
+		K_SR = 10.4649
+		K_PR = 0.15
+		M = 0.0002 # intrafusal fiber mass
+
+		LN_SR = 0.0423
+		LN_PR = 0.89
+
+		L0_SR = 0.04 #in units of L0
+		L0_PR = 0.76 #polar region rest length
+
+		L_secondary = 0.04
+		X = 0.7
+
+		ChainTensionSecondDeriv = K_SR/M * (C * ChainBeta * np.sign(LengthFirstDeriv-ChainTensionFirstDeriv/K_SR)*((abs(LengthFirstDeriv-ChainTensionFirstDeriv/K_SR))**a)*(Length-L0_SR-ChainTension/K_SR-R)+K_PR*(Length-L0_SR-ChainTension/K_SR-L0_PR)+M*LengthSecondDeriv+ChainGamma-ChainTension)
+		ChainTensionFirstDeriv = ChainTensionSecondDeriv*SamplingPeriod + ChainTensionFirstDeriv
+		ChainTension = ChainTensionFirstDeriv*SamplingPeriod + ChainTension
+
+		#nan_test(ChainTensionSecondDeriv,'ChainTensionSecondDeriv')
+		#nan_test(ChainTensionFirstDeriv,'ChainTensionFirstDeriv')
+		#nan_test(ChainTension,'ChainTension')
+
+		ChainPrimaryAfferentPotential = G*(ChainTension/K_SR-(LN_SR-L0_SR))
+		ChainSecondaryAfferentPotential = G*(	X*(L_secondary/L0_SR)*(ChainTension/K_SR-(LN_SR-L0_SR)) \
+							+ (1-X)*(L_secondary/L0_PR)*(Length-ChainTension/K_SR-(L0_SR+LN_PR))	)
+
+		#nan_test(ChainPrimaryAfferentPotential,'ChainPrimaryAfferentPotential')
+		#nan_test(ChainSecondaryAfferentPotential,'ChainSecondaryAfferentPotential')
+
+		return(ChainPrimaryAfferentPotential,ChainSecondaryAfferentPotential,ChainTensionFirstDeriv,ChainTension)
+	def spindle_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,\
+		DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
+		StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
+		ChainTensionFirstDeriv,ChainTension):
+
+		S = 0.156
+
+		Bag1AfferentPotential,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension = bag1_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension)
+		Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension = bag2_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension)
+		ChainPrimaryAfferentPotential,ChainSecondaryAfferentPotential,ChainTensionFirstDeriv,ChainTension = chain_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,ChainTensionFirstDeriv,ChainTension)
+
+		if Bag1AfferentPotential < 0: Bag1AfferentPotential = 0 
+		if Bag2PrimaryAfferentPotential < 0: Bag2PrimaryAfferentPotential = 0
+		if ChainPrimaryAfferentPotential < 0: ChainPrimaryAfferentPotential = 0
+		if Bag2SecondaryAfferentPotential < 0: Bag2SecondaryAfferentPotential = 0
+		if ChainSecondaryAfferentPotential < 0: ChainSecondaryAfferentPotential = 0	        
+
+		if Bag1AfferentPotential > (Bag2PrimaryAfferentPotential+ChainPrimaryAfferentPotential):
+			Larger = Bag1AfferentPotential
+			Smaller = Bag2PrimaryAfferentPotential+ChainPrimaryAfferentPotential
+		else:
+			Larger = Bag2PrimaryAfferentPotential+ChainPrimaryAfferentPotential
+			Smaller = Bag1AfferentPotential
+
+		PrimaryOutput = Larger + S * Smaller
+		SecondaryOutput = Bag2SecondaryAfferentPotential + ChainSecondaryAfferentPotential
+
+		if PrimaryOutput < 0:
+			PrimaryOutput = 0
+		elif PrimaryOutput > 100000:
+			PrimaryOutput = 100000
+		if SecondaryOutput < 0:
+			SecondaryOutput = 0
+		elif SecondaryOutput > 100000:
+			SecondaryOutput = 100000
+
+		#nan_test(PrimaryOutput,'PrimaryOutput')
+		#nan_test(SecondaryOutput,'SecondaryOutput')
+
+		return(PrimaryOutput,SecondaryOutput)
+	def activation_frequency_slow(Activation,Length,LengthFirstDeriv,Y,fint,feff_dot,feff,SamplingFrequency,ActivationFrequencySlow):
+		import numpy as np
+
+		Uth = 0.001
+		f_half = 8.5 #f_half = 34 #can be found in Table 2 of Brown and Loeb 2000
+		fmin = 4 #fmin = 15
+		fmax = 2*f_half #fmin = 0.5*f_half #can be found in Song et al. 2008
+		af = 0.56
+		nf0 = 2.11
+		nf1 = 5
+		cy = 0.35
+		Vy = 0.1
+		Ty = 0.2
+
+		Tf1 = 0.0484
+		Tf2 = 0.032
+		Tf3 = 0.0664
+		Tf4 = 0.0356
+
+		Y_dot = (1 - cy*(1-np.exp(-abs(LengthFirstDeriv)/Vy))-Y)/Ty
+		Y = Y_dot*SamplingPeriod + Y 
+
+		#nan_test(Y_dot,'Y_dot')
+		#nan_test(Y,'Y')
+
+		fenv = (fmax-fmin)/(1-Uth)*Activation+fmin-(fmax-fmin)*Uth
+		fenv = fenv/f_half
+
+		#nan_test(fenv,'fenv')
+
+		if feff_dot >= 0:
+		    Tf = Tf1 * Length**2 + Tf2 * fenv
+		else:
+		    Tf = (Tf3 + Tf4*ActivationFrequencySlow)/Length
+
+		#nan_test(Tf,'Tf')
+
+		fint_dot = (fenv - fint)/Tf
+		fint = fint_dot*SamplingPeriod + fint
+		feff_dot = (fint - feff)/Tf
+		feff = feff_dot*SamplingPeriod + feff
+
+		#nan_test(fint_dot,'fint_dot')
+		#nan_test(fint,'fint')
+		#nan_test(feff_dot,'feff_dot')
+		#nan_test(feff,'feff')
+
+		nf = nf0 + nf1*(1/Length-1)
+		ActivationFrequencySlow = 1 - np.exp(-(Y*feff/(af*nf))**nf)
+
+		#nan_test(nf,'nf')
+		#nan_test(ActivationFrequencySlow,'ActivationFrequencySlow')
+
+		return(ActivationFrequencySlow,Y,fint,feff_dot,feff)
+	def activation_frequency_fast(Activation,Length,Saf,fint,feff_dot,feff,SamplingFrequency,ActivationFrequencyFast):
+		import numpy as np
+
+		Uth = 0.001
+		f_half = 34 #f_half = 34 #can be found in Table 2 of Brown and Loeb 2000
+		fmin = 15 #fmin = 15
+		fmax = 2*f_half #fmin = 0.5*f_half #can be found in Song et al. 2008
+		af = 0.56
+		nf0 = 2.11
+		nf1 = 3.3
+		as1 = 1.76
+		as2 = 0.96
+		Ts = 0.043
+
+		Tf1 = 0.0206
+		Tf2 = 0.0136
+		Tf3 = 0.0282
+		Tf4 = 0.0151
+
+		fenv = (fmax-fmin)/(1-Uth)*Activation+fmin-(fmax-fmin)*Uth
+		fenv = fenv/f_half
+
+		#nan_test(fenv,'fenv')
+
+		if feff_dot >= 0:
+			Tf = Tf1 * Length**2 + Tf2 * fenv
+		elif feff_dot < 0:
+			Tf = (Tf3 + Tf4*ActivationFrequencyFast)/Length
+
+		#nan_test(Tf,'Tf')
+
+		if feff < 0.1:
+			AS = as1
+		elif feff >= 0.1:
+			AS = as2
+
+		#nan_test(AS,'AS')
+
+		Saf_dot = (AS - Saf)/Ts
+		Saf = Saf_dot*SamplingPeriod + Saf
+		fint_dot = (fenv - fint)/Tf
+		fint = fint_dot*SamplingPeriod + fint
+		feff_dot = (fint - feff)/Tf
+		feff = feff_dot*SamplingPeriod + feff
+		nf = nf0 + nf1*(1/Length-1)
+		ActivationFrequencyFast = 1 - np.exp(-(S_af*feff/(af*nf))**nf)
+
+		#nan_test(Saf_dot,'Saf_dot')
+		#nan_test(Saf,'Saf')
+		#nan_test(fint_dot,'fint_dot')
+		#nan_test(fint,'fint')
+		#nan_test(feff_dot,'feff_dot')
+		#nan_test(feff,'feff')
+		#nan_test(nf,'nf')
+		#nan_test(ActivationFrequencyFast,'ActivationFrequencyFast')
+
+		return(ActivationFrequencyFast,fint,feff_dot,feff,Saf)
+	def force_length(Length):
+		import numpy as np
+		beta = 2.3
+		omega = 1.12
+		rho = 1.62
+		ForceLength = np.exp(-abs((Length**beta - 1)/omega)**rho)
+		#nan_test(ForceLength,'ForceLength')
+		return(ForceLength)
+	def concentric_force_velocity(Length,V):
+		Vmax = -7.88
+		cv0 = 5.88
+		cv1 = 0
+		ConcentricForceVelocity = (Vmax - V)/(Vmax + (cv0 + cv1*Length)*V)
+		#nan_test(ConcentricForceVelocity,'ConcentricForceVelocity')
+		return(ConcentricForceVelocity)
+	def eccentric_force_velocity(Length,V):
+		av0 = -4.7
+		av1 = 8.41
+		av2 = -5.34
+		bv = 0.35
+		EccentricForceVelocity = (bv - (av0 + av1*Length + av2*Length**2)*V)/(bv+V)
+		#nan_test(EccentricForceVelocity,'EccentricForceVelocity')
+		return(EccentricForceVelocity)
+	def parallel_elastic_element_force_1(Length,MaximumContractileElementLength):
+		import numpy as np
+		c1_pe1 = 23.0  #355, 67.1
+		k1_pe1 = 0.046 #0.04, 0.056
+		Lr1_pe1 = 1.17  #1.35, 1.41
+		ParallelElasticElementForce1 = c1_pe1 * k1_pe1 * np.log(np.exp((Length/MaximumContractileElementLength - Lr1_pe1)/k1_pe1)+1)
+		#nan_test(ParallelElasticElementForce1,'ParallelElasticElementForce1')
+		return(ParallelElasticElementForce1)
+	def parallel_elastic_element_force_2(Length):
+		import numpy as np
+		c2_pe2 = -0.02 #0.01  -0.1
+		k2_pe2 = -21
+		Lr2_pe2 = 0.70 #0.79 0.59
+		ParallelElasticElementForce2 = c2_pe2*np.exp((k2_pe2*(Length-Lr2_pe2))-1)
+		#nan_test(ParallelElasticElementForce2,'ParallelElasticElementForce2')
+		return(ParallelElasticElementForce2)
+	def normalized_series_elastic_element_force(LT):
+		import numpy as np
+		cT_se = 27.8
+		kT_se = 0.0047
+		LrT_se = 0.964
+		NormalizedSeriesElasticElementForce = cT_se * kT_se * np.log(np.exp((LT - LrT_se)/kT_se)+1)
+		#nan_test(NormalizedSeriesElasticElementForce,'NormalizedSeriesElasticElementForce')
+		return(NormalizedSeriesElasticElementForce)
+		def return_initial_values(PennationAngle,MuscleMass,OptimalLength,OptimalTendonLength,\
+		InitialMuscleLength,InitialTendonLength,InitialMusculoTendonLength):
+		import numpy as np
+
+		# calculate initial length based on balance between stiffness of muscle and
+		# tendon
+		TendonConstant = 27.8
+		TendonRateConstant = 0.0047
+		NormalizedRestingTendonLength = 0.964
+
+		MuscleConstant = 23.0  #355, 67.1
+		MuscleRateConstant = 0.046 #0.04, 0.056
+		RestingMuscleLength = 1.17  #1.35, 1.41
+		PassiveMuscleForce = float(MuscleConstant * MuscleRateConstant * np.log(np.exp((1 - RestingMuscleLength)/MuscleRateConstant)+1))
+		NormalizedSeriesElasticLength = float(TendonRateConstant*np.log(np.exp(PassiveMuscleForce/TendonConstant/TendonRateConstant)-1)+NormalizedRestingTendonLength)
+		SeriesElasticLength = float(TendonLength * NormalizedSeriesElasticLength)
+
+		# compare(PassiveMuscleForce,0.0260)
+		# compare(NormalizedSeriesElasticLength,0.9677)
+
+		MaximumMusculoTendonLength = float(OptimalLength * np.cos(PennationAngle) + TendonLength + 0.5)
+		NormalizedMaximumFascicleLength = float((MaximumMusculoTendonLength - SeriesElasticLength)/OptimalLength)
+		MaximumContractileElementLength = float(NormalizedMaximumFascicleLength/np.cos(PennationAngle)) # Contractile Element = Muscle
+
+		# compare(MaximumMusculoTendonLength,34.0616)
+		# compare(NormalizedSeriesElasticLength,0.9677)
+
+		# nan_test(PassiveMuscleForce,'PassiveMuscleForce')
+		# nan_test(NormalizedSeriesElasticLength,'NormalizedSeriesElasticLength')
+		# nan_test(MaximumMusculoTendonLength,'MaximumMusculoTendonLength')
+		# nan_test(SeriesElasticLength,'SeriesElasticLength')
+		# nan_test(NormalizedMaximumFascicleLength,'NormalizedMaximumFascicleLength')
+		# nan_test(MaximumContractileElementLength,'MaximumContractileElementLength')
+
+		InitialLength = float((InitialMusculoTendonLength+OptimalTendonLength\
+								*((TendonRateConstant/MuscleRateConstant)*RestingMuscleLength-NormalizedRestingTendonLength\
+								- TendonRateConstant*np.log((MuscleConstant/TendonConstant)*(MuscleRateConstant/TendonRateConstant))))\
+								/(100*(1+TendonRateConstant/MuscleRateConstant*OptimalTendonLength/MaximumContractileElementLength*(1/OptimalLength))*np.cos(PennationAngle)))
+		ContractileElementLength = float(InitialLength/(OptimalLength/100)) # initializing CE Length
+		SeriesElasticElementLength = float((InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength) # MTU - initial muscle = initial SEE length
+
+		# compare(InitialLength,0.1066)
+		# nan_test(InitialLength,'InitialLength')
+		# nan_test(ContractileElementLength,'ContractileElementLength')
+		# nan_test(SeriesElasticElementLength,'SeriesElasticElementLength')
+
+		# calculate maximal force output of the muscle based on PCSA
+		MuscleDensity = 1.06 #g/cm**3
+		PCSA = (MuscleMass*1000)/MuscleDensity/OptimalLength #physionp.logical cross-sectional area
+		SpecificTension = 31.4 # WHERE DOES THIS COME FROM AND WHAT DOES IT MEAN? N/
+		MaximumContractileElementForce = PCSA * SpecificTension
+
+		# parameter initialization
+		ContractileElementVelocity = 0
+		ContractileElementAcceleration = 0
+		MuscleAcceleration = [0]
+		MuscleVelocity = [0]
+		MuscleLength = [ContractileElementLength*OptimalLength/100]
+		SeriesElasticElementForce = 0.105
+
+		# Activation dynamics parameters
+		Y_dot = 0
+		Y = 0
+		Saf_dot = 0
+		Saf = 0
+		fint_dot = 0
+		fint = 0
+		feff_dot = 0
+		feff = 0
+
+		ActivationFrequency = 0
+		EffectiveMuscleActivation = 0
+
+		DynamicSpindleFrequency = 0
+		StaticSpindleFrequency = 0
+		Bag1TensionSecondDeriv = 0
+		Bag1TensionFirstDeriv = 0
+		Bag1Tension = 0
+		Bag2TensionSecondDeriv = 0
+		Bag2TensionFirstDeriv = 0
+		Bag2Tension = 0
+		ChainTensionSecondDeriv = 0
+		ChainTensionFirstDeriv = 0
+		ChainTension = 0
+
+		Input, IaInput, IIInput = [],[],[]
+		IbInput, x, TemporaryIbInput = [],[],[]
+		Noise, FilteredNoise, LongInput = [],[],[]
+		OutputForceMuscle,OutputForceTendon,OutputForceLength = [], [], []
+		OutputForceVelocity,OutputForcePassive1,OutputForcePassive2 = [], [], []
+		OutputSeriesElasticElementLength,OutputContractileElementVelocity = [(InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength], []
+		OutputContractileElementLength = [InitialLength/(OptimalLength/100)]
+		OutputContractileElementAcceleration,OutputActivationFrequency,OutputEffectiveMuscleActivation = [], [], []
+
+		return(PassiveMuscleForce,NormalizedSeriesElasticLength,SeriesElasticLength,\
+				MaximumMusculoTendonLength,NormalizedMaximumFascicleLength,MaximumContractileElementLength, \
+				InitialLength,ContractileElementLength,SeriesElasticElementLength, \
+				MaximumContractileElementForce,ContractileElementVelocity,ContractileElementAcceleration, \
+				MuscleAcceleration,MuscleVelocity,MuscleLength, \
+				SeriesElasticElementForce,Y_dot,Y, \
+				Saf_dot,Saf,fint_dot, \
+				fint,feff_dot,feff, \
+				ActivationFrequency,EffectiveMuscleActivation,DynamicSpindleFrequency, \
+				StaticSpindleFrequency,Bag1TensionSecondDeriv,Bag1TensionFirstDeriv, \
+				Bag1Tension,Bag2TensionSecondDeriv,Bag2TensionFirstDeriv, \
+				Bag2Tension,ChainTensionSecondDeriv,ChainTensionFirstDeriv, \
+				ChainTension,Input, IaInput, \
+				IIInput, IbInput, x, \
+				TemporaryIbInput, Noise, FilteredNoise, \
+				LongInput,OutputForceMuscle,OutputForceTendon,\
+				OutputForceLength,OutputForceVelocity,OutputForcePassive1,\
+				OutputForcePassive2,OutputSeriesElasticElementLength,OutputContractileElementVelocity,\
+				OutputContractileElementLength,OutputContractileElementAcceleration,OutputActivationFrequency,\
+				OutputEffectiveMuscleActivation)
