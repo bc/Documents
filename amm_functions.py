@@ -111,7 +111,7 @@ def generate_target_force_trajectory(TrajectoryType,Time,Amplitude,AmplitudeModu
 		triangle = 2*sawtooth(2*np.pi*(Time-Delay),0.5)-1
 		TargetForceTrajectory = AmplitudeModulation*triangle+Amplitude
 	elif TrajectoryType == 'sinewave':
-		TargetForceTrajectory = AmplitudeModulation*np.sin(2*np.pi*FrequencyModulation*Time)+Amplitude
+		TargetForceTrajectory = Amplitude*np.sin(FrequencyModulation*(2*np.pi*Time-Phase))+AmplitudeModulation
 	elif TrajectoryType == 'constant':
 		SamplingFrequency = 10000
 		TargetForceTrajectory = np.concatenate((np.zeros(SamplingFrequency), (Amplitude)*1/2*Time[:2*SamplingFrequency], Amplitude*np.ones(len(Time)-3*SamplingFrequency), Amplitude*np.ones(5000)))
@@ -150,7 +150,7 @@ def generate_target_force_trajectory(TrajectoryType,Time,Amplitude,AmplitudeModu
 	return(TargetForceTrajectory)
 
 
-def bag1_model(Length,LengthFirstDeriv,LengthSecondDeriv,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension):
+def bag1_model(Length,LengthFirstDeriv,LengthSecondDeriv,GammaDynamicGain,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension):
 	## Feedback system parameters
 	## Spindle Model
 	p = 2
@@ -206,7 +206,7 @@ def bag1_model(Length,LengthFirstDeriv,LengthSecondDeriv,DynamicSpindleFrequency
 	#nan_test(Bag1AfferentPotential,'Bag1AfferentPotential')
 
 	return(Bag1AfferentPotential,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension)
-def bag2_model(Length,LengthFirstDeriv,LengthSecondDeriv,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension):
+def bag2_model(Length,LengthFirstDeriv,LengthSecondDeriv,GammaStaticGain,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension):
 	## Feedback system parameters
 	## spindle_model Model
 	p = 2
@@ -272,7 +272,7 @@ def bag2_model(Length,LengthFirstDeriv,LengthSecondDeriv,StaticSpindleFrequency,
 	#nan_test(Bag2SecondaryAfferentPotential,'Bag2SecondaryAfferentPotential')
 
 	return(Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension)
-def chain_model(Length,LengthFirstDeriv,LengthSecondDeriv,ChainTensionFirstDeriv,ChainTension):
+def chain_model(Length,LengthFirstDeriv,LengthSecondDeriv,GammaStaticGain,ChainTensionFirstDeriv,ChainTension):
 	## Feedback system parameters
 	## spindle_model Model
 	p = 2
@@ -329,15 +329,15 @@ def chain_model(Length,LengthFirstDeriv,LengthSecondDeriv,ChainTensionFirstDeriv
 
 	return(ChainPrimaryAfferentPotential,ChainSecondaryAfferentPotential,ChainTensionFirstDeriv,ChainTension)
 def spindle_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,\
-	DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
-	StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
+	GammaDynamicGain,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
+	GammaStaticGain,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
 	ChainTensionFirstDeriv,ChainTension):
 
 	S = 0.156
 
-	Bag1AfferentPotential,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension = bag1_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension)
-	Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension = bag2_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension)
-	ChainPrimaryAfferentPotential,ChainSecondaryAfferentPotential,ChainTensionFirstDeriv,ChainTension = chain_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,ChainTensionFirstDeriv,ChainTension)
+	Bag1AfferentPotential,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension = bag1_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,GammaDynamicGain,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension)
+	Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension = bag2_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,GammaStaticGain,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension)
+	ChainPrimaryAfferentPotential,ChainSecondaryAfferentPotential,ChainTensionFirstDeriv,ChainTension = chain_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,GammaStaticGain,ChainTensionFirstDeriv,ChainTension)
 
 	if Bag1AfferentPotential < 0: Bag1AfferentPotential = 0 
 	if Bag2PrimaryAfferentPotential < 0: Bag2PrimaryAfferentPotential = 0
@@ -367,7 +367,10 @@ def spindle_model(ContractileElementLength,ContractileElementVelocity,Contractil
 	#nan_test(PrimaryOutput,'PrimaryOutput')
 	#nan_test(SecondaryOutput,'SecondaryOutput')
 
-	return(PrimaryOutput,SecondaryOutput)
+	return(PrimaryOutput,SecondaryOutput,\
+		DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
+		StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
+		ChainTensionFirstDeriv,ChainTension)
 def activation_frequency_slow(Activation,Length,LengthFirstDeriv,Y,fint,feff_dot,feff,SamplingFrequency,ActivationFrequencySlow):
 	import numpy as np
 
@@ -527,7 +530,7 @@ def normalized_series_elastic_element_force(LT):
 	#nan_test(NormalizedSeriesElasticElementForce,'NormalizedSeriesElasticElementForce')
 	return(NormalizedSeriesElasticElementForce)
 def return_initial_values(PennationAngle,MuscleMass,OptimalLength,OptimalTendonLength,\
-	InitialMuscleLength,InitialTendonLength,InitialMusculoTendonLength):
+	TendonLength,InitialMuscleLength,InitialTendonLength,InitialMusculoTendonLength):
 	import numpy as np
 
 	# calculate initial length based on balance between stiffness of muscle and
@@ -543,22 +546,9 @@ def return_initial_values(PennationAngle,MuscleMass,OptimalLength,OptimalTendonL
 	NormalizedSeriesElasticLength = float(TendonRateConstant*np.log(np.exp(PassiveMuscleForce/TendonConstant/TendonRateConstant)-1)+NormalizedRestingTendonLength)
 	SeriesElasticLength = float(TendonLength * NormalizedSeriesElasticLength)
 
-	# compare(PassiveMuscleForce,0.0260)
-	# compare(NormalizedSeriesElasticLength,0.9677)
-
 	MaximumMusculoTendonLength = float(OptimalLength * np.cos(PennationAngle) + TendonLength + 0.5)
 	NormalizedMaximumFascicleLength = float((MaximumMusculoTendonLength - SeriesElasticLength)/OptimalLength)
 	MaximumContractileElementLength = float(NormalizedMaximumFascicleLength/np.cos(PennationAngle)) # Contractile Element = Muscle
-
-	# compare(MaximumMusculoTendonLength,34.0616)
-	# compare(NormalizedSeriesElasticLength,0.9677)
-
-	# nan_test(PassiveMuscleForce,'PassiveMuscleForce')
-	# nan_test(NormalizedSeriesElasticLength,'NormalizedSeriesElasticLength')
-	# nan_test(MaximumMusculoTendonLength,'MaximumMusculoTendonLength')
-	# nan_test(SeriesElasticLength,'SeriesElasticLength')
-	# nan_test(NormalizedMaximumFascicleLength,'NormalizedMaximumFascicleLength')
-	# nan_test(MaximumContractileElementLength,'MaximumContractileElementLength')
 
 	InitialLength = float((InitialMusculoTendonLength+OptimalTendonLength\
 							*((TendonRateConstant/MuscleRateConstant)*RestingMuscleLength-NormalizedRestingTendonLength\
@@ -566,11 +556,6 @@ def return_initial_values(PennationAngle,MuscleMass,OptimalLength,OptimalTendonL
 							/(100*(1+TendonRateConstant/MuscleRateConstant*OptimalTendonLength/MaximumContractileElementLength*(1/OptimalLength))*np.cos(PennationAngle)))
 	ContractileElementLength = float(InitialLength/(OptimalLength/100)) # initializing CE Length
 	SeriesElasticElementLength = float((InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength) # MTU - initial muscle = initial SEE length
-
-	# compare(InitialLength,0.1066)
-	# nan_test(InitialLength,'InitialLength')
-	# nan_test(ContractileElementLength,'ContractileElementLength')
-	# nan_test(SeriesElasticElementLength,'SeriesElasticElementLength')
 
 	# calculate maximal force output of the muscle based on PCSA
 	MuscleDensity = 1.06 #g/cm**3
