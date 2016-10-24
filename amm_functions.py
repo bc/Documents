@@ -625,3 +625,18 @@ def return_initial_values(PennationAngle,MuscleMass,OptimalLength,OptimalTendonL
 			OutputForcePassive2,OutputSeriesElasticElementLength,OutputContractileElementVelocity,\
 			OutputContractileElementLength,OutputContractileElementAcceleration,OutputActivationFrequency,\
 			OutputEffectiveMuscleActivation)
+	
+def initialize_dictionary(keys,values):
+	assert len(keys)==len(values), "keys and values must have the same length."
+	result = {}
+	for i in range(len(keys)): result[keys[i]]=values[i]
+	return(result)
+
+def append_dictionary(dictionary,keys,values):
+	assert len(keys)==len(values), "keys and values must have the same length."
+	assert type(dictionary)==dict, "Input must be a dictionary"
+	for i in range(len(keys)): 
+		if keys[i] not in dictionary.keys(): 
+			dictionary[keys[i]]=values[i]
+		else:
+			dictionary[keys[i]].append(values[i])
