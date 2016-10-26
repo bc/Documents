@@ -120,7 +120,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	StaticSpindleFrequency = 0
 	Bag1TensionSecondDeriv = 0
 	Bag1TensionFirstDeriv = 0
-	Bag1Tension = 0
+	Bag1Tension = 0.0
 	Bag2TensionSecondDeriv = 0
 	Bag2TensionFirstDeriv = 0
 	Bag2Tension = 0
@@ -161,9 +161,10 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	# Convert force trajectory to unit of newton
 	TargetForceTrajectory = TargetTrajectory*MaximumContractileElementForce
 
-	def bag1_model(CE,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension):
+	def bag1_model(CE,Bag1):
 		Length,LengthFirstDeriv,LengthSecondDeriv = CE['Length'][-1],CE['Velocity'][-1],CE['Acceleration'][-1]
-
+		DynamicSpindleFrequency, GammaDynamicGain = Bag1['DynamicSpindleFrequency'][-1], Bag1['GammaDynamicGain']
+		Bag1TensionFirstDeriv, Bag1Tension = Bag1['TensionFirstDeriv'][-1], Bag1['Tension'][-1]
 		## Feedback system parameters
 		## Spindle Model
 		p = 2
@@ -182,7 +183,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		DynamicSpindleFrequencyFirstDeriv = (GammaDynamicGain**p/(GammaDynamicGain**p+Bag1Frequency**p) - DynamicSpindleFrequency)\
 										/ Bag1TimeConstant
 		DynamicSpindleFrequency = (SamplingPeriod)*DynamicSpindleFrequencyFirstDeriv + DynamicSpindleFrequency
-
+		
 		Bag1Beta = Bag1BetaNot + Bag1Beta * DynamicSpindleFrequency
 		Bag1Gamma = Bag1Gamma * DynamicSpindleFrequency
 
@@ -197,21 +198,23 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		L0_SR = 0.04 #in units of L0
 		L0_PR = 0.76 #polar region rest length
 
-		Bag1TensionSecondDeriv = (K_SR/M)*(	(C*Bag1Beta*np.sign(LengthFirstDeriv-Bag1TensionFirstDeriv/K_SR) \
+		Bag1TensionSecondDeriv = float((K_SR/M)*(	(C*Bag1Beta*np.sign(LengthFirstDeriv-Bag1TensionFirstDeriv/K_SR) \
 											* ((abs(LengthFirstDeriv-Bag1TensionFirstDeriv/K_SR))**a)  \
 											* (Length-L0_SR-Bag1Tension/K_SR-R)) \
 											+ K_PR*(Length-L0_SR-Bag1Tension/K_SR-L0_PR) \
 											+ M*LengthSecondDeriv \
 											+ Bag1Gamma \
-											- Bag1Tension 	)
-		Bag1TensionFirstDeriv = Bag1TensionSecondDeriv*(SamplingPeriod) + Bag1TensionFirstDeriv
-		Bag1Tension = Bag1TensionFirstDeriv*(SamplingPeriod) + Bag1Tension
+											- Bag1Tension 	))
+		Bag1['TensionFirstDeriv'].append(float(Bag1TensionSecondDeriv*(SamplingPeriod) + Bag1TensionFirstDeriv))
+		Bag1['Tension'].append(float(Bag1['TensionFirstDeriv'][-1]*(SamplingPeriod) + Bag1Tension))
+		Bag1['DynamicSpindleFrequency'].append(DynamicSpindleFrequency)
+		Bag1AfferentPotential = G*(Bag1['Tension'][-1]/K_SR-(LN_SR-L0_SR))
 
-		Bag1AfferentPotential = G*(Bag1Tension/K_SR-(LN_SR-L0_SR))
-
-		return(Bag1AfferentPotential,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension)
-	def bag2_model(CE,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension):
+		return(Bag1AfferentPotential)
+	def bag2_model(CE,Bag2):
 		Length,LengthFirstDeriv,LengthSecondDeriv = CE['Length'][-1],CE['Velocity'][-1],CE['Acceleration'][-1]
+		StaticSpindleFrequency, GammaStaticGain = Bag2['StaticSpindleFrequency'][-1], Bag2['GammaStaticGain']
+		Bag2TensionFirstDeriv, Bag2Tension = Bag2['TensionFirstDeriv'][-1], Bag2['Tension'][-1]
 
 		## Feedback system parameters
 		## spindle_model Model
@@ -260,17 +263,18 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 											+ M*LengthSecondDeriv \
 											+ Bag2Gamma \
 											- Bag2Tension )
-		Bag2TensionFirstDeriv = Bag2TensionSecondDeriv*(SamplingPeriod) + Bag2TensionFirstDeriv
-		Bag2Tension = Bag2TensionFirstDeriv*(SamplingPeriod) + Bag2Tension
+		Bag2['TensionFirstDeriv'].append(Bag2TensionSecondDeriv*(SamplingPeriod) + Bag2TensionFirstDeriv)
+		Bag2['Tension'].append(Bag2['TensionFirstDeriv'][-1]*(SamplingPeriod) + Bag2Tension)
+		Bag2['StaticSpindleFrequency'].append(StaticSpindleFrequency)
+		Bag2PrimaryAfferentPotential = G*(Bag2['Tension'][-1]/K_SR-(LN_SR-L0_SR))
+		Bag2SecondaryAfferentPotential = G*(	X*(L_secondary/L0_SR)*(Bag2['Tension'][-1]/K_SR-(LN_SR-L0_SR)) \
+							+(1-X)*(L_secondary/L0_PR)*(Length-Bag2['Tension'][-1]/K_SR-(L0_SR+LN_PR))	)
 
-		Bag2PrimaryAfferentPotential = G*(Bag2Tension/K_SR-(LN_SR-L0_SR))
-		Bag2SecondaryAfferentPotential = G*(	X*(L_secondary/L0_SR)*(Bag2Tension/K_SR-(LN_SR-L0_SR)) \
-							+(1-X)*(L_secondary/L0_PR)*(Length-Bag2Tension/K_SR-(L0_SR+LN_PR))	)
-
-		return(Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension)
-	def chain_model(CE,ChainTensionFirstDeriv,ChainTension):
+		return(Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential)
+	def chain_model(CE,Chain,Bag2):
 		Length,LengthFirstDeriv,LengthSecondDeriv = CE['Length'][-1],CE['Velocity'][-1],CE['Acceleration'][-1]
-
+		ChainTensionFirstDeriv,ChainTension = Chain['TensionFirstDeriv'][-1],Chain['Tension'][-1]
+		StaticSpindleFrequency,GammaStaticGain = Bag2['StaticSpindleFrequency'][-1],Bag2['GammaStaticGain']
 		## Feedback system parameters
 		## spindle_model Model
 		p = 2
@@ -309,23 +313,23 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		X = 0.7
 
 		ChainTensionSecondDeriv = K_SR/M * (C * ChainBeta * np.sign(LengthFirstDeriv-ChainTensionFirstDeriv/K_SR)*((abs(LengthFirstDeriv-ChainTensionFirstDeriv/K_SR))**a)*(Length-L0_SR-ChainTension/K_SR-R)+K_PR*(Length-L0_SR-ChainTension/K_SR-L0_PR)+M*LengthSecondDeriv+ChainGamma-ChainTension)
-		ChainTensionFirstDeriv = ChainTensionSecondDeriv*SamplingPeriod + ChainTensionFirstDeriv
-		ChainTension = ChainTensionFirstDeriv*SamplingPeriod + ChainTension
+		Chain['TensionFirstDeriv'].append(ChainTensionSecondDeriv*SamplingPeriod + ChainTensionFirstDeriv)
+		Chain['Tension'].append(ChainTensionFirstDeriv*SamplingPeriod + ChainTension)
 
-		ChainPrimaryAfferentPotential = G*(ChainTension/K_SR-(LN_SR-L0_SR))
-		ChainSecondaryAfferentPotential = G*(	X*(L_secondary/L0_SR)*(ChainTension/K_SR-(LN_SR-L0_SR)) \
-							+ (1-X)*(L_secondary/L0_PR)*(Length-ChainTension/K_SR-(L0_SR+LN_PR))	)
+		ChainPrimaryAfferentPotential = G*(Chain['Tension'][-1]/K_SR-(LN_SR-L0_SR))
+		ChainSecondaryAfferentPotential = G*(	X*(L_secondary/L0_SR)*(Chain['Tension'][-1]/K_SR-(LN_SR-L0_SR)) \
+							+ (1-X)*(L_secondary/L0_PR)*(Length-Chain['Tension'][-1]/K_SR-(L0_SR+LN_PR))	)
 
-		return(ChainPrimaryAfferentPotential,ChainSecondaryAfferentPotential,ChainTensionFirstDeriv,ChainTension)
+		return(ChainPrimaryAfferentPotential,ChainSecondaryAfferentPotential)
 	def spindle_model(CE,\
-		DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
-		StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
-		ChainTensionFirstDeriv,ChainTension):
+		Bag1,\
+		Bag2,\
+		Chain):
 
 		S = 0.156
-		Bag1AfferentPotential,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension = bag1_model(CE,DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension)
-		Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension = bag2_model(CE,StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension)
-		ChainPrimaryAfferentPotential,ChainSecondaryAfferentPotential,ChainTensionFirstDeriv,ChainTension = chain_model(CE,ChainTensionFirstDeriv,ChainTension)
+		Bag1AfferentPotential = bag1_model(CE,Bag1)
+		Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential = bag2_model(CE,Bag2)
+		ChainPrimaryAfferentPotential,ChainSecondaryAfferentPotential = chain_model(CE,Chain,Bag2)
 
 		if Bag1AfferentPotential < 0: Bag1AfferentPotential = 0 
 		if Bag2PrimaryAfferentPotential < 0: Bag2PrimaryAfferentPotential = 0
@@ -455,8 +459,8 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		bv = 0.35
 		EccentricForceVelocity = (bv - (av0 + av1*Length + av2*Length**2)*V)/(bv+V)
 		return(EccentricForceVelocity)
-	def parallel_elastic_element_force_1(CE,MaximumContractileElementLength):
-		Length = CE['Length'][-1]
+	def parallel_elastic_element_force_1(CE):
+		Length, MaximumContractileElementLength = CE['Length'][-1], CE['Maximum Length']
 		c1_pe1 = 23.0  #355, 67.1
 		k1_pe1 = 0.046 #0.04, 0.056
 		Lr1_pe1 = 1.17  #1.35, 1.41
@@ -485,8 +489,14 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	OutputContractileElementLength = [InitialLength/(OptimalLength/100)]
 	OutputContractileElementAcceleration,OutputActivationFrequency,OutputEffectiveMuscleActivation = [], [], []
 	
-	CE = initialize_dictionary(['Length','Velocity','Acceleration'],[[InitialLength/(OptimalLength/100)],[0],[0]])
-
+	CE = initialize_dictionary(['Length','Velocity','Acceleration','Maximum Length'],\
+									[[InitialLength/(OptimalLength/100)],[0],[0],float(NormalizedMaximumFascicleLength/np.cos(PennationAngle))])
+	Bag1 = initialize_dictionary(['GammaDynamicGain','DynamicSpindleFrequency','Tension','TensionFirstDeriv'],\
+										[GammaDynamicGain,[DynamicSpindleFrequency],[Bag1Tension],[Bag1TensionFirstDeriv]])
+	Bag2 = initialize_dictionary(['GammaStaticGain','StaticSpindleFrequency','Tension','TensionFirstDeriv'],\
+										[GammaStaticGain,[StaticSpindleFrequency],[Bag2Tension],[Bag2TensionFirstDeriv]])
+	Chain = initialize_dictionary(['Tension','TensionFirstDeriv'],\
+										[[ChainTension],[ChainTensionFirstDeriv]])
 	StartTime = time.time()
 	FeedforwardInput = TargetForceTrajectory/MaximumContractileElementForce
 
@@ -498,9 +508,9 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 			IbInput.append(0)
 		elif FeedbackOption == 'servo_control': # Servo control (feedforward + spindle and GTO)
 			PrimaryOutput,SecondaryOutput = spindle_model(CE,\
-				DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
-				StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
-				ChainTensionFirstDeriv,ChainTension)
+				Bag1,\
+				Bag2,\
+				Chain)
 			IaInput.append(PrimaryOutput)
 			IIInput.append(SecondaryOutput)
 			if i == Count:
@@ -544,9 +554,9 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 				Input.append(Input[-1])
 		elif FeedbackOption == 'fb_control': # Feedback control (proprioceptive systems + supraspinal loop)
 			PrimaryOutput,SecondaryOutput = spindle_model(CE,\
-															DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
-															StaticSpindleFrequency,Bag2TensionFirstDeriv,Bag2Tension,\
-															ChainTensionFirstDeriv,ChainTension)
+															Bag1,\
+															Bag2,\
+															Chain)
 			IaInput.append(PrimaryOutput)
 			IIInput.append(SecondaryOutput)
 			if i == Count:
@@ -612,7 +622,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		elif Input[-1] > 1:
 			Input[-1] = 1
 
-		random.seed(1)
+		# random.seed(1)
 		if i > 4:
 			Noise.append(2*(random.random()-0.5)*(np.sqrt(0.01*Input[i])*np.sqrt(3)))
 			FilteredNoise.append((BButtersCoefficients[4]*Noise[i-4] + BButtersCoefficients[3]*Noise[i-3] + BButtersCoefficients[2]*Noise[i-2] + BButtersCoefficients[1]*Noise[i-1] + BButtersCoefficients[0]*Noise[i] \
@@ -651,7 +661,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		# viscous property
 		ForceViscocity = MuscleViscosity * CE['Velocity'][-1]
 		# passive element 1
-		ForcePassive1 = parallel_elastic_element_force_1(CE,MaximumContractileElementLength)
+		ForcePassive1 = parallel_elastic_element_force_1(CE)
 		# passive element 2
 		ForcePassive2 = parallel_elastic_element_force_2(CE)
 		ForcePassive2 = (ForcePassive2 <= 0)*ForcePassive2
@@ -694,12 +704,12 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		OutputForcePassive2.append(ForcePassive2)
 		statusbar(i,len(Time),StartTime=StartTime,Title = 'afferented_muscle_model')
 
-	# plt.figure()
-	# plt.plot(Time,OutputForceTendon)
-	# plt.plot(Time,TargetForceTrajectory,'r')
-	# plt.legend(['Output Force','Target Force'])
-	# plt.xlabel('Time (sec)')
-	# plt.ylabel('Force (N)')
+	plt.figure()
+	plt.plot(Time,OutputForceTendon)
+	plt.plot(Time,TargetForceTrajectory,'r')
+	plt.legend(['Output Force','Target Force'])
+	plt.xlabel('Time (sec)')
+	plt.ylabel('Force (N)')
 
 	# save data as output in structure format
 	output = {	'Force' : OutputForceMuscle, 										'ForceTendon' : OutputForceTendon, \
