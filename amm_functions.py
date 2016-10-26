@@ -529,10 +529,55 @@ def normalized_series_elastic_element_force(LT):
 	NormalizedSeriesElasticElementForce = cT_se * kT_se * np.log(np.exp((LT - LrT_se)/kT_se)+1)
 	#nan_test(NormalizedSeriesElasticElementForce,'NormalizedSeriesElasticElementForce')
 	return(NormalizedSeriesElasticElementForce)
-def return_initial_values(PennationAngle,MuscleMass,OptimalLength,OptimalTendonLength,\
-	TendonLength,InitialMuscleLength,InitialTendonLength,InitialMusculoTendonLength):
+def return_initial_values(muscle_parameters,gain_parameters):
 	import numpy as np
+	def contractile_element_parameters(Length,Velocity,Acceleration,MaximumContractileElementLength,ForceLength,ForceVelocity,MaximumContractileElementForce):
+		CE = initialize_dictionary(['Length','Velocity','Acceleration','MaximumLength','ForceLength','ForceVelocity','MaximumForce'],\
+									[[Length],[Velocity],[Acceleration],MaximumContractileElementLength,ForceLength,ForceVelocity,MaximumContractileElementForce])
+		return(CE)
+	def bag_1_parameters(GammaDynamicGain,DynamicSpindleFrequency,Bag1Tension,Bag1TensionFirstDeriv):
+		Bag1 = initialize_dictionary(['GammaDynamicGain','DynamicSpindleFrequency','Tension','TensionFirstDeriv'],\
+										[GammaDynamicGain,DynamicSpindleFrequency,Bag1Tension,Bag1TensionFirstDeriv])
+		return(Bag1)
+	def bag_2_parameters(GammaStaticGain,StaticSpindleFrequency,Bag2Tension,Bag2TensionFirstDeriv):
+			Bag2 = initialize_dictionary(['GammaStaticGain','StaticSpindleFrequency','Tension','TensionFirstDeriv'],\
+											[GammaStaticGain,StaticSpindleFrequency,Bag2Tension,Bag2TensionFirstDeriv])
+			return(Bag2)
+	def chain_parameters(ChainTension,ChainTensionFirstDeriv):
+		Chain = initialize_dictionary(['Tension','TensionFirstDeriv'],\
+										[ChainTension, ChainTensionFirstDeriv])
+		return(Chain)
+	def slow_twitch_parameters(Y,fint,feff_dot,feff,ActivationFrequencySlow):
+		SlowTwitch = initialize_dictionary(['Y','fint','feff_dot','feff','ActivationFrequency'],\
+											[Y,fint,feff_dot,feff,ActivationFrequencySlow])
+		return(SlowTwitch)
+	def fast_twitch_parameters(Saf,fint,feff_dot,feff,ActivationFrequencyFast):
+		FastTwitch = initialize_dictionary(['Saf','fint','feff_dot','feff','ActivationFrequency'],\
+											[Saf,fint,feff_dot,feff,ActivationFrequencyFast])
+		return(FastTwitch)
+	def series_elastic_element_parameters(Length,Force):
+		SEE = initialize_dictionary(['Length','Force', 'Temp'],\
+									[[Length], [Force], []])
+		return(SEE)
+	def parallel_elastic_element_parameters(ForcePassive1,ForcePassive2):
+		PEE = initialize_dictionary(['ForcePassive1','ForcePassive2'],\
+									[ForcePassive1,ForcePassive2])
+		return(PEE)
 
+	PennationAngle = muscle_parameters['Pennation Angle']
+	MuscleMass = muscle_parameters['Muscle Mass']
+	OptimalLength = muscle_parameters['Optimal Length']
+	TendonLength = muscle_parameters['Tendon Length']
+	OptimalTendonLength = TendonLength*1.05
+	InitialMuscleLength = muscle_parameters['Initial Muscle Length']
+	InitialTendonLength = muscle_parameters['Initial Tendon Length']
+	InitialMusculoTendonLength = InitialMuscleLength*np.cos(PennationAngle)+InitialTendonLength
+
+	GammaDynamicGain = gain_parameters['Gamma Dynamic Gain']
+	GammaStaticGain = gain_parameters['Gamma Static Gain']
+	IaSpindleGain = gain_parameters['Ia Gain']
+	IISpindleGain = gain_parameters['II Gain']
+	IbGTOGain = gain_parameters['Ib Gain']
 	# calculate initial length based on balance between stiffness of muscle and
 	# tendon
 	TendonConstant = 27.8
@@ -566,9 +611,9 @@ def return_initial_values(PennationAngle,MuscleMass,OptimalLength,OptimalTendonL
 	# parameter initialization
 	ContractileElementVelocity = 0
 	ContractileElementAcceleration = 0
-	MuscleAcceleration = [0]
-	MuscleVelocity = [0]
-	MuscleLength = [ContractileElementLength*OptimalLength/100]
+	MuscleAcceleration = 0
+	MuscleVelocity = 0
+	MuscleLength = ContractileElementLength*OptimalLength/100
 	SeriesElasticElementForce = 0.105
 
 	# Activation dynamics parameters
@@ -596,15 +641,31 @@ def return_initial_values(PennationAngle,MuscleMass,OptimalLength,OptimalTendonL
 	ChainTensionFirstDeriv = 0
 	ChainTension = 0
 
-	Input, IaInput, IIInput = [],[],[]
-	IbInput, x, TemporaryIbInput = [],[],[]
-	Noise, FilteredNoise, LongInput = [],[],[]
-	OutputForceMuscle,OutputForceTendon,OutputForceLength = [], [], []
-	OutputForceVelocity,OutputForcePassive1,OutputForcePassive2 = [], [], []
-	OutputSeriesElasticElementLength,OutputContractileElementVelocity = [(InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength], []
-	OutputContractileElementLength = [InitialLength/(OptimalLength/100)]
-	OutputContractileElementAcceleration,OutputActivationFrequency,OutputEffectiveMuscleActivation = [], [], []
+	CE = contractile_element_parameters(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,\
+											MaximumContractileElementLength,[],[],MaximumContractileElementForce)
+	Bag1 = bag_1_parameters(GammaDynamicGain,DynamicSpindleFrequency,Bag1Tension,Bag1TensionFirstDeriv)
+	Bag2 = bag_2_parameters(GammaStaticGain,StaticSpindleFrequency,Bag2Tension,Bag2TensionFirstDeriv)
+	Chain = chain_parameters(ChainTension,ChainTensionFirstDeriv)
+	SlowTwitch = slow_twitch_parameters(Y,fint,feff_dot,feff,ActivationFrequency)
+	FastTwitch = slow_twitch_parameters(Saf,fint,feff_dot,feff,ActivationFrequency)
+	SEE = series_elastic_element_parameters(SeriesElasticElementLength,SeriesElasticElementForce)
+	PEE = parallel_elastic_element_parameters([],[])
+	Input = initialize_dictionary(['EffectiveMuscleActivation','Ia','II','Ib','TempIb1',\
+									'TempIb2','Noise','FilteredNoise','Total','LongInput'],\
+									[[EffectiveMuscleActivation],[],[],[],[],[],[],[],[],[]])
+	# Removed 'Feedforward','TargetTrajectory','CorticalInput','Feedback',
+	Muscle = initialize_dictionary(['Length','Velocity','Acceleration','Muscle Force','Tendon Force','Activation Frequency'],\
+									[[MuscleLength],[MuscleVelocity],[MuscleAcceleration],[],[],[]])
 
+	# Input, IaInput, IIInput = [],[],[]
+	# IbInput, x, TemporaryIbInput = [],[],[]
+	# Noise, FilteredNoise, LongInput = [],[],[]
+	# OutputForceMuscle,OutputForceTendon,OutputForceLength = [], [], []
+	# OutputForceVelocity,OutputForcePassive1,OutputForcePassive2 = [], [], []
+	# OutputSeriesElasticElementLength,OutputContractileElementVelocity = [(InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength], []
+	# OutputContractileElementLength = [InitialLength/(OptimalLength/100)]
+	# OutputContractileElementAcceleration,OutputActivationFrequency,OutputEffectiveMuscleActivation = [], [], []
+	return(Bag1,Bag2,Chain,SlowTwitch,FastTwitch,CE,SEE,PEE,Muscle,Input)
 	return(PassiveMuscleForce,NormalizedSeriesElasticLength,SeriesElasticLength,\
 			MaximumMusculoTendonLength,NormalizedMaximumFascicleLength,MaximumContractileElementLength, \
 			InitialLength,ContractileElementLength,SeriesElasticElementLength, \
@@ -640,3 +701,29 @@ def append_dictionary(dictionary,keys,values):
 			dictionary[keys[i]]=values[i]
 		else:
 			dictionary[keys[i]].append(values[i])
+
+def test_input_values(muscle_parameters, delay_parameters, gain_parameters, FeedbackOption):
+	assert FeedbackOption in ['ff_only','servo_control','fb_control','cortical_fb_only'],\
+	"FeedbackOption must be either 'ff_only', 'servo_control', 'fb_control', or 'cortical_fb_only'"
+	assert type(muscle_parameters)==dict, "muscle_parameters must be a dictionary"
+	assert len(muscle_parameters)==6, "dict muscle_parameters can only have 6 entries"
+	assert 'Pennation Angle' in muscle_parameters, "'Pennation Angle' missing in muscle_parameters"
+	assert 'Muscle Mass' in muscle_parameters, "'Muscle Mass' missing in muscle_parameters"
+	assert 'Optimal Length' in muscle_parameters, "'Optimal Length' missing in muscle_parameters"
+	assert 'Tendon Length' in muscle_parameters, "'Tendon Length' missing in muscle_parameters"
+	assert 'Initial Muscle Length' in muscle_parameters, "'Initial Muscle Length' missing in muscle_parameters"
+	assert 'Initial Tendon Length' in muscle_parameters, "'Initial Tendon Length' missing in muscle_parameters"
+	assert type(delay_parameters)==dict, "delay_parameters must be a dictionary"
+	assert len(delay_parameters)==5, "dict delay_parameters can only have 5 entries"
+	assert 'Efferent Delay' in delay_parameters, "'Efferent Delay' missing in delay_parameters"
+	assert 'Ia Delay' in delay_parameters, "'Ia Delay' missing in delay_parameters"
+	assert 'II Delay' in delay_parameters, "'II Delay' missing in delay_parameters"
+	assert 'Ib Delay' in delay_parameters, "'Ib Delay' missing in delay_parameters"
+	assert 'Cortical Delay' in delay_parameters, "'Cortical Delay' missing in delay_parameters"
+	assert type(gain_parameters)==dict, "gain_parameters must be a dictionary"
+	assert len(gain_parameters)==5, "dict gain_parameters can only have 5 entries"
+	assert 'Gamma Dynamic Gain' in gain_parameters, "'Gamma Dynamic Gain' missing in gain_parameters"
+	assert 'Gamma Static Gain' in gain_parameters, "'Gamma Static Gain' missing in gain_parameters"
+	assert 'Ia Gain' in gain_parameters, "'Ia Gain' missing in gain_parameters"
+	assert 'II Gain' in gain_parameters, "'II Gain' missing in gain_parameters"
+	assert 'Ib Gain' in gain_parameters, "'Ib Gain' missing in gain_parameters"
