@@ -28,30 +28,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	"""
 
 	FeedbackOption = kwargs.get("FeedbackOption",'ff_only')
-	assert FeedbackOption in ['ff_only','servo_control','fb_control','cortical_fb_only'],\
-	"FeedbackOption must be either 'ff_only', 'servo_control', 'fb_control', or 'cortical_fb_only'"
-	assert type(muscle_parameters)==dict, "muscle_parameters must be a dictionary"
-	assert len(muscle_parameters)==6, "dict muscle_parameters can only have 6 entries"
-	assert 'Pennation Angle' in muscle_parameters, "'Pennation Angle' missing in muscle_parameters"
-	assert 'Muscle Mass' in muscle_parameters, "'Muscle Mass' missing in muscle_parameters"
-	assert 'Optimal Length' in muscle_parameters, "'Optimal Length' missing in muscle_parameters"
-	assert 'Tendon Length' in muscle_parameters, "'Tendon Length' missing in muscle_parameters"
-	assert 'Initial Muscle Length' in muscle_parameters, "'Initial Muscle Length' missing in muscle_parameters"
-	assert 'Initial Tendon Length' in muscle_parameters, "'Initial Tendon Length' missing in muscle_parameters"
-	assert type(delay_parameters)==dict, "delay_parameters must be a dictionary"
-	assert len(delay_parameters)==5, "dict delay_parameters can only have 5 entries"
-	assert 'Efferent Delay' in delay_parameters, "'Efferent Delay' missing in delay_parameters"
-	assert 'Ia Delay' in delay_parameters, "'Ia Delay' missing in delay_parameters"
-	assert 'II Delay' in delay_parameters, "'II Delay' missing in delay_parameters"
-	assert 'Ib Delay' in delay_parameters, "'Ib Delay' missing in delay_parameters"
-	assert 'Cortical Delay' in delay_parameters, "'Cortical Delay' missing in delay_parameters"
-	assert type(gain_parameters)==dict, "gain_parameters must be a dictionary"
-	assert len(gain_parameters)==5, "dict gain_parameters can only have 5 entries"
-	assert 'Gamma Dynamic Gain' in gain_parameters, "'Gamma Dynamic Gain' missing in gain_parameters"
-	assert 'Gamma Static Gain' in gain_parameters, "'Gamma Static Gain' missing in gain_parameters"
-	assert 'Ia Gain' in gain_parameters, "'Ia Gain' missing in gain_parameters"
-	assert 'II Gain' in gain_parameters, "'II Gain' missing in gain_parameters"
-	assert 'Ib Gain' in gain_parameters, "'Ib Gain' missing in gain_parameters"
+	test_input_values(muscle_parameters,delay_parameters,gain_parameters,FeedbackOption)
 
 	import numpy as np 
 	from scipy import signal
@@ -653,7 +630,6 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 			else:
 				IbInput.append(IbInput[-1])
 				Input.append(Input[-1])
-		
 		elif FeedbackOption == 'fb_control': # Feedback control (proprioceptive systems + supraspinal loop)
 			PrimaryOutput,SecondaryOutput = spindle_model(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,\
 															DynamicSpindleFrequency,Bag1TensionFirstDeriv,Bag1Tension,\
@@ -711,7 +687,6 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 			else:
 				IbInput.append(IbInput[-1])
 				Input.append(Input[-1])
-
 		elif FeedbackOption == 'cortical_fb_only':
 			if i > CorticalDelayTimeStep-1:
 				FeedbackInput = TransCorticalLoopConstant*(TargetForceTrajectory[i]-OutputForceTendon[i-CorticalDelayTimeStep-1])/MaximumContractileElementForce + FeedbackInput  # feedback input through cortical pathway
