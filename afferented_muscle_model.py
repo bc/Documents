@@ -915,13 +915,14 @@ elif FeedbackOption == 'cortical_fb_only':
     FeedbackOptionString = 'CC'
 
 # Output from the muscle model
-NumberOfTrials = 10
+NumberOfTrials = 1
 Output = []
 PXX = []
 Range = []
 for i in range(NumberOfTrials): #trialN = 1:10
 	#rng('shufle')
 	output = afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,TargetTrajectory,CorticalInput,FeedbackOption = FeedbackOption)    
+	compare_output(output)
 	Output.append(output)
 	f,pxx = welch(output['ForceTendon'][-int(10*SamplingFrequency)-1:]-np.average(output['ForceTendon'][int(-10*SamplingFrequency-1):]),window = gaussian(5*SamplingFrequency,(5*SamplingFrequency-1)/(2*2.5)),\
 		noverlap = SamplingFrequency,nperseg = len(gaussian(5*SamplingFrequency,(5*SamplingFrequency-1)/(2*2.5))), fs = SamplingFrequency) 

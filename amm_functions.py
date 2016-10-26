@@ -727,3 +727,15 @@ def test_input_values(muscle_parameters, delay_parameters, gain_parameters, Feed
 	assert 'Ia Gain' in gain_parameters, "'Ia Gain' missing in gain_parameters"
 	assert 'II Gain' in gain_parameters, "'II Gain' missing in gain_parameters"
 	assert 'Ib Gain' in gain_parameters, "'Ib Gain' missing in gain_parameters"
+
+def compare_output(TheoreticalOutput):
+	import pickle
+	import numpy as np 
+	ActualOutput = pickle.load(open('OutputWithoutError.pkl','rb'))
+	Keys = ActualOutput.keys()
+	for key in Keys:
+		assert type(ActualOutput[key])==type(TheoreticalOutput[key]), "output["+key+"] has changed!"
+		if type(ActualOutput[key])==list or type(ActualOutput[key])== int or type(ActualOutput[key])== float:
+			assert ActualOutput[key]==TheoreticalOutput[key], "output["+key+"] has changed!"
+		elif type(ActualOutput[key])==np.ndarray:
+			assert np.array(ActualOutput[key]==TheoreticalOutput[key],ndmin=2).all(1)[0], "output["+key+"] has changed!"
