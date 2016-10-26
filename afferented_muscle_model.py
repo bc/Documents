@@ -433,7 +433,6 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 
 		return(PrimaryOutput,SecondaryOutput)
 	def activation_frequency_slow(Activation,Length,LengthFirstDeriv,Y,fint,feff_dot,feff,SamplingFrequency,ActivationFrequencySlow):
-	
 		Uth = 0.001
 		f_half = 8.5 #f_half = 34 #can be found in Table 2 of Brown and Loeb 2000
 		fmin = 4 #fmin = 15
@@ -735,7 +734,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		#nan_test(Input[-1],'Input')
 
 		#nan_test(CorticalInput[-1],'CorticalInput')
-
+		random.seed(1)
 		if i > 4:
 			Noise.append(2*(random.random()-0.5)*(np.sqrt(0.01*Input[i])*np.sqrt(3)))
 			FilteredNoise.append((BButtersCoefficients[4]*Noise[i-4] + BButtersCoefficients[3]*Noise[i-3] + BButtersCoefficients[2]*Noise[i-2] + BButtersCoefficients[1]*Noise[i-1] + BButtersCoefficients[0]*Noise[i] \
