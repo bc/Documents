@@ -100,7 +100,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	MuscleLength = [ContractileElementLength*OptimalLength/100]
 	SeriesElasticElementForce = 0.105
 
-	# filter parameters for Noise
+	# filter parameters for Input['Noise']
 	BButtersCoefficients,AButtersCoefficients = signal.butter(4,100/(SamplingFrequency/2),'low')
 
 	# Activation dynamics parameters
@@ -345,14 +345,6 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		SecondaryOutput = Bag2SecondaryAfferentPotential + ChainSecondaryAfferentPotential
 		PrimaryOutput = bound(PrimaryOutput,0,100000)
 		SecondaryOutput = bound(SecondaryOutput,0,100000)
-		# if PrimaryOutput < 0:
-		# 	PrimaryOutput = 0
-		# elif PrimaryOutput > 100000:
-		# 	PrimaryOutput = 100000
-		# if SecondaryOutput < 0:
-		# 	SecondaryOutput = 0
-		# elif SecondaryOutput > 100000:
-		# 	SecondaryOutput = 100000
 
 		return(PrimaryOutput,SecondaryOutput)
 	def activation_frequency_slow(CE,SlowTwitch,Activation,SamplingFrequency):
@@ -509,13 +501,9 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		else:
 			result = value
 		return(result)
-	Input, IaInput, IIInput = [],[],[]
-	IbInput, x, TemporaryIbInput = [],[],[]
-	Noise, FilteredNoise, LongInput = [],[],[]
-	OutputForceMuscle,OutputForceTendon,OutputForceLength = [], [], []
+
+	OutputForceMuscle,OutputForceLength = [], []
 	OutputForceVelocity,OutputForcePassive1,OutputForcePassive2 = [], [], []
-	OutputSeriesElasticElementLength,OutputContractileElementVelocity = [(InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength], []
-	OutputContractileElementLength = [InitialLength/(OptimalLength/100)]
 	OutputContractileElementAcceleration,OutputActivationFrequency,OutputEffectiveMuscleActivation = [], [], []
 	
 	CE = initialize_dictionary(['Length','Velocity','Acceleration','Maximum Length'],\
@@ -531,149 +519,152 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	FastTwitch = initialize_dictionary(['Saf','fint','feff_dot','feff','ActivationFrequency'],\
 											[Saf,fint,feff_dot,feff,ActivationFrequency])
 	SEE = initialize_dictionary(['Length','Force'],[[float((InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength)],[SeriesElasticElementForce]])
-
+	Input = initialize_dictionary(['Ia','II','Ib','IbTemp1','IbTemp2','Total','Noise','FilteredNoise','Long'],\
+									[[],[],[],[],[],[],[],[],[]])
+	Muscle = initialize_dictionary(['Effective Activation','Force','FL','FV','Passive Force 1','Passive Force 2'],\
+									[[EffectiveMuscleActivation],[],[],[],[],[]])
 	StartTime = time.time()
 	FeedforwardInput = TargetForceTrajectory/MaximumContractileElementForce
 
 	for i in range(len(Time)): #= 1:length(Time)
 		if FeedbackOption == 'ff_only': # Feedforward input onl
-			Input.append(FeedforwardInput[i])
-			IaInput.append(0)
-			IIInput.append(0)
-			IbInput.append(0)
+			Input['Total'].append(FeedforwardInput[i])
+			Input['Ia'].append(0)
+			Input['II'].append(0)
+			Input['Ib'].append(0)
 		elif FeedbackOption == 'servo_control': # Servo control (feedforward + spindle and GTO)
 			PrimaryOutput,SecondaryOutput = spindle_model(CE,Bag1,Bag2,Chain)
-			IaInput.append(PrimaryOutput)
-			IIInput.append(SecondaryOutput)
+			Input['Ia'].append(PrimaryOutput)
+			Input['II'].append(SecondaryOutput)
 			if i == Count:
 				# Get spindle primary and secondary afferent activity
 
 				# Get Ib activity
-				x.append(GTOConstant1*np.log(SEE['Force'][-1]/GTOConstant2+1))
+				Input['IbTemp1'].append(GTOConstant1*np.log(SEE['Force'][-1]/GTOConstant2+1))
 				if i == 0:
-					TemporaryIbInput.append(x[-1])
+					Input['IbTemp2'].append(Input['IbTemp1'][-1])
 				elif i == 1*SamplingRatio:
-					TemporaryIbInput.append(x[-1])
+					Input['IbTemp2'].append(Input['IbTemp1'][-1])
 				elif i == 2*SamplingRatio:
-					TemporaryIbInput.append((Num[0]*x[-1])/Den[0])
+					Input['IbTemp2'].append((Num[0]*Input['IbTemp1'][-1])/Den[0])
 				elif i == 3*SamplingRatio:
-					TemporaryIbInput.append((Num[1]*x[-2] + Num[0]*x[-1] \
-						- Den[1]*TemporaryIbInput[-2])/Den[0])
+					Input['IbTemp2'].append((Num[1]*Input['IbTemp1'][-2] + Num[0]*Input['IbTemp1'][-1] \
+						- Den[1]*Input['IbTemp2'][-2])/Den[0])
 				elif i >= 3*SamplingRatio:
-					TemporaryIbInput.append((Num[2]*x[-3] + Num[1]*x[-2] + Num[0]*x[-1] \
-						- Den[2]*TemporaryIbInput[-3] - Den[1]*TemporaryIbInput[-2])/Den[0])
+					Input['IbTemp2'].append((Num[2]*Input['IbTemp1'][-3] + Num[1]*Input['IbTemp1'][-2] + Num[0]*Input['IbTemp1'][-1] \
+						- Den[2]*Input['IbTemp2'][-3] - Den[1]*Input['IbTemp2'][-2])/Den[0])
 
-				IbInput.append(TemporaryIbInput[-1]*(TemporaryIbInput[-1]>0))
+				Input['Ib'].append(Input['IbTemp2'][-1]*(Input['IbTemp2'][-1]>0))
 			
 				if i in range(IaAfferentDelayTimeStep-1,IbAfferentDelayTimeStep):
-					Input.append(IaInput[i-IaAfferentDelayTimeStep+1]/IaSpindleGain \
+					Input['Total'].append(Input['Ia'][i-IaAfferentDelayTimeStep+1]/IaSpindleGain \
 								+FeedforwardInput[i]) #input to the muscle
 				elif i in range(IbAfferentDelayTimeStep, IIAfferentDelayTimeStep):
-					Input.append(IaInput[i-IaAfferentDelayTimeStep+1]/IaSpindleGain \
-								-IbInput[i-IbAfferentDelayTimeStep]/IbGTOGain \
+					Input['Total'].append(Input['Ia'][i-IaAfferentDelayTimeStep+1]/IaSpindleGain \
+								-Input['Ib'][i-IbAfferentDelayTimeStep]/IbGTOGain \
 								+FeedforwardInput[i]) #input to the muscle
 				elif i in range(IIAfferentDelayTimeStep, CorticalDelayTimeStep):
-					Input.append(IaInput[i-IaAfferentDelayTimeStep+1]/IaSpindleGain \
-								+IIInput[i-IIAfferentDelayTimeStep]/IISpindleGain \
-								-IbInput[i-IbAfferentDelayTimeStep]/IbGTOGain \
+					Input['Total'].append(Input['Ia'][i-IaAfferentDelayTimeStep+1]/IaSpindleGain \
+								+Input['II'][i-IIAfferentDelayTimeStep]/IISpindleGain \
+								-Input['Ib'][i-IbAfferentDelayTimeStep]/IbGTOGain \
 								+FeedforwardInput[i]) #input to the muscle
 				else:	
-					Input.append(FeedforwardInput[i])
+					Input['Total'].append(FeedforwardInput[i])
 				
 				Count = SamplingRatio+Count
 			else:
-				IbInput.append(IbInput[-1])
-				Input.append(Input[-1])
+				Input['Ib'].append(Input['Ib'][-1])
+				Input['Total'].append(Input[-1])
 		elif FeedbackOption == 'fb_control': # Feedback control (proprioceptive systems + supraspinal loop)
 			PrimaryOutput,SecondaryOutput = spindle_model(CE,Bag1,Bag2,Chain)
-			IaInput.append(PrimaryOutput)
-			IIInput.append(SecondaryOutput)
+			Input['Ia'].append(PrimaryOutput)
+			Input['II'].append(SecondaryOutput)
 			if i == Count:
 				# Get spindle primary and secondary afferent activity
 				
 				# Get Ib activity
-				x.append(GTOConstant1*np.log((SEE['Force'][-1]/GTOConstant2+1)))
+				Input['IbTemp1'].append(GTOConstant1*np.log((SEE['Force'][-1]/GTOConstant2+1)))
 				if i == 0:
-					TemporaryIbInput.append(x[-1])
+					Input['IbTemp2'].append(Input['IbTemp1'][-1])
 				elif i == 1*SamplingRatio:
-					TemporaryIbInput.append(x[-1])
+					Input['IbTemp2'].append(Input['IbTemp1'][-1])
 				elif i == 2*SamplingRatio:
-					TemporaryIbInput.append((Num[0]*x[-1])/Den[0])
+					Input['IbTemp2'].append((Num[0]*Input['IbTemp1'][-1])/Den[0])
 				elif i == 3*SamplingRatio:
-					TemporaryIbInput.append((Num[1]*x[-2] + Num[0]*x[-1]- Den[1]*TemporaryIbInput[-1])/Den[0])
+					Input['IbTemp2'].append((Num[1]*Input['IbTemp1'][-2] + Num[0]*Input['IbTemp1'][-1]- Den[1]*Input['IbTemp2'][-1])/Den[0])
 				elif i > 3*SamplingRatio:
-					TemporaryIbInput.append((Num[2]*x[-3] + Num[1]*x[-2] + Num[0]*x[-1] \
-														- Den[2]*TemporaryIbInput[-2] - Den[1]*TemporaryIbInput[-1])/Den[0])
+					Input['IbTemp2'].append((Num[2]*Input['IbTemp1'][-3] + Num[1]*Input['IbTemp1'][-2] + Num[0]*Input['IbTemp1'][-1] \
+														- Den[2]*Input['IbTemp2'][-2] - Den[1]*Input['IbTemp2'][-1])/Den[0])
 
-				IbInput.append(TemporaryIbInput[-1]*(TemporaryIbInput[-1]>0))
+				Input['Ib'].append(Input['IbTemp2'][-1]*(Input['IbTemp2'][-1]>0))
 
 				if i in range(IaAfferentDelayTimeStep-1,IbAfferentDelayTimeStep):
-					Input.append(IaInput[i-IaAfferentDelayTimeStep+1]/IaSpindleGain\
+					Input['Total'].append(Input['Ia'][i-IaAfferentDelayTimeStep+1]/IaSpindleGain\
 								+ FeedforwardInput[i]	) #input to the muscle
 				elif i in range(IbAfferentDelayTimeStep, IIAfferentDelayTimeStep):
-					Input.append(IaInput[i-IaAfferentDelayTimeStep+1]/IaSpindleGain \
-								- IbInput[i-IbAfferentDelayTimeStep]/IbGTOGain \
+					Input['Total'].append(Input['Ia'][i-IaAfferentDelayTimeStep+1]/IaSpindleGain \
+								- Input['Ib'][i-IbAfferentDelayTimeStep]/IbGTOGain \
 								+ FeedforwardInput[i] ) #input to the muscle
 				elif i in range(IIAfferentDelayTimeStep, CorticalDelayTimeStep):
-					Input.append(IaInput[i-IaAfferentDelayTimeStep+1]/IaSpindleGain \
-								+ IIInput[i-IIAfferentDelayTimeStep]/IISpindleGain \
-								- IbInput[i-IbAfferentDelayTimeStep]/IbGTOGain \
+					Input['Total'].append(Input['Ia'][i-IaAfferentDelayTimeStep+1]/IaSpindleGain \
+								+ Input['II'][i-IIAfferentDelayTimeStep]/IISpindleGain \
+								- Input['Ib'][i-IbAfferentDelayTimeStep]/IbGTOGain \
 								+ FeedforwardInput[i]	) #input to the muscle
 				elif i >= CorticalDelayTimeStep:
 					FeedbackInput = TransCorticalLoopConstant*(TargetForceTrajectory[i]-SEE['Force'][i-CorticalDelayTimeStep+1])/MaximumContractileElementForce + FeedbackInput  # feedback input through cortical pathway
-					Input.append(IaInput[i-IaAfferentDelayTimeStep+1]/IaSpindleGain \
-								+IIInput[i-IIAfferentDelayTimeStep]/IISpindleGain \
-								-IbInput[i-IbAfferentDelayTimeStep]/IbGTOGain \
+					Input['Total'].append(Input['Ia'][i-IaAfferentDelayTimeStep+1]/IaSpindleGain \
+								+Input['II'][i-IIAfferentDelayTimeStep]/IISpindleGain \
+								-Input['Ib'][i-IbAfferentDelayTimeStep]/IbGTOGain \
 								+FeedbackInput	) #input to the muscle
 				else:	
-					Input.append(FeedforwardInput[i])
+					Input['Total'].append(FeedforwardInput[i])
 				
 				Count = SamplingRatio+Count
 			else:
-				IbInput.append(IbInput[-1])
-				Input.append(Input[-1])
+				Input['Ib'].append(Input['Ib'][-1])
+				Input['Total'].append(Input['Total'][-1])
 		elif FeedbackOption == 'cortical_fb_only':
 			if i > CorticalDelayTimeStep-1:
-				FeedbackInput = TransCorticalLoopConstant*(TargetForceTrajectory[i]-OutputForceTendon[i-CorticalDelayTimeStep-1])/MaximumContractileElementForce + FeedbackInput  # feedback input through cortical pathway
-				Input.append(FeedbackInput) #input to the muscle
+				FeedbackInput = TransCorticalLoopConstant*(TargetForceTrajectory[i]-SEE['Force'][i-CorticalDelayTimeStep+1])/MaximumContractileElementForce + FeedbackInput  # feedback input through cortical pathway
+				Input['Total'].append(FeedbackInput) #input to the muscle
 			else:
-				Input.append(FeedforwardInput[i])
+				Input['Total'].append(FeedforwardInput[i])
 
-			IaInput.append(0)
-			IIInput.append(0)
-			IbInput.append(0)
+			Input['Ia'].append(0)
+			Input['II'].append(0)
+			Input['Ib'].append(0)
 
 		# Feedforward only
 		# Input[i] = input[i] #TargetForceTrajectory[i]/MaximumContractileElementForce
-		## Noise + additional input
-		Input[-1] = bound(Input[-1],0,1)
+		## Input['Noise'] + additional input
+		Input['Total'][-1] = bound(Input['Total'][-1],0,1)
 
 		random.seed(1)
 		if i > 4:
-			Noise.append(2*(random.random()-0.5)*(np.sqrt(0.01*Input[i])*np.sqrt(3)))
-			FilteredNoise.append((BButtersCoefficients[4]*Noise[i-4] + BButtersCoefficients[3]*Noise[i-3] + BButtersCoefficients[2]*Noise[i-2] + BButtersCoefficients[1]*Noise[i-1] + BButtersCoefficients[0]*Noise[i] \
-									- AButtersCoefficients[4]*FilteredNoise[i-4] - AButtersCoefficients[3]*FilteredNoise[i-3] - AButtersCoefficients[2]*FilteredNoise[i-2] - AButtersCoefficients[1]*FilteredNoise[i-1])/AButtersCoefficients[0])
+			Input['Noise'].append(2*(random.random()-0.5)*(np.sqrt(0.01*Input['Total'][i])*np.sqrt(3)))
+			Input['FilteredNoise'].append((BButtersCoefficients[4]*Input['Noise'][i-4] + BButtersCoefficients[3]*Input['Noise'][i-3] + BButtersCoefficients[2]*Input['Noise'][i-2] + BButtersCoefficients[1]*Input['Noise'][i-1] + BButtersCoefficients[0]*Input['Noise'][i] \
+									- AButtersCoefficients[4]*Input['FilteredNoise'][i-4] - AButtersCoefficients[3]*Input['FilteredNoise'][i-3] - AButtersCoefficients[2]*Input['FilteredNoise'][i-2] - AButtersCoefficients[1]*Input['FilteredNoise'][i-1])/AButtersCoefficients[0])
 		else:
-			Noise.append(0)
-			FilteredNoise.append(0)
+			Input['Noise'].append(0)
+			Input['FilteredNoise'].append(0)
 
-		Input[-1] = Input[-1] + FilteredNoise[-1] + CorticalInput[-1]
+		Input['Total'][-1] = Input['Total'][-1] + Input['FilteredNoise'][-1] + CorticalInput[-1]
 
-		Input[-1] = bound(Input[-1],0,1)
+		Input['Total'][-1] = bound(Input['Total'][-1],0,1)
 
 		# add delay along efferent pathway
-		if i > EfferentDelayTimeStep:
-			LongInput.append(Input[i-EfferentDelayTimeStep])
+		if i > EfferentDelayTimeStep: #NEED TO MAKE THIS >= after next run!
+			Input['Long'].append(Input['Total'][i-EfferentDelayTimeStep])
 		else:
-			LongInput.append(0)
+			Input['Long'].append(0)
 
 		# add activation filter
-		TU = 0.12*(LongInput[-1] < EffectiveMuscleActivation) + 0.03 # When true TU = 0.15, else TU = 0.03
+		TU = 0.12*(Input['Long'][-1] < Muscle['Effective Activation'][-1]) + 0.03 # When true TU = 0.15, else TU = 0.03
 
-		EffectiveMuscleActivationFirstDeriv = (LongInput[-1] - EffectiveMuscleActivation)/TU
-		EffectiveMuscleActivation = EffectiveMuscleActivationFirstDeriv*(SamplingPeriod) + EffectiveMuscleActivation # effective neural drive
+		EffectiveMuscleActivationFirstDeriv = (Input['Long'][-1] - Muscle['Effective Activation'][-1])/TU
+		Muscle['Effective Activation'].append(EffectiveMuscleActivationFirstDeriv*(SamplingPeriod) + Muscle['Effective Activation'][-1]) # effective neural drive
 
-		# SlowTwitch = activation_frequency_slow(CE,SlowTwitch,EffectiveMuscleActivation,SamplingFrequency) # not used
+		# SlowTwitch = activation_frequency_slow(CE,SlowTwitch,Muscle['Effective Activation'][-1],SamplingFrequency) # not used
 
 		# force-velocity relationship
 		ForceVelocity = (CE['Velocity'][-1] <= 0)*concentric_force_velocity(CE) \
@@ -690,7 +681,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		ForcePassive2 = (ForcePassive2 <= 0)*ForcePassive2
 
 		# total force from contractile element
-		ForceTotal = (EffectiveMuscleActivation*(ContractileElementForce + ForcePassive2) + ForcePassive1 + ForceViscocity)*MaximumContractileElementForce
+		ForceTotal = (Muscle['Effective Activation'][-1]*(ContractileElementForce + ForcePassive2) + ForcePassive1 + ForceViscocity)*MaximumContractileElementForce
 		ForceTotal = ForceTotal*(ForceTotal>=0.0)
 
 		# force from series elastic element
@@ -716,7 +707,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 
 			# store data
 			OutputActivationFrequency.append(ActivationFrequency)
-			OutputEffectiveMuscleActivation.append(EffectiveMuscleActivation)
+			# OutputEffectiveMuscleActivation.append(EffectiveMuscleActivation)
 
 		OutputForceMuscle.append(ForceTotal)
 		OutputForceLength.append(ForceLength)
@@ -739,15 +730,15 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 				'Target' : TargetForceTrajectory, 									'ContractileElementLength' : CE['Length'], \
 				'ContractileElementVelocity' : CE['Velocity'][1:],				 	'ContractileElementAcceleration' : CE['Acceleration'][1:], \
 				'SeriesElasticElementLength' : SEE['Length'],					 	'Activation Frequency' : OutputActivationFrequency, \
-				'Input' : Input, 													'Noise' : Noise, \
-				'FilteredNoise' : FilteredNoise, 									'U' : OutputEffectiveMuscleActivation, \
-				'Ia Input' : IaInput,												'II Input' : IIInput, \
-				'Ib Input' : IbInput 	} #, 'CorticalInput' : CorticalInput }
+				'Input' : Input['Total'], 											'Noise' : Input['Noise'], \
+				'FilteredNoise' : Input['FilteredNoise'], 							'U' : Muscle['Effective Activation'][1:-1], \
+				'Ia Input' : Input['Ia'],											'II Input' : Input['II'], \
+				'Ib Input' : Input['Ib'] 	} #, 'CorticalInput' : CorticalInput }
 	"""
 	NOTES:
 
 	'ContractileElementVelocity','ContractileElementAcceleration', and 'ForceTendon' are from 1: because originally the lists were not initialized even though Vce and Ace are initialized to zero
-
+	'EffectiveMuscleActivation' has the same problem
 
 	"""
 	return(output)
