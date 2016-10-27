@@ -36,7 +36,6 @@ def statusbar(i,N,**kwargs):
 		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) + 'sec        \r', end='')
 	else:
 		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete           \r',end = '')
-
 def is_within_bounds(y,ymin,ymax):
 	"""
 	This takes in a 1D array/list or scalar value and tests to see if the values are within the allowed bounds [ymin, ymax].
@@ -50,7 +49,6 @@ def is_within_bounds(y,ymin,ymax):
 	assert sum([type(elem)!= str and type(elem)!= np.str_ for elem in y[0]])==len(y[0]), "y cannot have string values"
 	result = max(y[0])<=ymax and min(y[0])>=ymin
 	return(result)
-
 def compare(Variable1,Variable2,epsilon = 1e-3):
 	import numpy as np 
 	assert np.shape(Variable1)==np.shape(Variable2), "Variables have different shapes. \nVariable 1: "+str(np.shape(Variable1))+"\nVariable 2: "+str(np.shape(Variable2))
@@ -59,7 +57,6 @@ def compare(Variable1,Variable2,epsilon = 1e-3):
 	if type(Variable1)==np.ndarray: error = sum((Variable1-Variable2)**2)
 	if type(Variable1)!=np.ndarray: error = abs(Variable1-Variable2)
 	assert error < epsilon, "Error threshold of "+str(epsilon)+" has been reached. \nVariable 1: "+str(Variable1)+"\nVariable 2: "+str(Variable2)
-
 def nan_test(x,xname = ""):
 	"""
 	Takes in a value x and asserts that it is real. Can be either a list, array, or scalar value.
@@ -76,7 +73,6 @@ def nan_test(x,xname = ""):
 			assert isnan(x)==False, "Value is/contains NaN!"
 		else:
 			assert isnan(x)==False, xname + " is/contains NaN!"
-
 def smooth(x, window_size):
 	"""
 	Takes in an array/list and a scalar window_size and returns a smoother
@@ -89,7 +85,6 @@ def smooth(x, window_size):
 	x = x[0]
 	window= np.ones(int(window_size))/float(window_size)
 	return(np.convolve(x, window, 'same'))
-
 def generate_target_force_trajectory(TrajectoryType,Time,Amplitude,AmplitudeModulation,FrequencyModulation,Phase = 0):
 	"""
 	TrajectoryType must either be 'triangle','sinewave','constant','trapezoid'. Time must be a 1D array. Amplitude,
@@ -148,8 +143,7 @@ def generate_target_force_trajectory(TrajectoryType,Time,Amplitude,AmplitudeModu
 		# 3%MVC + 10s hold => 
 	"""
 	return(TargetForceTrajectory)
-
-def return_initial_values(muscle_parameters,gain_parameters):
+def return_initial_values(muscle_parameters,gain_parameters,TargetTrajectory,CorticalInput):
 	import numpy as np
 	def contractile_element_parameters(Length,Velocity,Acceleration,MaximumContractileElementLength,FL,FV,Force,MaximumContractileElementForce):
 		CE = initialize_dictionary(['Length','Velocity','Acceleration','Maximum Length','FL','FV','Force','Maximum Force'],\
@@ -176,7 +170,7 @@ def return_initial_values(muscle_parameters,gain_parameters):
 											[Saf,fint,feff_dot,feff,[ActivationFrequencyFast]])
 		return(FastTwitch)
 	def series_elastic_element_parameters(Length,Force,OptimalTendonLength):
-		SEE = initialize_dictionary(['Length','Force','Optimal Length'],\
+		SEE = initialize_dictionary(['Tendon Length','Tendon Force','Optimal Length'],\
 									[[Length], [Force], OptimalTendonLength])
 		return(SEE)
 	def parallel_elastic_element_parameters(ForcePassive1,ForcePassive2):
@@ -265,6 +259,9 @@ def return_initial_values(muscle_parameters,gain_parameters):
 	ChainTensionSecondDeriv = 0
 	ChainTensionFirstDeriv = 0
 	ChainTension = 0
+	FeedbackInput = 0
+	TargetForceTrajectory = TargetTrajectory*MaximumContractileElementForce
+	FeedforwardInput = TargetForceTrajectory/MaximumContractileElementForce
 
 	CE = contractile_element_parameters(ContractileElementLength,ContractileElementVelocity,ContractileElementAcceleration,\
 											MaximumContractileElementLength,FL,FV,Force,MaximumContractileElementForce)
@@ -275,8 +272,10 @@ def return_initial_values(muscle_parameters,gain_parameters):
 	FastTwitch = slow_twitch_parameters(Saf,fint,feff_dot,feff,ActivationFrequency)
 	SEE = series_elastic_element_parameters(SeriesElasticElementLength,SeriesElasticElementForce,OptimalTendonLength)
 	PEE = parallel_elastic_element_parameters([],[])
-	Input = initialize_dictionary(['Ia','II','Ib','IbTemp1','IbTemp2','Total','Noise','FilteredNoise','Long'],\
-									[[],[],[],[],[],[],[],[],[]])
+	Input = initialize_dictionary(['Ia','II','Ib','IbTemp1','IbTemp2','Total','Noise','FilteredNoise',\
+									'Long','Feedback','Target Force Trajectory','Feedforward','Cortical'],\
+									[[],[],[],[],[],[],[],[],\
+									[],FeedbackInput,TargetForceTrajectory,FeedforwardInput,CorticalInput])
 	# Removed 'Feedforward','TargetTrajectory','CorticalInput','Feedback',
 	Muscle = muscle_values(EffectiveMuscleActivation,MuscleLength,MuscleVelocity,MuscleAcceleration,MuscleMass,OptimalLength)
 	return(Bag1,Bag2,Chain,SlowTwitch,FastTwitch,CE,SEE,PEE,Muscle,Input)
@@ -615,12 +614,143 @@ def parallel_elastic_element_force_2(CE):
 	return(ParallelElasticElementForce2)
 def normalized_series_elastic_element_force(SEE):
 	import numpy as np
-	LT = SEE['Length'][-1]
+	LT = SEE['Tendon Length'][-1]
 	cT_se = 27.8
 	kT_se = 0.0047
 	LrT_se = 0.964
 	NormalizedSeriesElasticElementForce = cT_se * kT_se * np.log(np.exp((LT - LrT_se)/kT_se)+1)
 	return(NormalizedSeriesElasticElementForce)
+def update_ib_input(i,Input,SEE,Num,Den,SamplingRatio):
+	import numpy as np
+	## GTO model
+	GTOConstant1 = 60
+	GTOConstant2 = 4
+	# Get Ib activity
+	Input['IbTemp1'].append(GTOConstant1*np.log(SEE['Tendon Force'][-1]/GTOConstant2+1))
+	if i == 0 or i == SamplingRatio:
+		Input['IbTemp2'].append(Input['IbTemp1'][-1])
+	elif i == 2*SamplingRatio:
+		Input['IbTemp2'].append((Num[0]*Input['IbTemp1'][-1])/Den[0])
+	elif i == 3*SamplingRatio:
+		Input['IbTemp2'].append((Num[1]*Input['IbTemp1'][-2] + Num[0]*Input['IbTemp1'][-1]- Den[1]*Input['IbTemp2'][-1])/Den[0])
+	else:
+		Input['IbTemp2'].append((Num[2]*Input['IbTemp1'][-3] + Num[1]*Input['IbTemp1'][-2] + Num[0]*Input['IbTemp1'][-1] \
+								- Den[2]*Input['IbTemp2'][-2] - Den[1]*Input['IbTemp2'][-1])/Den[0])
+	Input['Ib'].append(Input['IbTemp2'][-1]*(Input['IbTemp2'][-1]>0))
+def update_input_with_delayed_afferents_and_feedback(i,Input,SEE,CE,delay_parameters,gain_parameters,SamplingRatio):
+	## Transcortical loop
+	TransCorticalLoopGain = 0.01
+	IaSpindleGain = gain_parameters['Ia Gain']
+	IISpindleGain = gain_parameters['II Gain']
+	IbGTOGain = gain_parameters['Ib Gain']
+
+	IaAfferentDelay = delay_parameters['Ia Delay']
+	IIAfferentDelay = delay_parameters['II Delay']
+	IbAfferentDelay = delay_parameters['Ib Delay']
+	CorticalDelay = delay_parameters['Cortical Delay']
+
+	IaAfferentDelayTimeStep = IaAfferentDelay*SamplingRatio   #Ia + II 30
+	IIAfferentDelayTimeStep = IIAfferentDelay*SamplingRatio
+	IbAfferentDelayTimeStep = IbAfferentDelay*SamplingRatio
+	CorticalDelayTimeStep = CorticalDelay*SamplingRatio   #cortical 50
+
+	IaAfferentDelayTimeStep = int(IaAfferentDelayTimeStep)   #Ia + II 30
+	IIAfferentDelayTimeStep = int(IIAfferentDelayTimeStep)
+	IbAfferentDelayTimeStep = int(IbAfferentDelayTimeStep)   #Ib 40
+	CorticalDelayTimeStep = int(CorticalDelayTimeStep)   #cortical 50
+
+	if i >=IaAfferentDelayTimeStep-1: DelayedIaInput = Input['Ia'][i-IaAfferentDelayTimeStep+1]
+	if i >=IbAfferentDelayTimeStep: DelayedIbInput = Input['Ib'][i-IbAfferentDelayTimeStep]
+	if i >=IIAfferentDelayTimeStep: DelayedIIInput = Input['II'][i-IIAfferentDelayTimeStep]
+	if i >=CorticalDelayTimeStep: DelayedTendonForce = SEE['Tendon Force'][i-CorticalDelayTimeStep+1]
+
+	if i in range(IaAfferentDelayTimeStep-1,IbAfferentDelayTimeStep):
+		Input['Total'].append(DelayedIaInput/IaSpindleGain\
+							+ Input['Feedforward'][i]	) #input to the muscle
+	elif i in range(IbAfferentDelayTimeStep, IIAfferentDelayTimeStep):
+		Input['Total'].append(DelayedIaInput/IaSpindleGain \
+							- DelayedIbInput/IbGTOGain \
+							+ Input['Feedforward'][i] ) #input to the muscle
+	elif i in range(IIAfferentDelayTimeStep, CorticalDelayTimeStep):
+		Input['Total'].append(DelayedIaInput/IaSpindleGain \
+							+ DelayedIIInput/IISpindleGain \
+							- DelayedIbInput/IbGTOGain \
+							+ Input['Feedforward'][i]	) #input to the muscle
+	elif i >= CorticalDelayTimeStep:
+		Input['Feedback'] = TransCorticalLoopGain*(Input['Target Force Trajectory'][i]-DelayedTendonForce)/CE['Maximum Force'] + Input['Feedback']  # feedback input through cortical pathway
+		Input['Total'].append(DelayedIaInput/IaSpindleGain \
+							+DelayedIIInput/IISpindleGain \
+							-DelayedIbInput/IbGTOGain \
+							+Input['Feedback']	) #input to the muscle
+	else:	
+		Input['Total'].append(Input['Feedforward'][i])
+def update_input_with_delayed_afferents(i,Input,delay_parameters,gain_parameters,SamplingRatio):
+	## Transcortical loop
+	IaSpindleGain = gain_parameters['Ia Gain']
+	IISpindleGain = gain_parameters['II Gain']
+	IbGTOGain = gain_parameters['Ib Gain']
+
+	IaAfferentDelay = delay_parameters['Ia Delay']
+	IIAfferentDelay = delay_parameters['II Delay']
+	IbAfferentDelay = delay_parameters['Ib Delay']
+			
+	IaAfferentDelayTimeStep = IaAfferentDelay*SamplingRatio   #Ia + II 30
+	IIAfferentDelayTimeStep = IIAfferentDelay*SamplingRatio
+	IbAfferentDelayTimeStep = IbAfferentDelay*SamplingRatio
+		
+	IaAfferentDelayTimeStep = int(IaAfferentDelayTimeStep)   #Ia + II 30
+	IIAfferentDelayTimeStep = int(IIAfferentDelayTimeStep)
+	IbAfferentDelayTimeStep = int(IbAfferentDelayTimeStep)   #Ib 40
+	
+	if i >=IaAfferentDelayTimeStep-1: DelayedIaInput = Input['Ia'][i-IaAfferentDelayTimeStep+1]
+	if i >=IbAfferentDelayTimeStep: DelayedIbInput = Input['Ib'][i-IbAfferentDelayTimeStep]
+	if i >=IIAfferentDelayTimeStep: DelayedIIInput = Input['II'][i-IIAfferentDelayTimeStep]
+
+	if i in range(IaAfferentDelayTimeStep-1,IbAfferentDelayTimeStep):
+		Input['Total'].append(DelayedIaInput/IaSpindleGain\
+							+ Input['Feedforward'][i]	) #input to the muscle
+	elif i in range(IbAfferentDelayTimeStep, IIAfferentDelayTimeStep):
+		Input['Total'].append(DelayedIaInput/IaSpindleGain \
+							- DelayedIbInput/IbGTOGain \
+							+ Input['Feedforward'][i] ) #input to the muscle
+	elif i >= IIAfferentDelayTimeStep:
+		Input['Total'].append(DelayedIaInput/IaSpindleGain \
+							+ DelayedIIInput/IISpindleGain \
+							- DelayedIbInput/IbGTOGain \
+							+ Input['Feedforward'][i]	) #input to the muscle
+	else:	
+		Input['Total'].append(Input['Feedforward'][i])
+def update_input_with_only_cortical_feedback(Input,SEE,CE,delay_parameters,SamplingRatio):
+	TransCorticalLoopGain = 0.01
+	CorticalDelay = delay_parameters['Cortical Delay']
+	CorticalDelayTimeStep = CorticalDelay*SamplingRatio   #cortical 50
+	CorticalDelayTimeStep = int(CorticalDelayTimeStep)   #cortical 50
+	if i >=CorticalDelayTimeStep: DelayedTendonForce = SEE['Tendon Force'][i-CorticalDelayTimeStep+1]
+	elif i >= CorticalDelayTimeStep:
+		Input['Feedback'] = TransCorticalLoopGain*(Input['Target Force Trajectory'][i]-DelayedTendonForce)/CE['Maximum Force'] + Input['Feedback']  # feedback input through cortical pathway
+		append_dictionary(Input,['Total','Ia','II','Ib'],[Input['Feedback'],0,0,0])
+	else:	
+		append_dictionary(Input,['Total','Ia','II','Ib'],[Input['Feedforward'][i],0,0,0])
+def update_total_input_at_step_i(i,Input,CE,SEE,Bag1,Bag2,Chain,Num,Den,delay_parameters,gain_parameters,SamplingRatio,SamplingPeriod,FeedbackOption):
+	assert FeedbackOption in ['ff_only','servo_control','fb_control','cortical_fb_only'],"FeedbackOption must be one of the following: 'ff_only','servo_control','fb_control','cortical_fb_only'"
+	if FeedbackOption == 'ff_only': # Feedforward input onl
+		append_dictionary(Input,['Total','Ia','II','Ib'],[Input['Feedforward'][i],0,0,0])
+	elif FeedbackOption == 'servo_control': # Servo control (feedforward + spindle and GTO)
+		append_dictionary(Input,['Ia','II'],spindle_model(CE,Bag1,Bag2,Chain,SamplingPeriod))
+		if i%SamplingRatio == 0:
+			update_ib_input(i,Input,SEE,Num,Den,SamplingRatio)
+			update_input_with_delayed_afferents(i,Input,delay_parameters,gain_parameters,SamplingRatio)
+		else:
+			append_dictionary(Input,['Ib','Total'],[Input['Ib'][-1],Input['Total'][-1]])
+	elif FeedbackOption == 'fb_control': # Feedback control (proprioceptive systems + supraspinal loop)
+		append_dictionary(Input,['Ia','II'],spindle_model(CE,Bag1,Bag2,Chain,SamplingPeriod))
+		if i%SamplingRatio == 0:
+			update_ib_input(i,Input,SEE,Num,Den,SamplingRatio)
+			update_input_with_delayed_afferents_and_feedback(i,Input,SEE,CE,delay_parameters,gain_parameters,SamplingRatio)
+		else:
+			append_dictionary(Input,['Ib','Total'],[Input['Ib'][-1],Input['Total'][-1]])
+	elif FeedbackOption == 'cortical_fb_only':
+		update_input_with_only_cortical_feedback(Input,SEE,CE,delay_parameters,SamplingRatio)
 def bound(value,min_value,max_value):
 	if value > max_value:
 		result = max_value
@@ -629,6 +759,83 @@ def bound(value,min_value,max_value):
 	else:
 		result = value
 	return(result)
+def add_noise_to_input(i,Input,AButtersCoefficients,BButtersCoefficients):
+	"""
+	must import and seed random before running this function
+	"""
+	import numpy as np
+	import random
+	## Input['Noise'] + additional input
+	Input['Total'][-1] = bound(Input['Total'][-1],0,1)
+	if i > 4:
+		Input['Noise'].append(2*(random.random()-0.5)*(np.sqrt(0.01*Input['Total'][i])*np.sqrt(3)))
+		Input['FilteredNoise'].append((BButtersCoefficients[4]*Input['Noise'][i-4] + BButtersCoefficients[3]*Input['Noise'][i-3] \
+										+ BButtersCoefficients[2]*Input['Noise'][i-2] + BButtersCoefficients[1]*Input['Noise'][i-1] \
+										+ BButtersCoefficients[0]*Input['Noise'][i] \
+										- AButtersCoefficients[4]*Input['FilteredNoise'][i-4] - AButtersCoefficients[3]*Input['FilteredNoise'][i-3] \
+										- AButtersCoefficients[2]*Input['FilteredNoise'][i-2] - AButtersCoefficients[1]*Input['FilteredNoise'][i-1]) \
+										/ AButtersCoefficients[0])
+	else:
+		append_dictionary(Input,['Noise','FilteredNoise'],[0,0])
+
+	Input['Total'][-1] = Input['Total'][-1] + Input['FilteredNoise'][-1] + Input['Cortical'][i]
+	Input['Total'][-1] = bound(Input['Total'][-1],0,1)
+def apply_activation_filter(Input,Muscle,SamplingPeriod):
+	# add activation filter
+	TU = 0.12*(Input['Long'][-1] < Muscle['Effective Activation'][-1]) + 0.03 # When true TU = 0.15, else TU = 0.03
+
+	EffectiveMuscleActivationFirstDeriv = (Input['Long'][-1] - Muscle['Effective Activation'][-1])/TU
+	EffectiveMuscleActivation = EffectiveMuscleActivationFirstDeriv*(SamplingPeriod) + Muscle['Effective Activation'][-1] # effective neural drive
+	return(EffectiveMuscleActivation)
+def update_CE_FLV_relationship(CE):
+	# force-velocity relationship
+	CE['FV'].append((CE['Velocity'][-1] <= 0)*concentric_force_velocity(CE) \
+						+ (CE['Velocity'][-1] > 0)*eccentric_force_velocity(CE) )
+	# force-length relationship
+	CE['FL'].append(force_length(CE))
+	CE['Force'] = CE['FL'][-1]*CE['FV'][-1]
+def update_PEE_with_current_CE_length(PEE,CE):
+	# passive element 1
+	PEE['Passive Force 1'].append(parallel_elastic_element_force_1(CE))
+	# passive element 2
+	ForcePassive2 = parallel_elastic_element_force_2(CE)
+	PEE['Passive Force 2'].append((ForcePassive2 <= 0)*ForcePassive2)
+def update_muscle_kinematics_with_current_muscle_and_tendon_forces(Muscle,SEE,PennationAngle,SamplingPeriod):
+	import numpy as np
+	# calculate muscle excursion acceleration based on the difference
+	# between muscle force and tendon force
+	Muscle['Acceleration'].append((SEE['Tendon Force'][-1]*np.cos(PennationAngle) - Muscle['Force'][-1]*(np.cos(PennationAngle))**2)/(Muscle['Mass']) \
+		+ (Muscle['Velocity'][-1])**2*np.tan(PennationAngle)**2/(Muscle['Length'][-1]))
+	# integrate acceleration to get velocity
+	Muscle['Velocity'].append((Muscle['Acceleration'][-1]+ \
+		Muscle['Acceleration'][-2])/2*(SamplingPeriod)+Muscle['Velocity'][-1])
+	# integrate velocity to get length
+	Muscle['Length'].append((Muscle['Velocity'][-1]+ \
+		Muscle['Velocity'][-2])/2*(SamplingPeriod)+Muscle['Length'][-1])
+def update_CE_kinematics(CE,Muscle):
+	# normalize each variable to optimal muscle length or tendon legnth
+	CE['Acceleration'].append(Muscle['Acceleration'][-1]/(Muscle['Optimal Length']/100))
+	CE['Velocity'].append(Muscle['Velocity'][-1]/(Muscle['Optimal Length']/100))
+	CE['Length'].append(Muscle['Length'][-1]/(Muscle['Optimal Length']/100))
+def update_kinematics_and_kinetics(CE,PEE,SEE,Muscle,MuscleViscosity,PennationAngle,InitialMusculoTendonLength,SamplingPeriod):
+	import numpy as np
+	# update FLV relationship
+	update_CE_FLV_relationship(CE)
+	# update force due to viscous property
+	ForceViscosity = MuscleViscosity * CE['Velocity'][-1]
+	# update passive forces with current CE length
+	update_PEE_with_current_CE_length(PEE,CE)
+	# update total muscle force from contractile element, passive forces, and viscous forces (ONLY POSITIVE VALUES)
+	ForceTotal = (Muscle['Effective Activation'][-1]*(CE['Force'] + PEE['Passive Force 2'][-1]) + PEE['Passive Force 1'][-1] + ForceViscosity)*CE['Maximum Force']
+	Muscle['Force'].append(ForceTotal*(ForceTotal>=0.0))
+	# update force from series elastic element
+	SEE['Tendon Force'].append(normalized_series_elastic_element_force(SEE) * CE['Maximum Force'])
+	# update muscle kinematics based on most recent muscle/tendon forces
+	update_muscle_kinematics_with_current_muscle_and_tendon_forces(Muscle,SEE,PennationAngle,SamplingPeriod)
+	# update CE kinematics based on most recent muscle kinematics
+	update_CE_kinematics(CE,Muscle)
+	# update SEE length based on most recent CE length
+	SEE['Tendon Length'].append((InitialMusculoTendonLength - CE['Length'][-1]*Muscle['Optimal Length']*np.cos(PennationAngle))/SEE['Optimal Length'])
 def initialize_dictionary(keys,values):
 	assert len(keys)==len(values), "keys and values must have the same length."
 	result = {}
@@ -642,7 +849,6 @@ def append_dictionary(dictionary,keys,values):
 			dictionary[keys[i]]=values[i]
 		else:
 			dictionary[keys[i]].append(values[i])
-
 def test_input_values(muscle_parameters, delay_parameters, gain_parameters, FeedbackOption):
 	assert FeedbackOption in ['ff_only','servo_control','fb_control','cortical_fb_only'],\
 	"FeedbackOption must be either 'ff_only', 'servo_control', 'fb_control', or 'cortical_fb_only'"
@@ -668,7 +874,6 @@ def test_input_values(muscle_parameters, delay_parameters, gain_parameters, Feed
 	assert 'Ia Gain' in gain_parameters, "'Ia Gain' missing in gain_parameters"
 	assert 'II Gain' in gain_parameters, "'II Gain' missing in gain_parameters"
 	assert 'Ib Gain' in gain_parameters, "'Ib Gain' missing in gain_parameters"
-
 def compare_output(TheoreticalOutput):
 	import pickle
 	import numpy as np 
