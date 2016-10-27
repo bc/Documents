@@ -95,9 +95,6 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	# parameter initialization
 	ContractileElementVelocity = 0
 	ContractileElementAcceleration = 0
-	MuscleAcceleration = [0]
-	MuscleVelocity = [0]
-	MuscleLength = [ContractileElementLength*OptimalLength/100]
 	SeriesElasticElementForce = 0.105
 
 	# filter parameters for Input['Noise']
@@ -397,7 +394,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		#nan_test(feff,'feff')
 
 		nf = nf0 + nf1*(1/Length-1)
-		SlowTwitch['ActivationFrequency'] = 1 - np.exp(-(Y*feff/(af*nf))**nf)
+		SlowTwitch['ActivationFrequency'].append(1 - np.exp(-(Y*feff/(af*nf))**nf))
 		SlowTwitch['Y'],SlowTwitch['fint'],SlowTwitch['feff_dot'],SlowTwitch['feff'] = Y,fint,feff_dot,feff 
 		return(SlowTwitch)
 	def activation_frequency_fast(CE,FastTwitch,Activation,SamplingFrequency):
@@ -447,7 +444,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		feff_dot = (fint - feff)/Tf
 		feff = feff_dot*SamplingPeriod + feff
 		nf = nf0 + nf1*(1/Length-1)
-		FastTwitch['ActivationFrequency'] = 1 - np.exp(-(S_af*feff/(af*nf))**nf)
+		FastTwitch['ActivationFrequency'].append(1 - np.exp(-(S_af*feff/(af*nf))**nf))
 		FastTwitch['Saf'],FastTwitch['fint'],FastTwitch['feff_dot'],FastTwitch['feff'] = Saf,fint,feff_dot,feff
 		return(FastTwitch)
 	def force_length(CE):
@@ -501,10 +498,6 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		else:
 			result = value
 		return(result)
-
-	OutputForceMuscle,OutputForceLength = [], []
-	OutputForceVelocity,OutputForcePassive1,OutputForcePassive2 = [], [], []
-	OutputContractileElementAcceleration,OutputActivationFrequency,OutputEffectiveMuscleActivation = [], [], []
 	
 	CE = initialize_dictionary(['Length','Velocity','Acceleration','Maximum Length'],\
 									[[InitialLength/(OptimalLength/100)],[0],[0],float(NormalizedMaximumFascicleLength/np.cos(PennationAngle))])
@@ -521,8 +514,8 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	SEE = initialize_dictionary(['Length','Force'],[[float((InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength)],[SeriesElasticElementForce]])
 	Input = initialize_dictionary(['Ia','II','Ib','IbTemp1','IbTemp2','Total','Noise','FilteredNoise','Long'],\
 									[[],[],[],[],[],[],[],[],[]])
-	Muscle = initialize_dictionary(['Effective Activation','Force','FL','FV','Passive Force 1','Passive Force 2'],\
-									[[EffectiveMuscleActivation],[],[],[],[],[]])
+	Muscle = initialize_dictionary(['Effective Activation','Force','FL','FV','Passive Force 1','Passive Force 2','Length','Velocity','Acceleration'],\
+									[[EffectiveMuscleActivation],[],[],[],[],[],[ContractileElementLength*OptimalLength/100],[0],[0]])
 	StartTime = time.time()
 	FeedforwardInput = TargetForceTrajectory/MaximumContractileElementForce
 
@@ -667,22 +660,22 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		# SlowTwitch = activation_frequency_slow(CE,SlowTwitch,Muscle['Effective Activation'][-1],SamplingFrequency) # not used
 
 		# force-velocity relationship
-		ForceVelocity = (CE['Velocity'][-1] <= 0)*concentric_force_velocity(CE) \
-							+ (CE['Velocity'][-1] > 0)*eccentric_force_velocity(CE) 
+		Muscle['FV'].append((CE['Velocity'][-1] <= 0)*concentric_force_velocity(CE) \
+							+ (CE['Velocity'][-1] > 0)*eccentric_force_velocity(CE) )
 		# force-length relationship
-		ForceLength = force_length(CE)
-		ContractileElementForce = ForceLength*ForceVelocity
+		Muscle['FL'].append(force_length(CE))
+		ContractileElementForce = Muscle['FL'][-1]*Muscle['FV'][-1]
 		# viscous property
 		ForceViscocity = MuscleViscosity * CE['Velocity'][-1]
 		# passive element 1
-		ForcePassive1 = parallel_elastic_element_force_1(CE)
+		Muscle['Passive Force 1'].append(parallel_elastic_element_force_1(CE))
 		# passive element 2
 		ForcePassive2 = parallel_elastic_element_force_2(CE)
-		ForcePassive2 = (ForcePassive2 <= 0)*ForcePassive2
+		Muscle['Passive Force 2'].append((ForcePassive2 <= 0)*ForcePassive2)
 
 		# total force from contractile element
-		ForceTotal = (Muscle['Effective Activation'][-1]*(ContractileElementForce + ForcePassive2) + ForcePassive1 + ForceViscocity)*MaximumContractileElementForce
-		ForceTotal = ForceTotal*(ForceTotal>=0.0)
+		ForceTotal = (Muscle['Effective Activation'][-1]*(ContractileElementForce + Muscle['Passive Force 2'][-1]) + Muscle['Passive Force 1'][-1] + ForceViscocity)*MaximumContractileElementForce
+		Muscle['Force'].append(ForceTotal*(ForceTotal>=0.0))
 
 		# force from series elastic element
 		SEE['Force'].append(normalized_series_elastic_element_force(SEE) * MaximumContractileElementForce)
@@ -690,30 +683,21 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		# calculate muscle excursion acceleration based on the difference
 		# between muscle force and tendon force
 		if i < len(Time)-1:
-			MuscleAcceleration.append((SEE['Force'][-1]*np.cos(PennationAngle) - ForceTotal*(np.cos(PennationAngle))**2)/(MuscleMass) \
-				+ (MuscleVelocity[-1])**2*np.tan(PennationAngle)**2/(MuscleLength[-1]))
+			Muscle['Acceleration'].append((SEE['Force'][-1]*np.cos(PennationAngle) - Muscle['Force'][-1]*(np.cos(PennationAngle))**2)/(MuscleMass) \
+				+ (Muscle['Velocity'][-1])**2*np.tan(PennationAngle)**2/(Muscle['Length'][-1]))
 			# integrate acceleration to get velocity
-			MuscleVelocity.append((MuscleAcceleration[-1]+ \
-				MuscleAcceleration[-2])/2*(SamplingPeriod)+MuscleVelocity[-1])
+			Muscle['Velocity'].append((Muscle['Acceleration'][-1]+ \
+				Muscle['Acceleration'][-2])/2*(SamplingPeriod)+Muscle['Velocity'][-1])
 			# integrate velocity to get length
-			MuscleLength.append((MuscleVelocity[-1]+ \
-				MuscleVelocity[-2])/2*(SamplingPeriod)+MuscleLength[-1])
+			Muscle['Length'].append((Muscle['Velocity'][-1]+ \
+				Muscle['Velocity'][-2])/2*(SamplingPeriod)+Muscle['Length'][-1])
 
 			# normalize each variable to optimal muscle length or tendon legnth
-			CE['Acceleration'].append(MuscleAcceleration[-1]/(OptimalLength/100))
-			CE['Velocity'].append(MuscleVelocity[-1]/(OptimalLength/100))
-			CE['Length'].append(MuscleLength[-1]/(OptimalLength/100))
+			CE['Acceleration'].append(Muscle['Acceleration'][-1]/(OptimalLength/100))
+			CE['Velocity'].append(Muscle['Velocity'][-1]/(OptimalLength/100))
+			CE['Length'].append(Muscle['Length'][-1]/(OptimalLength/100))
 			SEE['Length'].append((InitialMusculoTendonLength - CE['Length'][-1]*OptimalLength*np.cos(PennationAngle))/OptimalTendonLength)
 
-			# store data
-			OutputActivationFrequency.append(ActivationFrequency)
-			# OutputEffectiveMuscleActivation.append(EffectiveMuscleActivation)
-
-		OutputForceMuscle.append(ForceTotal)
-		OutputForceLength.append(ForceLength)
-		OutputForceVelocity.append(ForceVelocity)
-		OutputForcePassive1.append(ForcePassive1)
-		OutputForcePassive2.append(ForcePassive2)
 		statusbar(i,len(Time),StartTime=StartTime,Title = 'afferented_muscle_model')
 
 	# plt.figure()
@@ -724,12 +708,12 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	# plt.ylabel('Force (N)')
 
 	# save data as output in structure format
-	output = {	'Force' : OutputForceMuscle, 										'ForceTendon' : SEE['Force'][1:], \
-				'FL' : OutputForceLength, 											'FV' : OutputForceVelocity, \
-				'PE Force 1' : OutputForcePassive1, 								'PE Force 2' : OutputForcePassive2, \
+	output = {	'Force' : Muscle['Force'], 											'ForceTendon' : SEE['Force'][1:], \
+				'FL' : Muscle['FL'], 												'FV' : Muscle['FV'], \
+				'PE Force 1' : Muscle['Passive Force 1'], 							'PE Force 2' : Muscle['Passive Force 2'], \
 				'Target' : TargetForceTrajectory, 									'ContractileElementLength' : CE['Length'], \
 				'ContractileElementVelocity' : CE['Velocity'][1:],				 	'ContractileElementAcceleration' : CE['Acceleration'][1:], \
-				'SeriesElasticElementLength' : SEE['Length'],					 	'Activation Frequency' : OutputActivationFrequency, \
+				'SeriesElasticElementLength' : SEE['Length'],					 	'Activation Frequency' : [0.0]*149999, \
 				'Input' : Input['Total'], 											'Noise' : Input['Noise'], \
 				'FilteredNoise' : Input['FilteredNoise'], 							'U' : Muscle['Effective Activation'][1:-1], \
 				'Ia Input' : Input['Ia'],											'II Input' : Input['II'], \
