@@ -343,15 +343,16 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 
 		PrimaryOutput = Larger + S * Smaller
 		SecondaryOutput = Bag2SecondaryAfferentPotential + ChainSecondaryAfferentPotential
-
-		if PrimaryOutput < 0:
-			PrimaryOutput = 0
-		elif PrimaryOutput > 100000:
-			PrimaryOutput = 100000
-		if SecondaryOutput < 0:
-			SecondaryOutput = 0
-		elif SecondaryOutput > 100000:
-			SecondaryOutput = 100000
+		PrimaryOutput = bound(PrimaryOutput,0,100000)
+		SecondaryOutput = bound(SecondaryOutput,0,100000)
+		# if PrimaryOutput < 0:
+		# 	PrimaryOutput = 0
+		# elif PrimaryOutput > 100000:
+		# 	PrimaryOutput = 100000
+		# if SecondaryOutput < 0:
+		# 	SecondaryOutput = 0
+		# elif SecondaryOutput > 100000:
+		# 	SecondaryOutput = 100000
 
 		return(PrimaryOutput,SecondaryOutput)
 	def activation_frequency_slow(CE,SlowTwitch,Activation,SamplingFrequency):
@@ -500,7 +501,14 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		LrT_se = 0.964
 		NormalizedSeriesElasticElementForce = cT_se * kT_se * np.log(np.exp((LT - LrT_se)/kT_se)+1)
 		return(NormalizedSeriesElasticElementForce)
-	
+	def bound(value,min_value,max_value):
+		if value > max_value:
+			result = max_value
+		elif value < min_value:
+			result = min_value
+		else:
+			result = value
+		return(result)
 	Input, IaInput, IIInput = [],[],[]
 	IbInput, x, TemporaryIbInput = [],[],[]
 	Noise, FilteredNoise, LongInput = [],[],[]
@@ -638,10 +646,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		# Feedforward only
 		# Input[i] = input[i] #TargetForceTrajectory[i]/MaximumContractileElementForce
 		## Noise + additional input
-		if Input[-1] < 0:
-			Input[-1] = 0
-		elif Input[-1] > 1:
-			Input[-1] = 1
+		Input[-1] = bound(Input[-1],0,1)
 
 		random.seed(1)
 		if i > 4:
@@ -654,10 +659,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 
 		Input[-1] = Input[-1] + FilteredNoise[-1] + CorticalInput[-1]
 
-		if Input[-1] < 0:
-			Input[-1] = 0
-		elif Input[-1] > 1:
-			Input[-1] = 1
+		Input[-1] = bound(Input[-1],0,1)
 
 		# add delay along efferent pathway
 		if i > EfferentDelayTimeStep:
