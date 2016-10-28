@@ -273,9 +273,11 @@ def return_initial_values(muscle_parameters,gain_parameters,TargetTrajectory,Cor
 	SEE = series_elastic_element_parameters(SeriesElasticElementLength,SeriesElasticElementForce,OptimalTendonLength)
 	PEE = parallel_elastic_element_parameters([],[])
 	Input = initialize_dictionary(['Ia','II','Ib','IbTemp1','IbTemp2','Total','Noise','FilteredNoise',\
-									'Long','Feedback','Target Force Trajectory','Feedforward','Cortical'],\
+									'Long','Feedback','Target Force Trajectory','Feedforward','Cortical',\
+									'Ia Interneuron', 'Ib Interneuron'],\
 									[[],[],[],[],[],[],[],[],\
-									[],FeedbackInput,TargetForceTrajectory,FeedforwardInput,CorticalInput])
+									[],FeedbackInput,TargetForceTrajectory,FeedforwardInput,CorticalInput,\
+									[],[]])
 	# Removed 'Feedforward','TargetTrajectory','CorticalInput','Feedback',
 	Muscle = muscle_values(EffectiveMuscleActivation,MuscleLength,MuscleVelocity,MuscleAcceleration,MuscleMass,OptimalLength)
 	return(Bag1,Bag2,Chain,SlowTwitch,FastTwitch,CE,SEE,PEE,Muscle,Input)
@@ -637,7 +639,9 @@ def update_ib_input(i,Input,SEE,Num,Den,SamplingRatio):
 		Input['IbTemp2'].append((Num[2]*Input['IbTemp1'][-3] + Num[1]*Input['IbTemp1'][-2] + Num[0]*Input['IbTemp1'][-1] \
 								- Den[2]*Input['IbTemp2'][-2] - Den[1]*Input['IbTemp2'][-1])/Den[0])
 	Input['Ib'].append(Input['IbTemp2'][-1]*(Input['IbTemp2'][-1]>0))
-def update_input_with_delayed_afferents_and_feedback(i,Input,SEE,CE,delay_parameters,gain_parameters,SamplingRatio):
+def update_input_with_delayed_afferents_and_feedback(i,Input,SEE,CE,delay_parameters,gain_parameters,SamplingRatio,**kwargs):
+	ControlStrategy = kwargs.get("ControlStrategy",None)
+	SEE_synergist,CE_synergist = kwargs.get("SynergistParameters",[None,None])
 	## Transcortical loop
 	TransCorticalLoopGain = 0.01
 	IaSpindleGain = gain_parameters['Ia Gain']
@@ -662,8 +666,13 @@ def update_input_with_delayed_afferents_and_feedback(i,Input,SEE,CE,delay_parame
 	if i >=IaAfferentDelayTimeStep-1: DelayedIaInput = Input['Ia'][i-IaAfferentDelayTimeStep+1]
 	if i >=IbAfferentDelayTimeStep: DelayedIbInput = Input['Ib'][i-IbAfferentDelayTimeStep]
 	if i >=IIAfferentDelayTimeStep: DelayedIIInput = Input['II'][i-IIAfferentDelayTimeStep]
-	if i >=CorticalDelayTimeStep: DelayedTendonForce = SEE['Tendon Force'][i-CorticalDelayTimeStep+1]
-
+	if i >=CorticalDelayTimeStep:
+		if ControlStrategy == "synergist": 
+			DelayedTendonForce = SEE['Tendon Force'][i-CorticalDelayTimeStep+1] + SEE_synergist['Tendon Force'][i-CorticalDelayTimeStep+1]
+			MaximumForce = CE['Maximum Force'] + CE_synergist['Maximum Force']
+		else:
+			DelayedTendonForce = SEE['Tendon Force'][i-CorticalDelayTimeStep+1]
+			MaximumForce = CE['Maximum Force']
 	if i in range(IaAfferentDelayTimeStep-1,IbAfferentDelayTimeStep):
 		Input['Total'].append(DelayedIaInput/IaSpindleGain\
 							+ Input['Feedforward'][i]	) #input to the muscle
@@ -677,7 +686,7 @@ def update_input_with_delayed_afferents_and_feedback(i,Input,SEE,CE,delay_parame
 							- DelayedIbInput/IbGTOGain \
 							+ Input['Feedforward'][i]	) #input to the muscle
 	elif i >= CorticalDelayTimeStep:
-		Input['Feedback'] = TransCorticalLoopGain*(Input['Target Force Trajectory'][i]-DelayedTendonForce)/CE['Maximum Force'] + Input['Feedback']  # feedback input through cortical pathway
+		Input['Feedback'] = TransCorticalLoopGain*(Input['Target Force Trajectory'][i]-DelayedTendonForce)/MaximumForce + Input['Feedback']  # feedback input through cortical pathway
 		Input['Total'].append(DelayedIaInput/IaSpindleGain \
 							+DelayedIIInput/IISpindleGain \
 							-DelayedIbInput/IbGTOGain \
@@ -731,9 +740,10 @@ def update_input_with_only_cortical_feedback(Input,SEE,CE,delay_parameters,Sampl
 		append_dictionary(Input,['Total','Ia','II','Ib'],[Input['Feedback'],0,0,0])
 	else:	
 		append_dictionary(Input,['Total','Ia','II','Ib'],[Input['Feedforward'][i],0,0,0])
-def update_total_input_at_step_i(i,Input,CE,SEE,Bag1,Bag2,Chain,Num,Den,delay_parameters,gain_parameters,SamplingRatio,SamplingPeriod,FeedbackOption):
-	assert FeedbackOption in ['ff_only','servo_control','fb_control','cortical_fb_only'],"FeedbackOption must be one of the following: 'ff_only','servo_control','fb_control','cortical_fb_only'"
-	if FeedbackOption == 'ff_only': # Feedforward input onl
+def update_total_input_at_step_i(i,Input,CE,SEE,Bag1,Bag2,Chain,Num,Den,delay_parameters,gain_parameters,SamplingRatio,SamplingPeriod,FeedbackOption,**kwargs):
+	ControlStrategy = kwargs.get("ControlStrategy",None)
+	SynergistParameters = kwargs.get("SynergistParameters",[None,None])
+	if FeedbackOption == 'ff_only': # Feedforward input only
 		append_dictionary(Input,['Total','Ia','II','Ib'],[Input['Feedforward'][i],0,0,0])
 	elif FeedbackOption == 'servo_control': # Servo control (feedforward + spindle and GTO)
 		append_dictionary(Input,['Ia','II'],spindle_model(CE,Bag1,Bag2,Chain,SamplingPeriod))
@@ -746,11 +756,87 @@ def update_total_input_at_step_i(i,Input,CE,SEE,Bag1,Bag2,Chain,Num,Den,delay_pa
 		append_dictionary(Input,['Ia','II'],spindle_model(CE,Bag1,Bag2,Chain,SamplingPeriod))
 		if i%SamplingRatio == 0:
 			update_ib_input(i,Input,SEE,Num,Den,SamplingRatio)
-			update_input_with_delayed_afferents_and_feedback(i,Input,SEE,CE,delay_parameters,gain_parameters,SamplingRatio)
+			update_input_with_delayed_afferents_and_feedback(i,Input,SEE,CE,delay_parameters,gain_parameters,\
+				SamplingRatio,ControlStrategy=ControlStrategy,SynergistParameters=SynergistParameters)
 		else:
 			append_dictionary(Input,['Ib','Total'],[Input['Ib'][-1],Input['Total'][-1]])
 	elif FeedbackOption == 'cortical_fb_only':
 		update_input_with_only_cortical_feedback(Input,SEE,CE,delay_parameters,SamplingRatio)
+def update_ia_interneurons_at_step_i(i,Input_1,Input_2,InterneuronType):
+	"""
+	InterneuronType must be either "excitatory" or "inhibitory"
+	"""
+	assert InterneuronType in ['excitatory', 'inhibitory'], "InterneuronType must be either 'excitatory' or 'inhibitory'"
+	InterneuronDelay = 20
+	ExcitatoryWeight = 0.5
+	InhibitoryWeight = 0.5
+	InterneuronWeight = (InterneuronType=='excitatory')*ExcitatoryWeight - (InterneuronType=='inhibitory')*InhibitoryWeight
+	if i <= InterneuronDelay:
+		Input_1['Ia Interneuron'].append(0)
+		Input_2['Ia Interneuron'].append(0)
+	else:
+		Input_1['Ia Interneuron'].append(Input_1['Ia'][-1] + InterneuronWeight*Input_2['Ia Interneuron'][i-InterneuronDelay] )
+		Input_2['Ia Interneuron'].append(Input_2['Ia'][-1] + InterneuronWeight*Input_1['Ia Interneuron'][i-InterneuronDelay] )
+def update_ib_interneurons_at_step_i(i,Input_1,Input_2,InterneuronType):
+	"""
+	InterneuronType must be either "excitatory" or "inhibitory"
+	"""
+	assert InterneuronType in ['excitatory', 'inhibitory'], "InterneuronType must be either 'excitatory' or 'inhibitory'"
+	InterneuronDelay = 20
+	ExcitatoryWeight = 0.5
+	InhibitoryWeight = 0.5
+	InterneuronWeight = (InterneuronType=='excitatory')*ExcitatoryWeight - (InterneuronType=='inhibitory')*InhibitoryWeight
+	if i <= InterneuronDelay:
+		Input_1['Ib Interneuron'].append(0)
+		Input_2['Ib Interneuron'].append(0)
+	else:
+		Input_1['Ib Interneuron'].append(Input_1['Ib'][-1] + InterneuronWeight*Input_2['Ib Interneuron'][i-InterneuronDelay] )
+		Input_2['Ib Interneuron'].append(Input_2['Ib'][-1] + InterneuronWeight*Input_1['Ib Interneuron'][i-InterneuronDelay] )
+def add_interneuron_inputs_to_total_at_step_i(i,Input_1,Input_2,gain_1_parameters,delay_1_parameters,gain_2_parameters,delay_2_parameters,IaInterneuronType,IbInterneuronType,SamplingRatio):
+	IaSpindleGain_1, IaSpindleGain_2 = gain_1_parameters['Ia Gain'], gain_2_parameters['Ia Gain']
+	IaReciprocalSpindleGain_1, IaReciprocalSpindleGain_2 = gain_1_parameters['Ia Reciprocal Gain'], gain_2_parameters['Ia Reciprocal Gain']
+	IbGTOGain_1, IbGTOGain_2 = gain_1_parameters['Ib Gain'], gain_2_parameters['Ib Gain']
+	IaAfferentDelay_1, IaAfferentDelay_2 = delay_1_parameters['Ia Delay'], delay_2_parameters['Ia Delay']
+	IbAfferentDelay_1, IbAfferentDelay_2 = delay_1_parameters['Ib Delay'], delay_2_parameters['Ib Delay']
+	IaAfferentDelayTimeStep_1, IaAfferentDelayTimeStep_2 = IaAfferentDelay_1*SamplingRatio, IaAfferentDelay_2*SamplingRatio
+	IbAfferentDelayTimeStep_1, IbAfferentDelayTimeStep_2 = IbAfferentDelay_1*SamplingRatio, IbAfferentDelay_2*SamplingRatio
+	IaAfferentDelayTimeStep_1, IaAfferentDelayTimeStep_2 = int(IaAfferentDelayTimeStep_1), int(IaAfferentDelayTimeStep_2)
+	IbAfferentDelayTimeStep_1, IbAfferentDelayTimeStep_2 = int(IbAfferentDelayTimeStep_1), int(IbAfferentDelayTimeStep_2)
+
+	# update the input values for both interneurons (Ia and Ib)
+	update_ia_interneurons_at_step_i(i,Input_1,Input_2,IaInterneuronType)
+	update_ib_interneurons_at_step_i(i,Input_1,Input_2,IbInterneuronType)
+
+	# create delay time steps
+	if i >=IaAfferentDelayTimeStep_1-1: 
+		DelayedIaInput_1 = Input_1['Ia'][i-IaAfferentDelayTimeStep_1+1]
+		DelayedIaInterneuronInput_1 = Input_1['Ia Interneuron'][i-IaAfferentDelayTimeStep_1+1]
+	else:
+		DelayedIaInput_1, DelayedIaInterneuronInput_1 = 0,0
+	if i >=IaAfferentDelayTimeStep_2-1: 
+		DelayedIaInput_2 = Input_2['Ia'][i-IaAfferentDelayTimeStep_2+1]
+		DelayedIaInterneuronInput_2 = Input_2['Ia Interneuron'][i-IaAfferentDelayTimeStep_2+1]
+	else:
+		DelayedIaInput_2, DelayedIaInterneuronInput_2 = 0,0
+	if i >=IbAfferentDelayTimeStep_1: 
+		DelayedIbInterneuronInput_1 = Input_1['Ib Interneuron'][i-IbAfferentDelayTimeStep_1]
+	else:
+		DelayedIbInterneuronInput_1 = 0
+	if i >=IbAfferentDelayTimeStep_2: 
+		DelayedIbInterneuronInput_2 = Input_2['Ib Interneuron'][i-IbAfferentDelayTimeStep_2]
+	else:
+		DelayedIbInterneuronInput_2 = 0
+
+	# update Total input
+	# NOTE: WILL THE SIGNS CHANGE AS A FUNCTION OF INTERNEURON TYPE?	
+	Input_1['Total'][-1] += DelayedIaInput_2/IaSpindleGain_2 \
+							- DelayedIaInterneuronInput_2/IaReciprocalSpindleGain_2 \
+							- DelayedIbInterneuronInput_1/IbGTOGain_1 \
+							+ DelayedIbInterneuronInput_2/IbGTOGain_2
+	Input_2['Total'][-1] += DelayedIaInput_1/IaSpindleGain_1 \
+							- DelayedIaInterneuronInput_1/IaReciprocalSpindleGain_1 \
+							- DelayedIbInterneuronInput_2/IbGTOGain_2 \
+							+ DelayedIbInterneuronInput_1/IbGTOGain_1
 def bound(value,min_value,max_value):
 	if value > max_value:
 		result = max_value
@@ -849,9 +935,12 @@ def append_dictionary(dictionary,keys,values):
 			dictionary[keys[i]]=values[i]
 		else:
 			dictionary[keys[i]].append(values[i])
-def test_input_values(muscle_parameters, delay_parameters, gain_parameters, FeedbackOption):
+def test_input_values(muscle_parameters, delay_parameters, gain_parameters, **kwargs):
+	FeedbackOption = kwargs.get("FeedbackOption",'ff_only')
+	ControlStrategy = kwargs.get("ControlStrategy",'synergist')
 	assert FeedbackOption in ['ff_only','servo_control','fb_control','cortical_fb_only'],\
 	"FeedbackOption must be either 'ff_only', 'servo_control', 'fb_control', or 'cortical_fb_only'"
+	assert ControlStrategy in ['synergist', 'antagonist'], " ControlStrategy must be either 'synergist' or 'antagonist'"
 	assert type(muscle_parameters)==dict, "muscle_parameters must be a dictionary"
 	assert len(muscle_parameters)==6, "dict muscle_parameters can only have 6 entries"
 	assert 'Pennation Angle' in muscle_parameters, "'Pennation Angle' missing in muscle_parameters"
@@ -868,12 +957,13 @@ def test_input_values(muscle_parameters, delay_parameters, gain_parameters, Feed
 	assert 'Ib Delay' in delay_parameters, "'Ib Delay' missing in delay_parameters"
 	assert 'Cortical Delay' in delay_parameters, "'Cortical Delay' missing in delay_parameters"
 	assert type(gain_parameters)==dict, "gain_parameters must be a dictionary"
-	assert len(gain_parameters)==5, "dict gain_parameters can only have 5 entries"
+	assert len(gain_parameters)==5 or len(gain_parameters)==6, "dict gain_parameters can only have 5 or 6 entries"
 	assert 'Gamma Dynamic Gain' in gain_parameters, "'Gamma Dynamic Gain' missing in gain_parameters"
 	assert 'Gamma Static Gain' in gain_parameters, "'Gamma Static Gain' missing in gain_parameters"
 	assert 'Ia Gain' in gain_parameters, "'Ia Gain' missing in gain_parameters"
 	assert 'II Gain' in gain_parameters, "'II Gain' missing in gain_parameters"
 	assert 'Ib Gain' in gain_parameters, "'Ib Gain' missing in gain_parameters"
+	if len(gain_parameters)==6: assert 'Ia Reciprocal Gain' in gain_parameters, "'Ia Reciprocal Gain' missing when incorporating interneurons"
 def compare_output(TheoreticalOutput):
 	import pickle
 	import numpy as np 
