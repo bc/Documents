@@ -30,6 +30,7 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 	'servo_control' (feedforward, spindle, and GTO), 'fb_control' (feedback
 	control - proprioceptive system + supraspinal loop) and 'cortical_fb_only'
 
+	ControlStrategy is a string that must be either "synergist" or "antagonist"
 	"""
 	import numpy as np 
 	from scipy import signal
@@ -39,8 +40,9 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 
 	# test input values
 	FeedbackOption = kwargs.get("FeedbackOption",'ff_only')
-	test_input_values(muscle_1_parameters,delay_1_parameters,gain_1_parameters,FeedbackOption)
-	test_input_values(muscle_2_parameters,delay_2_parameters,gain_2_parameters,FeedbackOption)
+	ControlStrategy = kwargs.get("ControlStrategy", 'synergist')
+	test_input_values(muscle_1_parameters,delay_1_parameters,gain_1_parameters,FeedbackOption=FeedbackOption, ControlStrategy=ControlStrategy)
+	test_input_values(muscle_2_parameters,delay_2_parameters,gain_2_parameters,FeedbackOption=FeedbackOption, ControlStrategy=ControlStrategy)
 
 	# muscle architectural parameters
 	PennationAngle_1 = muscle_1_parameters['Pennation Angle']
@@ -77,11 +79,26 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 	Bag1_1,Bag2_1,Chain_1,SlowTwitch_1,FastTwitch_1,CE_1,SEE_1,PEE_1,Muscle_1,Input_1 = return_initial_values(muscle_1_parameters,gain_1_parameters,TargetTrajectory_1,CorticalInput_1)
 	Bag1_2,Bag2_2,Chain_2,SlowTwitch_2,FastTwitch_2,CE_2,SEE_2,PEE_2,Muscle_2,Input_2 = return_initial_values(muscle_2_parameters,gain_2_parameters,TargetTrajectory_2,CorticalInput_2)
 	
+	# Account for synergist strategy by changing target force trajectories to be X %MVC OF THE SUM of CE['Maximum Force']
+	# NOTE: We only take Trajectory_1 in this case to make for uniform strategy shapes for synergists.
+	if ControlStrategy == 'synergist':
+		Input_1['Target Force Trajectory'],Input_2['Target Force Trajectory'] = [TargetTrajectory_1*(CE_1['Maximum Force'] + CE_2['Maximum Force'])]*2
+	
 	random.seed()
 	StartTime = time.time()
 	for i in range(len(Time)): 
-		update_total_input_at_step_i(i,Input_1,CE_1,SEE_1,Bag1_1,Bag2_1,Chain_1,Num,Den,delay_1_parameters,gain_1_parameters,SamplingRatio,SamplingPeriod,FeedbackOption)
-		update_total_input_at_step_i(i,Input_2,CE_2,SEE_2,Bag1_2,Bag2_2,Chain_2,Num,Den,delay_2_parameters,gain_2_parameters,SamplingRatio,SamplingPeriod,FeedbackOption)	
+		update_total_input_at_step_i(i,Input_1,CE_1,SEE_1,Bag1_1,Bag2_1,Chain_1,Num,Den,\
+									delay_1_parameters,gain_1_parameters,SamplingRatio,SamplingPeriod,\
+									FeedbackOption,ControlStrategy=ControlStrategy,SynergistParameters=[SEE_2,CE_2])
+		update_total_input_at_step_i(i,Input_2,CE_2,SEE_2,Bag1_2,Bag2_2,Chain_2,Num,Den,\
+									delay_2_parameters,gain_2_parameters,SamplingRatio,SamplingPeriod,\
+									FeedbackOption,ControlStrategy=ControlStrategy,SynergistParameters=[SEE_1,CE_1])	
+		
+		# add the interneuron input to total input
+		add_interneuron_inputs_to_total_at_step_i(i,Input_1,Input_2,\
+			gain_1_parameters,delay_1_parameters,gain_2_parameters,delay_2_parameters,\
+			'inhibitory','inhibitory', SamplingRatio)
+		
 		#add noise (and cortical input) to input
 		# random.seed(1)
 		add_noise_to_input(i,Input_1,AButtersCoefficients,BButtersCoefficients)
@@ -108,7 +125,7 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 		update_kinematics_and_kinetics(CE_1,PEE_1,SEE_1,Muscle_1,MuscleViscosity,PennationAngle_1,InitialMusculoTendonLength_1,SamplingPeriod)
 		update_kinematics_and_kinetics(CE_2,PEE_2,SEE_2,Muscle_2,MuscleViscosity,PennationAngle_2,InitialMusculoTendonLength_2,SamplingPeriod)	
 		
-		statusbar(i,len(Time),StartTime=StartTime,Title = 'afferented_muscle_model')
+		statusbar(i,len(Time),StartTime=StartTime,Title = '2 Muscles')
 
 	plt.figure()
 	plt.plot(Time,SEE_1['Tendon Force'][1:])
@@ -116,13 +133,22 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 	plt.legend(['Output Force','Target Force'])
 	plt.xlabel('Time (sec)')
 	plt.ylabel('Force (N)')
-	
+
 	plt.figure()
 	plt.plot(Time,SEE_2['Tendon Force'][1:])
 	plt.plot(Time,Input_2['Target Force Trajectory'],'r')
 	plt.legend(['Output Force','Target Force'])
 	plt.xlabel('Time (sec)')	
 	plt.ylabel('Force (N)')
+
+	if ControlStrategy == 'synergist':
+		plt.figure()
+		plt.plot(Time,np.array(SEE_2['Tendon Force'][1:])+np.array(SEE_1['Tendon Force'][1:]))
+		plt.plot(Time,Input_2['Target Force Trajectory'],'r')
+		plt.legend(['Output Force','Target Force'])
+		plt.xlabel('Time (sec)')	
+		plt.ylabel('Force (N)')
+		plt.title('Combined Force')
 
 	# save data as output in structure format
 	output_1 = {	'Force' : Muscle_1['Force'], 									'ForceTendon' : SEE_1['Tendon Force'][1:], \
@@ -181,16 +207,18 @@ delay_2_parameters = {"Efferent Delay": round(DistanceToTheSpinalCord/EfferentCo
 					"Cortical Delay" : 50 }
 
 # Define gain parameters for each neural pathway
-gain_1_parameters = {	"Gamma Dynamic Gain" : 70, \
-					"Gamma Static Gain" : 70, \
-					"Ia Gain" : 800, \
+gain_1_parameters = {	"Gamma Dynamic Gain" : 50, \
+					"Gamma Static Gain" : 50, \
+					"Ia Gain" : 2000, \
 					"II Gain" : 3000, \
-					"Ib Gain" : 1000 }
-gain_2_parameters = {	"Gamma Dynamic Gain" : 70, \
-					"Gamma Static Gain" : 70, \
-					"Ia Gain" : 800, \
+					"Ib Gain" : 5000, \
+					"Ia Reciprocal Gain" : 4000}
+gain_2_parameters = {	"Gamma Dynamic Gain" : 50, \
+					"Gamma Static Gain" : 50, \
+					"Ia Gain" : 2000, \
 					"II Gain" : 3000, \
-					"Ib Gain" : 1000 }
+					"Ib Gain" : 5000, \
+					"Ia Reciprocal Gain" : 4000}
 
 # Define force trajectory that model needs to track
 # You can create any target trajectory as you want, but it has to be
@@ -223,10 +251,12 @@ elif FeedbackOption == 'fb_control':
 elif FeedbackOption == 'cortical_fb_only':
     FeedbackOptionString = 'CC'
 
+ControlStrategy = 'synergist'
+
 # Output from the muscle model
 NumberOfTrials = 1
 Output_1,Output_2 = [],[]
-PXX_1,PXX_2 = [],[]
+PXX_1,PXX_2, PXX_total = [],[],[]
 Range_1,Range_2 = [],[]
 for i in range(NumberOfTrials): #trialN = 1:10
 	#rng('shufle')
@@ -235,7 +265,8 @@ for i in range(NumberOfTrials): #trialN = 1:10
 													gain_1_parameters,gain_2_parameters,\
 													TargetTrajectory_1,TargetTrajectory_2,\
 													CorticalInput_1,CorticalInput_2,\
-													FeedbackOption = FeedbackOption)    
+													FeedbackOption = FeedbackOption,\
+													ControlStrategy = ControlStrategy)    
 	# compare_output(output)
 	Output_1.append(output_1)
 	Output_2.append(output_1)
@@ -243,10 +274,16 @@ for i in range(NumberOfTrials): #trialN = 1:10
 		noverlap = SamplingFrequency,nperseg = len(gaussian(5*SamplingFrequency,(5*SamplingFrequency-1)/(2*2.5))), fs = SamplingFrequency) 
 	f_2,pxx_2 = welch(output_2['ForceTendon'][-int(10*SamplingFrequency)-1:]-np.average(output_2['ForceTendon'][int(-10*SamplingFrequency-1):]),window = gaussian(5*SamplingFrequency,(5*SamplingFrequency-1)/(2*2.5)),\
 		noverlap = SamplingFrequency,nperseg = len(gaussian(5*SamplingFrequency,(5*SamplingFrequency-1)/(2*2.5))), fs = SamplingFrequency) 
+	output_total = ((np.array(output_1['ForceTendon'][-int(10*SamplingFrequency)-1:])+np.array(output_2['ForceTendon'][-int(10*SamplingFrequency)-1:]))\
+						- np.average(np.array(output_1['ForceTendon'][-int(10*SamplingFrequency)-1:])+np.array(output_2['ForceTendon'][-int(10*SamplingFrequency)-1:])))
+	f_total,pxx_total = welch(output_total,window = gaussian(5*SamplingFrequency,(5*SamplingFrequency-1)/(2*2.5)),\
+		noverlap = SamplingFrequency,nperseg = len(gaussian(5*SamplingFrequency,(5*SamplingFrequency-1)/(2*2.5))), fs = SamplingFrequency) 
 	pxx_1 = smooth(pxx_1,5)
 	pxx_2 = smooth(pxx_2,5)
+	pxx_total = smooth(pxx_total,5)
 	PXX_1.append(np.array(pxx_1,ndmin=2))
 	PXX_2.append(np.array(pxx_2,ndmin=2))
+	PXX_total.append(np.array(pxx_total,ndmin=2))
 	Range_1.append(max(output_1['Ia Input'][-10*SamplingFrequency:-1])-min(output_1['Ia Input'][-10*SamplingFrequency-1:]))
 	Range_2.append(max(output_2['Ia Input'][-10*SamplingFrequency:-1])-min(output_2['Ia Input'][-10*SamplingFrequency-1:]))
 	print("\n")
@@ -259,6 +296,9 @@ PXX_2 = np.concatenate(PXX_2,axis=0)
 plt.figure()
 plt.plot(f_2[:131],np.average(PXX_2[:,:131],axis = 0))
 
+PXX_total = np.concatenate(PXX_total,axis=0)
+plt.figure()
+plt.plot(f_total[:131],np.average(PXX_total[:,:131],axis = 0))
 #max(output.Ia(end-10*SamplingFrequency:end))-min(output.Ia(end-10*SamplingFrequency:end))
 #Input to the MN model
 # Input = output.Input
