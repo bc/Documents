@@ -34,7 +34,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 
 	# test input values
 	FeedbackOption = kwargs.get("FeedbackOption",'ff_only')
-	test_input_values(muscle_parameters,delay_parameters,gain_parameters,FeedbackOption)
+	test_input_values(muscle_parameters,delay_parameters,gain_parameters,FeedbackOption = FeedbackOption)
 
 	# muscle architectural parameters
 	PennationAngle = muscle_parameters['Pennation Angle']
