@@ -87,17 +87,17 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 	random.seed()
 	StartTime = time.time()
 	for i in range(len(Time)): 
-		update_total_input_at_step_i(i,Input_1,CE_1,SEE_1,Bag1_1,Bag2_1,Chain_1,Num,Den,\
-									delay_1_parameters,gain_1_parameters,SamplingRatio,SamplingPeriod,\
-									FeedbackOption,ControlStrategy=ControlStrategy,SynergistParameters=[SEE_2,CE_2])
-		update_total_input_at_step_i(i,Input_2,CE_2,SEE_2,Bag1_2,Bag2_2,Chain_2,Num,Den,\
-									delay_2_parameters,gain_2_parameters,SamplingRatio,SamplingPeriod,\
-									FeedbackOption,ControlStrategy=ControlStrategy,SynergistParameters=[SEE_1,CE_1])	
+		update_spindle_afferent_inputs_at_step_i_multiple_muscles(i,Input_1,CE_1,SEE_1,Bag1_1,Bag2_1,Chain_1,Num,Den,\
+																delay_1_parameters,gain_1_parameters,SamplingRatio,SamplingPeriod,\
+																FeedbackOption,ControlStrategy=ControlStrategy,SynergistParameters=[SEE_2,CE_2])
+		update_spindle_afferent_inputs_at_step_i_multiple_muscles(i,Input_2,CE_2,SEE_2,Bag1_2,Bag2_2,Chain_2,Num,Den,\
+																delay_2_parameters,gain_2_parameters,SamplingRatio,SamplingPeriod,\
+																FeedbackOption,ControlStrategy=ControlStrategy,SynergistParameters=[SEE_1,CE_1])	
 		
 		# add the interneuron input to total input
-		add_interneuron_inputs_to_total_at_step_i(i,Input_1,Input_2,\
-			gain_1_parameters,delay_1_parameters,gain_2_parameters,delay_2_parameters,\
-			'inhibitory','inhibitory', SamplingRatio)
+		# add_interneuron_inputs_to_total_at_step_i(i,Input_1,Input_2,\
+		# 	gain_1_parameters,delay_1_parameters,gain_2_parameters,delay_2_parameters,\
+		# 	'inhibitory','inhibitory', SamplingRatio)
 		
 		#add noise (and cortical input) to input
 		# random.seed(1)
@@ -160,7 +160,7 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 					'Input' : Input_1['Total'], 									'Noise' : Input_1['Noise'], \
 					'FilteredNoise' : Input_1['FilteredNoise'], 					'U' : Muscle_1['Effective Activation'][1:-1], \
 					'Ia Input' : Input_1['Ia'],										'II Input' : Input_1['II'], \
-					'Ib Input' : Input_1['Ib'] 	} #, 'CorticalInput' : CorticalInput_1 }
+					'Ib Input' : Input_1['Ib'],										'ALL'  :  Input_1 	} #, 'CorticalInput' : CorticalInput_1 }
 	output_2 = {	'Force' : Muscle_2['Force'], 									'ForceTendon' : SEE_2['Tendon Force'][1:], \
 					'FL' : CE_2['FL'], 												'FV' : CE_2['FV'], \
 					'PE Force 1' : PEE_2['Passive Force 1'], 						'PE Force 2' : PEE_2['Passive Force 2'], \
@@ -170,7 +170,7 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 					'Input' : Input_2['Total'], 									'Noise' : Input_2['Noise'], \
 					'FilteredNoise' : Input_2['FilteredNoise'], 					'U' : Muscle_2['Effective Activation'][1:-1], \
 					'Ia Input' : Input_2['Ia'],										'II Input' : Input_2['II'], \
-					'Ib Input' : Input_2['Ib'] 	} #, 'CorticalInput' : CorticalInput_2 }
+					'Ib Input' : Input_2['Ib'],										'ALL'  :  Input_2 	} #, 'CorticalInput' : CorticalInput_2 }
 	"""
 	NOTES:
 
@@ -182,10 +182,10 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 
 muscle_1_parameters = {	"Pennation Angle":5*np.pi/180, 		"Muscle Mass":0.075,\
 						"Optimal Length":10.1, 				"Tendon Length":23.5,\
-					 	"Initial Muscle Length":10.1+0.41, 	"Initial Tendon Length":23.5+0.09}
+					 	"Initial Muscle Length":10.1, 	"Initial Tendon Length":23.5}
 muscle_2_parameters = {	"Pennation Angle":5*np.pi/180, 		"Muscle Mass":0.075,\
 						"Optimal Length":10.1, 				"Tendon Length":23.5,\
-					 	"Initial Muscle Length":10.1+0.41, 	"Initial Tendon Length":23.5+0.09}
+					 	"Initial Muscle Length":10.1, 	"Initial Tendon Length":23.5}
 
 # Define delays based on limb length and conduction velocity of each pathway
 DistanceToTheSpinalCord = 0.8 # cm
@@ -212,13 +212,13 @@ gain_1_parameters = {	"Gamma Dynamic Gain" : 50, \
 					"Ia Gain" : 2000, \
 					"II Gain" : 3000, \
 					"Ib Gain" : 5000, \
-					"Ia Reciprocal Gain" : 4000}
+					"Ia Reciprocal Gain" : 2000}
 gain_2_parameters = {	"Gamma Dynamic Gain" : 50, \
 					"Gamma Static Gain" : 50, \
 					"Ia Gain" : 2000, \
 					"II Gain" : 3000, \
 					"Ib Gain" : 5000, \
-					"Ia Reciprocal Gain" : 4000}
+					"Ia Reciprocal Gain" : 2000}
 
 # Define force trajectory that model needs to track
 # You can create any target trajectory as you want, but it has to be

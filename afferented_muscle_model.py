@@ -69,7 +69,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	random.seed()
 	StartTime = time.time()
 	for i in range(len(Time)): 
-		update_total_input_at_step_i(i,Input,CE,SEE,Bag1,Bag2,Chain,Num,Den,delay_parameters,gain_parameters,SamplingRatio,SamplingPeriod,FeedbackOption)
+		update_total_input_at_step_i_single_muscle(i,Input,CE,SEE,Bag1,Bag2,Chain,Num,Den,delay_parameters,gain_parameters,SamplingRatio,SamplingPeriod,FeedbackOption)
 		
 		#add noise (and cortical input) to input
 		# random.seed(1)

@@ -196,9 +196,16 @@ def return_initial_values(muscle_parameters,gain_parameters,TargetTrajectory,Cor
 	IaSpindleGain = gain_parameters['Ia Gain']
 	IISpindleGain = gain_parameters['II Gain']
 	IbGTOGain = gain_parameters['Ib Gain']
+
+	# calculate maximal force output of the muscle based on PCSA
+	MuscleDensity = 1.06 #g/cm**3
+	PCSA = (MuscleMass*1000)/MuscleDensity/OptimalLength #physionp.logical cross-sectional area
+	SpecificTension = 31.4 # WHERE DOES THIS COME FROM AND WHAT DOES IT MEAN? N/
+	MaximumContractileElementForce = PCSA * SpecificTension
+
 	# calculate initial length based on balance between stiffness of muscle and
 	# tendon
-	TendonConstant = 27.8
+	TendonConstant = 120 #27.8
 	TendonRateConstant = 0.0047
 	NormalizedRestingTendonLength = 0.964
 
@@ -206,10 +213,10 @@ def return_initial_values(muscle_parameters,gain_parameters,TargetTrajectory,Cor
 	MuscleRateConstant = 0.046 #0.04, 0.056
 	RestingMuscleLength = 1.17  #1.35, 1.41
 	PassiveMuscleForce = float(MuscleConstant * MuscleRateConstant * np.log(np.exp((1 - RestingMuscleLength)/MuscleRateConstant)+1))
-	NormalizedSeriesElasticLength = float(TendonRateConstant*np.log(np.exp(PassiveMuscleForce/TendonConstant/TendonRateConstant)-1)+NormalizedRestingTendonLength)
+	NormalizedSeriesElasticLength = float(TendonRateConstant*np.log(np.exp(PassiveMuscleForce*MaximumContractileElementForce/TendonConstant/TendonRateConstant)-1)+NormalizedRestingTendonLength)
 	SeriesElasticLength = float(TendonLength * NormalizedSeriesElasticLength)
 
-	MaximumMusculoTendonLength = float(OptimalLength * np.cos(PennationAngle) + TendonLength + 0.5)
+	MaximumMusculoTendonLength = float(OptimalLength * np.cos(PennationAngle) + TendonLength + 1)
 	NormalizedMaximumFascicleLength = float((MaximumMusculoTendonLength - SeriesElasticLength)/OptimalLength)
 	MaximumContractileElementLength = float(NormalizedMaximumFascicleLength/np.cos(PennationAngle)) # Contractile Element = Muscle
 
@@ -219,12 +226,6 @@ def return_initial_values(muscle_parameters,gain_parameters,TargetTrajectory,Cor
 							/(100*(1+TendonRateConstant/MuscleRateConstant*OptimalTendonLength/MaximumContractileElementLength*(1/OptimalLength))*np.cos(PennationAngle)))
 	ContractileElementLength = float(InitialLength/(OptimalLength/100)) # initializing CE Length
 	SeriesElasticElementLength = float((InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength) # MTU - initial muscle = initial SEE length
-
-	# calculate maximal force output of the muscle based on PCSA
-	MuscleDensity = 1.06 #g/cm**3
-	PCSA = (MuscleMass*1000)/MuscleDensity/OptimalLength #physionp.logical cross-sectional area
-	SpecificTension = 31.4 # WHERE DOES THIS COME FROM AND WHAT DOES IT MEAN? N/
-	MaximumContractileElementForce = PCSA * SpecificTension
 
 	# parameter initialization
 	ContractileElementVelocity = 0
@@ -617,7 +618,7 @@ def parallel_elastic_element_force_2(CE):
 def normalized_series_elastic_element_force(SEE):
 	import numpy as np
 	LT = SEE['Tendon Length'][-1]
-	cT_se = 27.8
+	cT_se = 120 #27.8
 	kT_se = 0.0047
 	LrT_se = 0.964
 	NormalizedSeriesElasticElementForce = cT_se * kT_se * np.log(np.exp((LT - LrT_se)/kT_se)+1)
@@ -639,93 +640,79 @@ def update_ib_input(i,Input,SEE,Num,Den,SamplingRatio):
 		Input['IbTemp2'].append((Num[2]*Input['IbTemp1'][-3] + Num[1]*Input['IbTemp1'][-2] + Num[0]*Input['IbTemp1'][-1] \
 								- Den[2]*Input['IbTemp2'][-2] - Den[1]*Input['IbTemp2'][-1])/Den[0])
 	Input['Ib'].append(Input['IbTemp2'][-1]*(Input['IbTemp2'][-1]>0))
-def update_input_with_delayed_afferents_and_feedback(i,Input,SEE,CE,delay_parameters,gain_parameters,SamplingRatio,**kwargs):
+def update_input_with_delayed_spindle_afferents_and_feedback(i,Input,SEE,CE,delay_parameters,gain_parameters,SamplingRatio,**kwargs):
 	ControlStrategy = kwargs.get("ControlStrategy",None)
 	SEE_synergist,CE_synergist = kwargs.get("SynergistParameters",[None,None])
 	## Transcortical loop
 	TransCorticalLoopGain = 0.01
 	IaSpindleGain = gain_parameters['Ia Gain']
 	IISpindleGain = gain_parameters['II Gain']
-	IbGTOGain = gain_parameters['Ib Gain']
 
 	IaAfferentDelay = delay_parameters['Ia Delay']
 	IIAfferentDelay = delay_parameters['II Delay']
-	IbAfferentDelay = delay_parameters['Ib Delay']
 	CorticalDelay = delay_parameters['Cortical Delay']
 
 	IaAfferentDelayTimeStep = IaAfferentDelay*SamplingRatio   #Ia + II 30
 	IIAfferentDelayTimeStep = IIAfferentDelay*SamplingRatio
-	IbAfferentDelayTimeStep = IbAfferentDelay*SamplingRatio
 	CorticalDelayTimeStep = CorticalDelay*SamplingRatio   #cortical 50
 
 	IaAfferentDelayTimeStep = int(IaAfferentDelayTimeStep)   #Ia + II 30
 	IIAfferentDelayTimeStep = int(IIAfferentDelayTimeStep)
-	IbAfferentDelayTimeStep = int(IbAfferentDelayTimeStep)   #Ib 40
 	CorticalDelayTimeStep = int(CorticalDelayTimeStep)   #cortical 50
 
 	if i >=IaAfferentDelayTimeStep-1: DelayedIaInput = Input['Ia'][i-IaAfferentDelayTimeStep+1]
-	if i >=IbAfferentDelayTimeStep: DelayedIbInput = Input['Ib'][i-IbAfferentDelayTimeStep]
 	if i >=IIAfferentDelayTimeStep: DelayedIIInput = Input['II'][i-IIAfferentDelayTimeStep]
 	if i >=CorticalDelayTimeStep:
 		if ControlStrategy == "synergist": 
-			DelayedTendonForce = SEE['Tendon Force'][i-CorticalDelayTimeStep+1] + SEE_synergist['Tendon Force'][i-CorticalDelayTimeStep+1]
+			DelayedTendonForce = SEE['Tendon Force'][i-CorticalDelayTimeStep] + SEE_synergist['Tendon Force'][i-CorticalDelayTimeStep]
 			MaximumForce = CE['Maximum Force'] + CE_synergist['Maximum Force']
 		else:
-			DelayedTendonForce = SEE['Tendon Force'][i-CorticalDelayTimeStep+1]
+			DelayedTendonForce = SEE['Tendon Force'][i-CorticalDelayTimeStep]
 			MaximumForce = CE['Maximum Force']
-	if i in range(IaAfferentDelayTimeStep-1,IbAfferentDelayTimeStep):
+	if i in range(IaAfferentDelayTimeStep-1,IIAfferentDelayTimeStep):
 		Input['Total'].append(DelayedIaInput/IaSpindleGain\
 							+ Input['Feedforward'][i]	) #input to the muscle
-	elif i in range(IbAfferentDelayTimeStep, IIAfferentDelayTimeStep):
-		Input['Total'].append(DelayedIaInput/IaSpindleGain \
-							- DelayedIbInput/IbGTOGain \
-							+ Input['Feedforward'][i] ) #input to the muscle
 	elif i in range(IIAfferentDelayTimeStep, CorticalDelayTimeStep):
 		Input['Total'].append(DelayedIaInput/IaSpindleGain \
 							+ DelayedIIInput/IISpindleGain \
-							- DelayedIbInput/IbGTOGain \
 							+ Input['Feedforward'][i]	) #input to the muscle
 	elif i >= CorticalDelayTimeStep:
 		Input['Feedback'] = TransCorticalLoopGain*(Input['Target Force Trajectory'][i]-DelayedTendonForce)/MaximumForce + Input['Feedback']  # feedback input through cortical pathway
 		Input['Total'].append(DelayedIaInput/IaSpindleGain \
 							+DelayedIIInput/IISpindleGain \
-							-DelayedIbInput/IbGTOGain \
 							+Input['Feedback']	) #input to the muscle
 	else:	
 		Input['Total'].append(Input['Feedforward'][i])
-def update_input_with_delayed_afferents(i,Input,delay_parameters,gain_parameters,SamplingRatio):
+def update_input_with_delayed_GTO_afferent(i,Input,delay_parameters,gain_parameters,SamplingRatio):
+	IbGTOGain = gain_parameters['Ib Gain']	
+	IbAfferentDelay = delay_parameters['Ib Delay']
+	IbAfferentDelayTimeStep = IbAfferentDelay*SamplingRatio
+	IbAfferentDelayTimeStep = int(IbAfferentDelayTimeStep)   #Ib 40
+	if i >=IbAfferentDelayTimeStep: 
+		DelayedIbInput = Input['Ib'][i-IbAfferentDelayTimeStep]
+		Input['Total'][-1] -= DelayedIbInput/IbGTOGain
+def update_input_with_delayed_spindle_afferents(i,Input,delay_parameters,gain_parameters,SamplingRatio):
 	## Transcortical loop
 	IaSpindleGain = gain_parameters['Ia Gain']
 	IISpindleGain = gain_parameters['II Gain']
-	IbGTOGain = gain_parameters['Ib Gain']
 
 	IaAfferentDelay = delay_parameters['Ia Delay']
 	IIAfferentDelay = delay_parameters['II Delay']
-	IbAfferentDelay = delay_parameters['Ib Delay']
 			
 	IaAfferentDelayTimeStep = IaAfferentDelay*SamplingRatio   #Ia + II 30
 	IIAfferentDelayTimeStep = IIAfferentDelay*SamplingRatio
-	IbAfferentDelayTimeStep = IbAfferentDelay*SamplingRatio
 		
 	IaAfferentDelayTimeStep = int(IaAfferentDelayTimeStep)   #Ia + II 30
 	IIAfferentDelayTimeStep = int(IIAfferentDelayTimeStep)
-	IbAfferentDelayTimeStep = int(IbAfferentDelayTimeStep)   #Ib 40
 	
 	if i >=IaAfferentDelayTimeStep-1: DelayedIaInput = Input['Ia'][i-IaAfferentDelayTimeStep+1]
-	if i >=IbAfferentDelayTimeStep: DelayedIbInput = Input['Ib'][i-IbAfferentDelayTimeStep]
 	if i >=IIAfferentDelayTimeStep: DelayedIIInput = Input['II'][i-IIAfferentDelayTimeStep]
-
-	if i in range(IaAfferentDelayTimeStep-1,IbAfferentDelayTimeStep):
+	if i in range(IaAfferentDelayTimeStep-1,IIAfferentDelayTimeStep):
 		Input['Total'].append(DelayedIaInput/IaSpindleGain\
 							+ Input['Feedforward'][i]	) #input to the muscle
-	elif i in range(IbAfferentDelayTimeStep, IIAfferentDelayTimeStep):
-		Input['Total'].append(DelayedIaInput/IaSpindleGain \
-							- DelayedIbInput/IbGTOGain \
-							+ Input['Feedforward'][i] ) #input to the muscle
 	elif i >= IIAfferentDelayTimeStep:
 		Input['Total'].append(DelayedIaInput/IaSpindleGain \
 							+ DelayedIIInput/IISpindleGain \
-							- DelayedIbInput/IbGTOGain \
 							+ Input['Feedforward'][i]	) #input to the muscle
 	else:	
 		Input['Total'].append(Input['Feedforward'][i])
@@ -740,7 +727,7 @@ def update_input_with_only_cortical_feedback(Input,SEE,CE,delay_parameters,Sampl
 		append_dictionary(Input,['Total','Ia','II','Ib'],[Input['Feedback'],0,0,0])
 	else:	
 		append_dictionary(Input,['Total','Ia','II','Ib'],[Input['Feedforward'][i],0,0,0])
-def update_total_input_at_step_i(i,Input,CE,SEE,Bag1,Bag2,Chain,Num,Den,delay_parameters,gain_parameters,SamplingRatio,SamplingPeriod,FeedbackOption,**kwargs):
+def update_total_input_at_step_i_single_muscle(i,Input,CE,SEE,Bag1,Bag2,Chain,Num,Den,delay_parameters,gain_parameters,SamplingRatio,SamplingPeriod,FeedbackOption,**kwargs):
 	ControlStrategy = kwargs.get("ControlStrategy",None)
 	SynergistParameters = kwargs.get("SynergistParameters",[None,None])
 	if FeedbackOption == 'ff_only': # Feedforward input only
@@ -749,14 +736,38 @@ def update_total_input_at_step_i(i,Input,CE,SEE,Bag1,Bag2,Chain,Num,Den,delay_pa
 		append_dictionary(Input,['Ia','II'],spindle_model(CE,Bag1,Bag2,Chain,SamplingPeriod))
 		if i%SamplingRatio == 0:
 			update_ib_input(i,Input,SEE,Num,Den,SamplingRatio)
-			update_input_with_delayed_afferents(i,Input,delay_parameters,gain_parameters,SamplingRatio)
+			update_input_with_delayed_spindle_afferents(i,Input,delay_parameters,gain_parameters,SamplingRatio)
+			update_input_with_delayed_GTO_afferent(i,Input,delay_parameters,gain_parameters,SamplingRatio)
 		else:
 			append_dictionary(Input,['Ib','Total'],[Input['Ib'][-1],Input['Total'][-1]])
 	elif FeedbackOption == 'fb_control': # Feedback control (proprioceptive systems + supraspinal loop)
 		append_dictionary(Input,['Ia','II'],spindle_model(CE,Bag1,Bag2,Chain,SamplingPeriod))
 		if i%SamplingRatio == 0:
 			update_ib_input(i,Input,SEE,Num,Den,SamplingRatio)
-			update_input_with_delayed_afferents_and_feedback(i,Input,SEE,CE,delay_parameters,gain_parameters,\
+			update_input_with_delayed_spindle_afferents_and_feedback(i,Input,SEE,CE,delay_parameters,gain_parameters,\
+				SamplingRatio,ControlStrategy=ControlStrategy,SynergistParameters=SynergistParameters)
+			update_input_with_delayed_GTO_afferent(i,Input,delay_parameters,gain_parameters,SamplingRatio)
+		else:
+			append_dictionary(Input,['Ib','Total'],[Input['Ib'][-1],Input['Total'][-1]])
+	elif FeedbackOption == 'cortical_fb_only':
+		update_input_with_only_cortical_feedback(Input,SEE,CE,delay_parameters,SamplingRatio)
+def update_spindle_afferent_inputs_at_step_i_multiple_muscles(i,Input,CE,SEE,Bag1,Bag2,Chain,Num,Den,delay_parameters,gain_parameters,SamplingRatio,SamplingPeriod,FeedbackOption,**kwargs):
+	ControlStrategy = kwargs.get("ControlStrategy",None)
+	SynergistParameters = kwargs.get("SynergistParameters",[None,None])
+	if FeedbackOption == 'ff_only': # Feedforward input only
+		append_dictionary(Input,['Total','Ia','II','Ib'],[Input['Feedforward'][i],0,0,0])
+	elif FeedbackOption == 'servo_control': # Servo control (feedforward + spindle and GTO)
+		append_dictionary(Input,['Ia','II'],spindle_model(CE,Bag1,Bag2,Chain,SamplingPeriod))
+		if i%SamplingRatio == 0:
+			update_ib_input(i,Input,SEE,Num,Den,SamplingRatio)
+			update_input_with_delayed_spindle_afferents(i,Input,delay_parameters,gain_parameters,SamplingRatio)
+		else:
+			append_dictionary(Input,['Ib','Total'],[Input['Ib'][-1],Input['Total'][-1]])
+	elif FeedbackOption == 'fb_control': # Feedback control (proprioceptive systems + supraspinal loop)
+		append_dictionary(Input,['Ia','II'],spindle_model(CE,Bag1,Bag2,Chain,SamplingPeriod))
+		if i%SamplingRatio == 0:
+			update_ib_input(i,Input,SEE,Num,Den,SamplingRatio)
+			update_input_with_delayed_spindle_afferents_and_feedback(i,Input,SEE,CE,delay_parameters,gain_parameters,\
 				SamplingRatio,ControlStrategy=ControlStrategy,SynergistParameters=SynergistParameters)
 		else:
 			append_dictionary(Input,['Ib','Total'],[Input['Ib'][-1],Input['Total'][-1]])
@@ -777,6 +788,7 @@ def update_ia_interneurons_at_step_i(i,Input_1,Input_2,InterneuronType):
 	else:
 		Input_1['Ia Interneuron'].append(Input_1['Ia'][-1] + InterneuronWeight*Input_2['Ia Interneuron'][i-InterneuronDelay] )
 		Input_2['Ia Interneuron'].append(Input_2['Ia'][-1] + InterneuronWeight*Input_1['Ia Interneuron'][i-InterneuronDelay] )
+		# Input_1['Ia Interneuron'][-1] = bound(Input_1['Ia Interneuron'][-1],0,1)
 def update_ib_interneurons_at_step_i(i,Input_1,Input_2,InterneuronType):
 	"""
 	InterneuronType must be either "excitatory" or "inhibitory"
@@ -820,23 +832,29 @@ def add_interneuron_inputs_to_total_at_step_i(i,Input_1,Input_2,gain_1_parameter
 		DelayedIaInput_2, DelayedIaInterneuronInput_2 = 0,0
 	if i >=IbAfferentDelayTimeStep_1: 
 		DelayedIbInterneuronInput_1 = Input_1['Ib Interneuron'][i-IbAfferentDelayTimeStep_1]
+		CorrectiveIbInput_1 = Input_1['Ib'][i-IbAfferentDelayTimeStep_1]
 	else:
-		DelayedIbInterneuronInput_1 = 0
+		DelayedIbInterneuronInput_1, CorrectiveIbInput_1 = 0, 0
 	if i >=IbAfferentDelayTimeStep_2: 
 		DelayedIbInterneuronInput_2 = Input_2['Ib Interneuron'][i-IbAfferentDelayTimeStep_2]
+		CorrectiveIbInput_2 = Input_2['Ib'][i-IbAfferentDelayTimeStep_2]
 	else:
-		DelayedIbInterneuronInput_2 = 0
+		DelayedIbInterneuronInput_2, CorrectiveIbInput_2 = 0, 0
 
 	# update Total input
 	# NOTE: WILL THE SIGNS CHANGE AS A FUNCTION OF INTERNEURON TYPE?	
-	Input_1['Total'][-1] += DelayedIaInput_2/IaSpindleGain_2 \
+	Input_1['Total'][-1] = Input_1['Total'][-1] \
+							+ DelayedIaInput_2/IaSpindleGain_2 \
 							- DelayedIaInterneuronInput_2/IaReciprocalSpindleGain_2 \
 							- DelayedIbInterneuronInput_1/IbGTOGain_1 \
-							+ DelayedIbInterneuronInput_2/IbGTOGain_2
-	Input_2['Total'][-1] += DelayedIaInput_1/IaSpindleGain_1 \
+							+ DelayedIbInterneuronInput_2/IbGTOGain_2 \
+							+ CorrectiveIbInput_1/IbGTOGain_1 # This term will correct the subtracted Ib input from simple 1 mm model
+	Input_2['Total'][-1] = Input_2['Total'][-1] \
+							+ DelayedIaInput_1/IaSpindleGain_1 \
 							- DelayedIaInterneuronInput_1/IaReciprocalSpindleGain_1 \
 							- DelayedIbInterneuronInput_2/IbGTOGain_2 \
-							+ DelayedIbInterneuronInput_1/IbGTOGain_1
+							+ DelayedIbInterneuronInput_1/IbGTOGain_1 \
+							+ CorrectiveIbInput_2/IbGTOGain_2 # This term will correct the subtracted Ib input from simple 1 mm model
 def bound(value,min_value,max_value):
 	if value > max_value:
 		result = max_value
