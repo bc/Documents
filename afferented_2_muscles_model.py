@@ -95,9 +95,9 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 																FeedbackOption,ControlStrategy=ControlStrategy,SynergistParameters=[SEE_1,CE_1])	
 		
 		# add the interneuron input to total input
-		# add_interneuron_inputs_to_total_at_step_i(i,Input_1,Input_2,\
-		# 	gain_1_parameters,delay_1_parameters,gain_2_parameters,delay_2_parameters,\
-		# 	'inhibitory','inhibitory', SamplingRatio)
+		add_interneuron_inputs_to_total_at_step_i(i,Input_1,Input_2,\
+			gain_1_parameters,delay_1_parameters,gain_2_parameters,delay_2_parameters,\
+			'inhibitory','inhibitory', SamplingRatio)
 		
 		#add noise (and cortical input) to input
 		# random.seed(1)

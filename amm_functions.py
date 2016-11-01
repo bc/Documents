@@ -787,8 +787,9 @@ def update_ia_interneurons_at_step_i(i,Input_1,Input_2,InterneuronType):
 		Input_2['Ia Interneuron'].append(0)
 	else:
 		Input_1['Ia Interneuron'].append(Input_1['Ia'][-1] + InterneuronWeight*Input_2['Ia Interneuron'][i-InterneuronDelay] )
-		Input_2['Ia Interneuron'].append(Input_2['Ia'][-1] + InterneuronWeight*Input_1['Ia Interneuron'][i-InterneuronDelay] )
 		# Input_1['Ia Interneuron'][-1] = bound(Input_1['Ia Interneuron'][-1],0,1)
+		Input_2['Ia Interneuron'].append(Input_2['Ia'][-1] + InterneuronWeight*Input_1['Ia Interneuron'][i-InterneuronDelay] )
+		# Input_2['Ia Interneuron'][-1] = bound(Input_2['Ia Interneuron'][-1],0,1)
 def update_ib_interneurons_at_step_i(i,Input_1,Input_2,InterneuronType):
 	"""
 	InterneuronType must be either "excitatory" or "inhibitory"
@@ -803,7 +804,9 @@ def update_ib_interneurons_at_step_i(i,Input_1,Input_2,InterneuronType):
 		Input_2['Ib Interneuron'].append(0)
 	else:
 		Input_1['Ib Interneuron'].append(Input_1['Ib'][-1] + InterneuronWeight*Input_2['Ib Interneuron'][i-InterneuronDelay] )
+		# Input_1['Ib Interneuron'][-1] = bound(Input_1['Ib Interneuron'][-1],0,1)
 		Input_2['Ib Interneuron'].append(Input_2['Ib'][-1] + InterneuronWeight*Input_1['Ib Interneuron'][i-InterneuronDelay] )
+		# Input_2['Ib Interneuron'][-1] = bound(Input_2['Ib Interneuron'][-1],0,1)
 def add_interneuron_inputs_to_total_at_step_i(i,Input_1,Input_2,gain_1_parameters,delay_1_parameters,gain_2_parameters,delay_2_parameters,IaInterneuronType,IbInterneuronType,SamplingRatio):
 	IaSpindleGain_1, IaSpindleGain_2 = gain_1_parameters['Ia Gain'], gain_2_parameters['Ia Gain']
 	IaReciprocalSpindleGain_1, IaReciprocalSpindleGain_2 = gain_1_parameters['Ia Reciprocal Gain'], gain_2_parameters['Ia Reciprocal Gain']
@@ -844,17 +847,15 @@ def add_interneuron_inputs_to_total_at_step_i(i,Input_1,Input_2,gain_1_parameter
 	# update Total input
 	# NOTE: WILL THE SIGNS CHANGE AS A FUNCTION OF INTERNEURON TYPE?	
 	Input_1['Total'][-1] = Input_1['Total'][-1] \
-							+ DelayedIaInput_2/IaSpindleGain_2 \
 							- DelayedIaInterneuronInput_2/IaReciprocalSpindleGain_2 \
 							- DelayedIbInterneuronInput_1/IbGTOGain_1 \
 							+ DelayedIbInterneuronInput_2/IbGTOGain_2 \
-							+ CorrectiveIbInput_1/IbGTOGain_1 # This term will correct the subtracted Ib input from simple 1 mm model
+							+ DelayedIaInput_2/(10*IaSpindleGain_2)
 	Input_2['Total'][-1] = Input_2['Total'][-1] \
-							+ DelayedIaInput_1/IaSpindleGain_1 \
 							- DelayedIaInterneuronInput_1/IaReciprocalSpindleGain_1 \
 							- DelayedIbInterneuronInput_2/IbGTOGain_2 \
 							+ DelayedIbInterneuronInput_1/IbGTOGain_1 \
-							+ CorrectiveIbInput_2/IbGTOGain_2 # This term will correct the subtracted Ib input from simple 1 mm model
+							+ DelayedIaInput_1/(10*IaSpindleGain_1)
 def bound(value,min_value,max_value):
 	if value > max_value:
 		result = max_value
