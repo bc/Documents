@@ -180,12 +180,12 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 	"""
 	return(output_1,output_2)
 
-muscle_1_parameters = {	"Pennation Angle":5*np.pi/180, 		"Muscle Mass":0.075,\
-						"Optimal Length":10.1, 				"Tendon Length":23.5,\
-					 	"Initial Muscle Length":10.1, 	"Initial Tendon Length":23.5}
-muscle_2_parameters = {	"Pennation Angle":5*np.pi/180, 		"Muscle Mass":0.075,\
-						"Optimal Length":10.1, 				"Tendon Length":23.5,\
-					 	"Initial Muscle Length":10.1, 	"Initial Tendon Length":23.5}
+muscle_1_parameters = {	"Pennation Angle":9.6*np.pi/180, 		"Muscle Mass":0.15,\
+						"Optimal Length":6.8, 				"Tendon Length":24.1,\
+					 	"Initial Muscle Length":6.8, 	"Initial Tendon Length":24.1}
+muscle_2_parameters = {	"Pennation Angle":9.6*np.pi/180, 		"Muscle Mass":0.15,\
+						"Optimal Length":6.8, 				"Tendon Length":24.1,\
+					 	"Initial Muscle Length":6.8, 	"Initial Tendon Length":24.1}
 
 # Define delays based on limb length and conduction velocity of each pathway
 DistanceToTheSpinalCord = 0.8 # cm
@@ -209,16 +209,16 @@ delay_2_parameters = {"Efferent Delay": round(DistanceToTheSpinalCord/EfferentCo
 # Define gain parameters for each neural pathway
 gain_1_parameters = {	"Gamma Dynamic Gain" : 50, \
 					"Gamma Static Gain" : 50, \
-					"Ia Gain" : 2000, \
+					"Ia Gain" : 400, \
 					"II Gain" : 3000, \
 					"Ib Gain" : 5000, \
-					"Ia Reciprocal Gain" : 2000}
+					"Ia Reciprocal Gain" : 6000}
 gain_2_parameters = {	"Gamma Dynamic Gain" : 50, \
 					"Gamma Static Gain" : 50, \
-					"Ia Gain" : 2000, \
+					"Ia Gain" : 400, \
 					"II Gain" : 3000, \
 					"Ib Gain" : 5000, \
-					"Ia Reciprocal Gain" : 2000}
+					"Ia Reciprocal Gain" : 6000}
 
 # Define force trajectory that model needs to track
 # You can create any target trajectory as you want, but it has to be
