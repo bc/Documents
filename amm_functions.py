@@ -143,6 +143,11 @@ def generate_target_force_trajectory(TrajectoryType,Time,Amplitude,AmplitudeModu
 		# 3%MVC + 10s hold => 
 	"""
 	return(TargetForceTrajectory)
+def current_pennation_angle(NormalizedMuscleLength,muscle_parameters):
+	import numpy as np
+	InitialPennationAngle = muscle_parameters['Pennation Angle']
+	CurrentPennationAngle = np.arcsin(np.sin(InitialPennationAngle)/NormalizedMuscleLength)
+	return(CurrentPennationAngle)
 def return_initial_values(muscle_parameters,gain_parameters,TargetTrajectory,CorticalInput):
 	import numpy as np
 	def contractile_element_parameters(Length,Velocity,Acceleration,MaximumContractileElementLength,FL,FV,Force,MaximumContractileElementForce):
@@ -177,9 +182,9 @@ def return_initial_values(muscle_parameters,gain_parameters,TargetTrajectory,Cor
 		PEE = initialize_dictionary(['Passive Force 1','Passive Force 2'],\
 									[ForcePassive1,ForcePassive2])
 		return(PEE)
-	def muscle_values(EffectiveMuscleActivation,MuscleLength,MuscleVelocity,MuscleAcceleration,MuscleMass,OptimalLength):
-		Muscle = initialize_dictionary(['Effective Activation','Force','Length','Velocity','Acceleration','Mass','Optimal Length'],\
-									[[EffectiveMuscleActivation],[],[MuscleLength],[MuscleVelocity],[MuscleAcceleration],MuscleMass,OptimalLength])
+	def muscle_values(EffectiveMuscleActivation,MuscleLength,MuscleVelocity,MuscleAcceleration,MuscleMass,OptimalLength,InitialPennationAngle):
+		Muscle = initialize_dictionary(['Effective Activation','Force','Length','Velocity','Acceleration','Mass','Optimal Length','Pennation Angle'],\
+									[[EffectiveMuscleActivation],[],[MuscleLength],[MuscleVelocity],[MuscleAcceleration],MuscleMass,OptimalLength,[InitialPennationAngle]])
 		return(Muscle)
 
 	PennationAngle = muscle_parameters['Pennation Angle']
@@ -189,6 +194,8 @@ def return_initial_values(muscle_parameters,gain_parameters,TargetTrajectory,Cor
 	OptimalTendonLength = TendonLength*1.05
 	InitialMuscleLength = muscle_parameters['Initial Muscle Length']
 	InitialTendonLength = muscle_parameters['Initial Tendon Length']
+	# adapted from Elias et al 2014 eq. 4
+	# see eq 5 for PennationAngle(NormalizedMuscleLength)
 	InitialMusculoTendonLength = InitialMuscleLength*np.cos(PennationAngle)+InitialTendonLength
 
 	GammaDynamicGain = gain_parameters['Gamma Dynamic Gain']
@@ -200,20 +207,25 @@ def return_initial_values(muscle_parameters,gain_parameters,TargetTrajectory,Cor
 	# calculate maximal force output of the muscle based on PCSA
 	MuscleDensity = 1.06 #g/cm**3
 	PCSA = (MuscleMass*1000)/MuscleDensity/OptimalLength #physionp.logical cross-sectional area
-	SpecificTension = 31.4 # WHERE DOES THIS COME FROM AND WHAT DOES IT MEAN? N/
+	SpecificTension = 31.4 
 	MaximumContractileElementForce = PCSA * SpecificTension
 
 	# calculate initial length based on balance between stiffness of muscle and
-	# tendon
-	TendonConstant = 240 #27.8
-	TendonRateConstant = 0.0047
-	NormalizedRestingTendonLength = 0.964
+	# tendon. Parameter values are taken from Elias 2014 -- Soleus mm
+	# Additional Ref Elias 2014 [75-77,82]
+	TendonStiffness = 27.8
+	TendonCurvatureConstant = 0.0047
+	TendonLengthAtStartOfLinearRegion = 0.964
 
-	MuscleConstant = 23.0  #355, 67.1
-	MuscleRateConstant = 0.046 #0.04, 0.056
+	MuscleStiffness = 23.0  #355, 67.1
+	MuscleCurvatureConstant = 0.046 #0.04, 0.056
 	RestingMuscleLength = 1.17  #1.35, 1.41
-	PassiveMuscleForce = float(MuscleConstant * MuscleRateConstant * np.log(np.exp((1 - RestingMuscleLength)/MuscleRateConstant)+1))
-	NormalizedSeriesElasticLength = float(TendonRateConstant*np.log(np.exp(PassiveMuscleForce*MaximumContractileElementForce/TendonConstant/TendonRateConstant)-1)+NormalizedRestingTendonLength)
+	PassiveMuscleForce = float(MuscleStiffness * MuscleCurvatureConstant * np.log(np.exp((1 - RestingMuscleLength)/MuscleCurvatureConstant)+1))
+	NormalizedSeriesElasticLength = float(TendonCurvatureConstant*np.log(np.exp(PassiveMuscleForce*OptimalTendonLength/TendonStiffness/TendonCurvatureConstant)-1)+TendonLengthAtStartOfLinearRegion)
+	# Note: this expression was originally float(TendonCurvatureConstant*np.log(np.exp(PassiveMuscleForce*MaximumContractileElementForce/TendonStiffness/TendonCurvatureConstant)-1)+TendonLengthAtStartOfLinearRegion)
+	# BUT Stiffness (27.8 from Elias et al 2014) is in units of MaximumContractileElementForce/OptimalTendonLength's (unitless/unitless). Therefore, 
+	# multiplying Stiffness by MaximumContractileElementForce and dividing by OptimalTendonLength will bring back the proper units,
+	# and the equation simplifies to the version seen above. (Dan Hagen - 11/9/16)
 	SeriesElasticLength = float(TendonLength * NormalizedSeriesElasticLength)
 
 	MaximumMusculoTendonLength = float(OptimalLength * np.cos(PennationAngle) + TendonLength + 1)
@@ -221,9 +233,9 @@ def return_initial_values(muscle_parameters,gain_parameters,TargetTrajectory,Cor
 	MaximumContractileElementLength = float(NormalizedMaximumFascicleLength/np.cos(PennationAngle)) # Contractile Element = Muscle
 
 	InitialLength = float((InitialMusculoTendonLength+OptimalTendonLength\
-							*((TendonRateConstant/MuscleRateConstant)*RestingMuscleLength-NormalizedRestingTendonLength\
-							- TendonRateConstant*np.log((MuscleConstant/TendonConstant)*(MuscleRateConstant/TendonRateConstant))))\
-							/(100*(1+TendonRateConstant/MuscleRateConstant*OptimalTendonLength/MaximumContractileElementLength*(1/OptimalLength))*np.cos(PennationAngle)))
+							*((TendonCurvatureConstant/MuscleCurvatureConstant)*RestingMuscleLength-TendonLengthAtStartOfLinearRegion\
+							- TendonCurvatureConstant*np.log((MuscleStiffness/TendonStiffness)*(MuscleCurvatureConstant/TendonCurvatureConstant))))\
+							/(100*(1+TendonCurvatureConstant/MuscleCurvatureConstant*OptimalTendonLength/MaximumContractileElementLength*(1/OptimalLength))*np.cos(PennationAngle)))
 	ContractileElementLength = float(InitialLength/(OptimalLength/100)) # initializing CE Length
 	SeriesElasticElementLength = float((InitialMusculoTendonLength - InitialLength*100)/OptimalTendonLength) # MTU - initial muscle = initial SEE length
 
@@ -280,9 +292,10 @@ def return_initial_values(muscle_parameters,gain_parameters,TargetTrajectory,Cor
 									[],FeedbackInput,TargetForceTrajectory,FeedforwardInput,CorticalInput,\
 									[],[]])
 	# Removed 'Feedforward','TargetTrajectory','CorticalInput','Feedback',
-	Muscle = muscle_values(EffectiveMuscleActivation,MuscleLength,MuscleVelocity,MuscleAcceleration,MuscleMass,OptimalLength)
+	Muscle = muscle_values(EffectiveMuscleActivation,MuscleLength,MuscleVelocity,MuscleAcceleration,MuscleMass,OptimalLength,PennationAngle)
 	return(Bag1,Bag2,Chain,SlowTwitch,FastTwitch,CE,SEE,PEE,Muscle,Input)
 def bag1_model(CE,Bag1,SamplingPeriod):
+	# Elias et al 2014 Ref # 84
 	import numpy as np
 	Length,LengthFirstDeriv,LengthSecondDeriv = CE['Length'][-1],CE['Velocity'][-1],CE['Acceleration'][-1]
 	DynamicSpindleFrequency, GammaDynamicGain = Bag1['DynamicSpindleFrequency'][-1], Bag1['GammaDynamicGain']
@@ -334,6 +347,7 @@ def bag1_model(CE,Bag1,SamplingPeriod):
 
 	return(Bag1AfferentPotential)
 def bag2_model(CE,Bag2,SamplingPeriod):
+	# Elias et al 2014 Ref # 84
 	import numpy as np
 	Length,LengthFirstDeriv,LengthSecondDeriv = CE['Length'][-1],CE['Velocity'][-1],CE['Acceleration'][-1]
 	StaticSpindleFrequency, GammaStaticGain = Bag2['StaticSpindleFrequency'][-1], Bag2['GammaStaticGain']
@@ -395,6 +409,7 @@ def bag2_model(CE,Bag2,SamplingPeriod):
 
 	return(Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential)
 def chain_model(CE,Chain,Bag2,SamplingPeriod):
+	# Elias et al 2014 Ref # 84
 	import numpy as np
 	Length,LengthFirstDeriv,LengthSecondDeriv = CE['Length'][-1],CE['Velocity'][-1],CE['Acceleration'][-1]
 	ChainTensionFirstDeriv,ChainTension = Chain['TensionFirstDeriv'][-1],Chain['Tension'][-1]
@@ -446,7 +461,7 @@ def chain_model(CE,Chain,Bag2,SamplingPeriod):
 
 	return(ChainPrimaryAfferentPotential,ChainSecondaryAfferentPotential)
 def spindle_model(CE,Bag1,Bag2,Chain,SamplingPeriod):
-
+	# Elias et al 2014 Ref # 84
 	S = 0.156
 	Bag1AfferentPotential = bag1_model(CE,Bag1,SamplingPeriod)
 	Bag2PrimaryAfferentPotential,Bag2SecondaryAfferentPotential = bag2_model(CE,Bag2,SamplingPeriod)
@@ -616,19 +631,26 @@ def parallel_elastic_element_force_2(CE):
 	ParallelElasticElementForce2 = c2_pe2*np.exp((k2_pe2*(Length-Lr2_pe2))-1)
 	return(ParallelElasticElementForce2)
 def normalized_series_elastic_element_force(SEE):
+	# adapted from Elias et al 2014 Equation 3
+	# parameter values are for Soleus
+	# Additional Ref Elias 2014 [75-77,82]
 	import numpy as np
-	LT = SEE['Tendon Length'][-1]
-	cT_se = 240 #27.8
-	kT_se = 0.0047
-	LrT_se = 0.964
-	NormalizedSeriesElasticElementForce = cT_se * kT_se * np.log(np.exp((LT - LrT_se)/kT_se)+1)
+	TendonLength = SEE['Tendon Length'][-1]
+	TendonStiffness = 27.8
+	TendonCurvatureConstant = 0.0047
+	TendonLengthAtStartOfLinearRegion = 0.964
+	NormalizedSeriesElasticElementForce = TendonStiffness * TendonCurvatureConstant * np.log(np.exp((TendonLength - TendonLengthAtStartOfLinearRegion)/TendonCurvatureConstant)+1)
 	return(NormalizedSeriesElasticElementForce)
 def update_ib_input(i,Input,SEE,Num,Den,SamplingRatio):
 	import numpy as np
 	## GTO model
-	GTOConstant1 = 60
-	GTOConstant2 = 4
+	# adjustable parameters chosen to reproduce individual Ib firing rates compatable with literature
+	# Ref 59 in Elias et al 2014
+	GTOConstant1 = 60 # Hz
+	GTOConstant2 = 4 # N
 	# Get Ib activity
+	# Ref Elias et al 2014 eq. 10
+	# 'IbTemp1' is in time domain
 	Input['IbTemp1'].append(GTOConstant1*np.log(SEE['Tendon Force'][-1]/GTOConstant2+1))
 	if i == 0 or i == SamplingRatio:
 		Input['IbTemp2'].append(Input['IbTemp1'][-1])
@@ -940,12 +962,13 @@ def update_PEE_with_current_CE_length(PEE,CE):
 	# passive element 2
 	ForcePassive2 = parallel_elastic_element_force_2(CE)
 	PEE['Passive Force 2'].append((ForcePassive2 <= 0)*ForcePassive2)
-def update_muscle_kinematics_with_current_muscle_and_tendon_forces(Muscle,SEE,PennationAngle,SamplingPeriod):
+def update_muscle_kinematics_with_current_muscle_and_tendon_forces(Muscle,SEE,SamplingPeriod):
 	import numpy as np
 	# calculate muscle excursion acceleration based on the difference
 	# between muscle force and tendon force
-	Muscle['Acceleration'].append((SEE['Tendon Force'][-1]*np.cos(PennationAngle) - Muscle['Force'][-1]*(np.cos(PennationAngle))**2)/(Muscle['Mass']) \
-		+ (Muscle['Velocity'][-1])**2*np.tan(PennationAngle)**2/(Muscle['Length'][-1]))
+	# Ref Elias et al 2014 eq 7
+	Muscle['Acceleration'].append((SEE['Tendon Force'][-1]*np.cos(Muscle['Pennation Angle'][-1]) - Muscle['Force'][-1]*(np.cos(Muscle['Pennation Angle'][-1]))**2)/(Muscle['Mass']) \
+		+ (Muscle['Velocity'][-1])**2*np.tan(Muscle['Pennation Angle'][-1])**2/(Muscle['Length'][-1]))
 	# integrate acceleration to get velocity
 	Muscle['Velocity'].append((Muscle['Acceleration'][-1]+ \
 		Muscle['Acceleration'][-2])/2*(SamplingPeriod)+Muscle['Velocity'][-1])
@@ -957,7 +980,7 @@ def update_CE_kinematics(CE,Muscle):
 	CE['Acceleration'].append(Muscle['Acceleration'][-1]/(Muscle['Optimal Length']/100))
 	CE['Velocity'].append(Muscle['Velocity'][-1]/(Muscle['Optimal Length']/100))
 	CE['Length'].append(Muscle['Length'][-1]/(Muscle['Optimal Length']/100))
-def update_kinematics_and_kinetics(CE,PEE,SEE,Muscle,MuscleViscosity,PennationAngle,InitialMusculoTendonLength,SamplingPeriod):
+def update_kinematics_and_kinetics(CE,PEE,SEE,Muscle,MuscleViscosity,InitialMusculoTendonLength,SamplingPeriod,muscle_parameters):
 	import numpy as np
 	# update FLV relationship
 	update_CE_FLV_relationship(CE)
@@ -971,11 +994,13 @@ def update_kinematics_and_kinetics(CE,PEE,SEE,Muscle,MuscleViscosity,PennationAn
 	# update force from series elastic element
 	SEE['Tendon Force'].append(normalized_series_elastic_element_force(SEE) * CE['Maximum Force'])
 	# update muscle kinematics based on most recent muscle/tendon forces
-	update_muscle_kinematics_with_current_muscle_and_tendon_forces(Muscle,SEE,PennationAngle,SamplingPeriod)
+	update_muscle_kinematics_with_current_muscle_and_tendon_forces(Muscle,SEE,SamplingPeriod)
 	# update CE kinematics based on most recent muscle kinematics
 	update_CE_kinematics(CE,Muscle)
 	# update SEE length based on most recent CE length
-	SEE['Tendon Length'].append((InitialMusculoTendonLength - CE['Length'][-1]*Muscle['Optimal Length']*np.cos(PennationAngle))/SEE['Optimal Length'])
+	SEE['Tendon Length'].append((InitialMusculoTendonLength - CE['Length'][-1]*Muscle['Optimal Length']*np.cos(Muscle['Pennation Angle'][-1]))/SEE['Optimal Length'])
+	# update Muscle['Pennation Angle']
+	Muscle['Pennation Angle'].append(current_pennation_angle(CE['Length'][-1],muscle_parameters))
 def initialize_dictionary(keys,values):
 	assert len(keys)==len(values), "keys and values must have the same length."
 	result = {}
