@@ -45,17 +45,15 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 	test_input_values(muscle_2_parameters,delay_2_parameters,gain_2_parameters,FeedbackOption=FeedbackOption, ControlStrategy=ControlStrategy)
 
 	# muscle architectural parameters
-	PennationAngle_1 = muscle_1_parameters['Pennation Angle']
-	InitialMusculoTendonLength_1 = muscle_1_parameters['Initial Muscle Length']*np.cos(PennationAngle_1)+muscle_1_parameters['Initial Tendon Length'] 
-	PennationAngle_2 = muscle_2_parameters['Pennation Angle']	
-	InitialMusculoTendonLength_2 = muscle_2_parameters['Initial Muscle Length']*np.cos(PennationAngle_2)+muscle_2_parameters['Initial Tendon Length'] 
+	InitialPennationAngle_1 = muscle_1_parameters['Pennation Angle']
+	InitialMusculoTendonLength_1 = muscle_1_parameters['Initial Muscle Length']*np.cos(InitialPennationAngle_1)+muscle_1_parameters['Initial Tendon Length'] 
+	InitialPennationAngle_2 = muscle_2_parameters['Pennation Angle']	
+	InitialMusculoTendonLength_2 = muscle_2_parameters['Initial Muscle Length']*np.cos(InitialPennationAngle_2)+muscle_2_parameters['Initial Tendon Length'] 
 	
 	# viscosity of muscle (ref: Elias et al. 2014)
 	MuscleViscosity = 0.005 #0.001	
 
 	SamplingFrequency = 10000
-	FeedbackSamplingFrequency = 1000
-	SamplingRatio = SamplingFrequency/FeedbackSamplingFrequency
 	SamplingPeriod = 1/SamplingFrequency
 	Time = np.arange(0,len(TargetTrajectory_1)*SamplingPeriod,SamplingPeriod) 
 
@@ -63,17 +61,20 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 	BButtersCoefficients,AButtersCoefficients = signal.butter(4,100/(SamplingFrequency/2),'low')
 
 	# discrete transfer function for GTO output
+	# Linear Dynamics of GTO that creates afferent firing rate 
+	# Ref. Elias et al 2014 eq. 11
+	# tranformed into discrete filter to reduce computational complexity of the system.
 	Num,Den = [1.7,2.58,0.4],[1,2.2,0.4]
 	ContinuousTransferFunction = control.tf(Num,Den)
-	DiscreteTransferFunction = control.matlab.c2d(ContinuousTransferFunction,1/FeedbackSamplingFrequency)
+	DiscreteTransferFunction = control.matlab.c2d(ContinuousTransferFunction,1/SamplingFrequency)
 	Num,Den = control.matlab.tfdata(DiscreteTransferFunction)
 	Num,Den = Num[0][0],Den[0][0]
 
 	# Convert delays in ms to samples
 	EfferentDelay_1 = delay_1_parameters['Efferent Delay']
-	EfferentDelayTimeStep_1 = int(EfferentDelay_1*SamplingRatio)
+	EfferentDelayTimeStep_1 = int(EfferentDelay_1*SamplingFrequency/1000)
 	EfferentDelay_2 = delay_2_parameters['Efferent Delay']	
-	EfferentDelayTimeStep_2 = int(EfferentDelay_2*SamplingRatio)
+	EfferentDelayTimeStep_2 = int(EfferentDelay_2*SamplingFrequency/1000)
 	
 	# define all dictionaries needed for muscle(s)
 	Bag1_1,Bag2_1,Chain_1,SlowTwitch_1,FastTwitch_1,CE_1,SEE_1,PEE_1,Muscle_1,Input_1 = return_initial_values(muscle_1_parameters,gain_1_parameters,TargetTrajectory_1,CorticalInput_1)
@@ -88,16 +89,16 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 	StartTime = time.time()
 	for i in range(len(Time)): 
 		update_spindle_afferent_inputs_at_step_i_multiple_muscles(i,Input_1,CE_1,SEE_1,Bag1_1,Bag2_1,Chain_1,Num,Den,\
-																delay_1_parameters,gain_1_parameters,SamplingRatio,SamplingPeriod,\
+																delay_1_parameters,gain_1_parameters,SamplingFrequency,\
 																FeedbackOption,ControlStrategy=ControlStrategy,SynergistParameters=[SEE_2,CE_2])
 		update_spindle_afferent_inputs_at_step_i_multiple_muscles(i,Input_2,CE_2,SEE_2,Bag1_2,Bag2_2,Chain_2,Num,Den,\
-																delay_2_parameters,gain_2_parameters,SamplingRatio,SamplingPeriod,\
+																delay_2_parameters,gain_2_parameters,SamplingFrequency,\
 																FeedbackOption,ControlStrategy=ControlStrategy,SynergistParameters=[SEE_1,CE_1])	
 		
 		# add the interneuron input to total input
 		add_interneuron_inputs_to_total_at_step_i(i,Input_1,Input_2,\
 			gain_1_parameters,delay_1_parameters,gain_2_parameters,delay_2_parameters,\
-			'inhibitory','inhibitory', SamplingRatio)
+			'inhibitory','inhibitory', SamplingFrequency)
 		
 		#add noise (and cortical input) to input
 		# random.seed(1)
@@ -122,8 +123,8 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 		# SlowTwitch_2 = activation_frequency_slow(CE_2,SlowTwitch_2,Muscle_2['Effective Activation'][-1],SamplingPeriod) # not used
 		
 		# update all kinematics and kinetics from Effective Muscle Activation at timestep i
-		update_kinematics_and_kinetics(CE_1,PEE_1,SEE_1,Muscle_1,MuscleViscosity,PennationAngle_1,InitialMusculoTendonLength_1,SamplingPeriod)
-		update_kinematics_and_kinetics(CE_2,PEE_2,SEE_2,Muscle_2,MuscleViscosity,PennationAngle_2,InitialMusculoTendonLength_2,SamplingPeriod)	
+		update_kinematics_and_kinetics(CE_1,PEE_1,SEE_1,Muscle_1,MuscleViscosity,InitialMusculoTendonLength_1,SamplingPeriod,muscle_1_parameters)
+		update_kinematics_and_kinetics(CE_2,PEE_2,SEE_2,Muscle_2,MuscleViscosity,InitialMusculoTendonLength_2,SamplingPeriod,muscle_2_parameters)	
 		
 		statusbar(i,len(Time),StartTime=StartTime,Title = '2 Muscles')
 
@@ -180,21 +181,22 @@ def afferented_2_muscles_model(muscle_1_parameters,muscle_2_parameters,\
 	"""
 	return(output_1,output_2)
 
-muscle_1_parameters = {	"Pennation Angle":9.6*np.pi/180, 		"Muscle Mass":0.15,\
-						"Optimal Length":6.8, 				"Tendon Length":24.1,\
-					 	"Initial Muscle Length":6.8, 	"Initial Tendon Length":24.1}
-muscle_2_parameters = {	"Pennation Angle":9.6*np.pi/180, 		"Muscle Mass":0.15,\
-						"Optimal Length":6.8, 				"Tendon Length":24.1,\
-					 	"Initial Muscle Length":6.8, 	"Initial Tendon Length":24.1}
+muscle_1_parameters = {	"Pennation Angle":28.3*np.pi/180, 		"Muscle Mass":0.53,\
+						"Optimal Length":4.9, 				"Tendon Length":28.9,\
+					 	"Initial Muscle Length":4.9+0.2, 	"Initial Tendon Length":28.9+0.09}
+muscle_2_parameters = {	"Pennation Angle":28.3*np.pi/180, 		"Muscle Mass":0.53,\
+						"Optimal Length":4.9, 				"Tendon Length":28.9,\
+					 	"Initial Muscle Length":10.1+0.2, 	"Initial Tendon Length":28.9+0.09}
 
 # Define delays based on limb length and conduction velocity of each pathway
-DistanceToTheSpinalCord = 0.8 # cm
+DistanceToTheSpinalCord = 0.8 # m
 EfferentConductionVelocity = 48.5 #m/s (ref. Elias et al. 2014) S-type = 44-51, FR = 51-52, FF 52-53
 IaConductionVelocity = 64.5 #m/s (ref. Elias et al. 2014)
 IIConductionVelocity = 32.5 #m/s (ref. Elias et al. 2014)
 IbConductionVelocity = 59 #m/s (ref. Elias et al. 2014)
 SynapticDelay = 2 #ms (ref. Kandel)
 
+# ALL DELAYS ARE IN MS
 delay_1_parameters = {"Efferent Delay": round(DistanceToTheSpinalCord/EfferentConductionVelocity*1000), \
 					"Ia Delay" : round(DistanceToTheSpinalCord/IaConductionVelocity*1000) + SynapticDelay, \
 					"II Delay" : round(DistanceToTheSpinalCord/IIConductionVelocity*1000) + 2*SynapticDelay, \
