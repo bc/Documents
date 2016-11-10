@@ -44,8 +44,6 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	MuscleViscosity = 0.005 #0.001	
 
 	SamplingFrequency = 10000
-	FeedbackSamplingFrequency = 1000
-	SamplingRatio = SamplingFrequency/FeedbackSamplingFrequency
 	SamplingPeriod = 1/SamplingFrequency
 	Time = np.arange(0,len(TargetTrajectory)*SamplingPeriod,SamplingPeriod) 
 
@@ -55,13 +53,13 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	# discrete transfer function for GTO output
 	Num,Den = [1.7,2.58,0.4],[1,2.2,0.4]
 	ContinuousTransferFunction = control.tf(Num,Den)
-	DiscreteTransferFunction = control.matlab.c2d(ContinuousTransferFunction,1/FeedbackSamplingFrequency)
+	DiscreteTransferFunction = control.matlab.c2d(ContinuousTransferFunction,1/SamplingFrequency)
 	Num,Den = control.matlab.tfdata(DiscreteTransferFunction)
 	Num,Den = Num[0][0],Den[0][0]
 
 	# Convert delays in ms to samples
 	EfferentDelay = delay_parameters['Efferent Delay']
-	EfferentDelayTimeStep = int(EfferentDelay*SamplingRatio)
+	EfferentDelayTimeStep = int(EfferentDelay*SamplingFrequency/1000)
 
 	# define all dictionaries needed for muscle(s)
 	Bag1,Bag2,Chain,SlowTwitch,FastTwitch,CE,SEE,PEE,Muscle,Input = return_initial_values(muscle_parameters,gain_parameters,TargetTrajectory,CorticalInput)
@@ -69,7 +67,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	random.seed()
 	StartTime = time.time()
 	for i in range(len(Time)): 
-		update_total_input_at_step_i_single_muscle(i,Input,CE,SEE,Bag1,Bag2,Chain,Num,Den,delay_parameters,gain_parameters,SamplingRatio,SamplingPeriod,FeedbackOption)
+		update_total_input_at_step_i_single_muscle(i,Input,CE,SEE,Bag1,Bag2,Chain,Num,Den,delay_parameters,gain_parameters,SamplingFrequency,FeedbackOption)
 		
 		#add noise (and cortical input) to input
 		# random.seed(1)
@@ -87,7 +85,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 		# SlowTwitch = activation_frequency_slow(CE,SlowTwitch,Muscle['Effective Activation'][-1],SamplingPeriod) # not used
 
 		# update all kinematics and kinetics from Effective Muscle Activation at timestep i
-		update_kinematics_and_kinetics(CE,PEE,SEE,Muscle,MuscleViscosity,PennationAngle,InitialMusculoTendonLength,SamplingPeriod)
+		update_kinematics_and_kinetics(CE,PEE,SEE,Muscle,MuscleViscosity,InitialMusculoTendonLength,SamplingPeriod,muscle_parameters)
 		
 		statusbar(i,len(Time),StartTime=StartTime,Title = 'afferented_muscle_model')
 
@@ -108,7 +106,7 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 				'Input' : Input['Total'], 											'Noise' : Input['Noise'], \
 				'FilteredNoise' : Input['FilteredNoise'], 							'U' : Muscle['Effective Activation'][1:-1], \
 				'Ia Input' : Input['Ia'],											'II Input' : Input['II'], \
-				'Ib Input' : Input['Ib'] 	} #, 'CorticalInput' : CorticalInput }
+				'Ib Input' : Input['Ib'],											'Pennation Angle' : Muscle['Pennation Angle'] 	} #, 'CorticalInput' : CorticalInput }
 
 	"""
 	NOTES:
@@ -119,9 +117,13 @@ def afferented_muscle_model(muscle_parameters,delay_parameters,gain_parameters,T
 	"""
 	return(output)
 
-muscle_parameters = {	"Pennation Angle":5*np.pi/180, 		"Muscle Mass":0.075,\
-						"Optimal Length":10.1, 				"Tendon Length":23.5,\
-					 	"Initial Muscle Length":10.1+0.41, 	"Initial Tendon Length":23.5+0.09}
+# muscle_parameters = {	"Pennation Angle":5*np.pi/180, 		"Muscle Mass":0.075,\
+# 						"Optimal Length":10.1, 				"Tendon Length":23.5,\
+# 					 	"Initial Muscle Length":10.1+0.41, 	"Initial Tendon Length":23.5+0.09}
+# Elias 2014 SO parameters
+muscle_parameters = {	"Pennation Angle":28.3*np.pi/180, 		"Muscle Mass":0.53,\
+						"Optimal Length":4.9, 				"Tendon Length":28.9,\
+					 	"Initial Muscle Length":4.9, 	"Initial Tendon Length":28.9}
 
 # Define delays based on limb length and conduction velocity of each pathway
 DistanceToTheSpinalCord = 0.8 # cm
@@ -138,11 +140,11 @@ delay_parameters = {"Efferent Delay": round(DistanceToTheSpinalCord/EfferentCond
 					"Cortical Delay" : 50 }
 
 # Define gain parameters for each neural pathway
-gain_parameters = {	"Gamma Dynamic Gain" : 70, \
-					"Gamma Static Gain" : 70, \
-					"Ia Gain" : 800, \
+gain_parameters = {	"Gamma Dynamic Gain" : 50, \
+					"Gamma Static Gain" : 50, \
+					"Ia Gain" : 400, \
 					"II Gain" : 3000, \
-					"Ib Gain" : 1000 }
+					"Ib Gain" : 5000 }
 
 # Define force trajectory that model needs to track
 # You can create any target trajectory as you want, but it has to be
@@ -172,7 +174,7 @@ elif FeedbackOption == 'cortical_fb_only':
     FeedbackOptionString = 'CC'
 
 # Output from the muscle model
-NumberOfTrials = 10
+NumberOfTrials = 1
 Output = []
 PXX = []
 Range = []
