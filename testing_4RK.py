@@ -82,7 +82,9 @@ StartTime = time.time()
 for i in range(len(t)):
 	append_dictionary(Bag1_RK,['TensionFirstDeriv','Tension'],fourth_order_runge_kutta(f,g,t[i],Bag1_RK['TensionFirstDeriv'][-1],Bag1_RK['Tension'][-1],dt))
 	statusbar(i,len(t),StartTime=StartTime,Title='4th Order Runge Kutta')
-
+Bag1_RK['Tension'] = Bag1_RK['Tension'][:-1]
+t_RK, bag1tension_RK = t[np.arange(0,len(t),10)],np.array(Bag1_RK['Tension'])[np.arange(0,len(t),10)]
+del(t,Bag1_RK)
 print('\n')
 def bag1_model(CE,Bag1,SamplingPeriod):
 	import numpy as np
@@ -141,9 +143,11 @@ StartTime = time.time()
 for i in range(len(Time)):
 	bag1_model(CE,Bag1_FE,SamplingPeriod)
 	statusbar(i,len(Time),StartTime=StartTime,Title='Forward Euler')
-Bag1Tension = Bag1_FE['Tension'][:-1]
+Bag1_FE['Tension'] = Bag1_FE['Tension'][:-1]
+Time_FE, bag1tension_FE = Time[np.arange(0,len(Time),100)],np.array(Bag1_FE['Tension'])[np.arange(0,len(Time),100)]
+del(Time,Bag1_FE)
 # Time,Bag1Tension = pickle.load(open('Bag1Tension_FE.pkl','rb'))
 
-# plt.plot(Time[range(0,len(Time),100)],Bag1Tension[range(0,len(Time),100)],'r--')
-# plt.plot(t[range(0,len(t),10)],Bag1_RK['Tension'][:-1][range(0,len(t),10)],'b')
-# plt.show()
+plt.plot(Time_FE,bag1tension_FE,'r--')
+plt.plot(t_RK,bag1tension_RK,'b')
+plt.show()
