@@ -1,5 +1,5 @@
 __pycache__/
 .vs/
 Documents.pyproj
-*.aux
-*.log
+Journal_Index/main.aux
+Journal_Index/main.log
