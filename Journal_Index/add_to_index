@@ -1,0 +1,4 @@
+ipython IndexInput.py
+git add . 
+git commit --quiet -m "Adding to Index!" 
+git push --quiet origin master
