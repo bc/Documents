@@ -7,7 +7,13 @@
 \begin{document} 
 Recall that for a 2-link kinematic model there are 4 \emph{DOF} (i.e., \emph{SE}(2) $\times$ \emph{SE}(2) - constraints on $x,y$ at the joint = 4 \emph{DOF}). More specifically, the system can be completely defined by the location and orientation of a system's body frame (i.e., its \emph{position}) and the variables that reflects the relative placement of the component rigid bodies (i.e., its \emph{shape}). As seen in Figure \ref{fig:kinematics}B, the position of this system can be the \emph{SE}(2) location and orientation of the body frame and the shape is the orientation of the two links relative to each other ($\theta \in \mathbb{R}$).
 
-When calculating the velocity of a frame that is not attached to the rigid body (as is the case when dealing with the center of gravity frame) it is often simpler to construct the velocity of the attached frames and then construct a transform to move the velocity back towards the disassociated frame. In order for this transform to work, it must be a function of the system's shape parameters.  
+When calculating the velocity of a frame that is not attached to the rigid body (as is the case when dealing with the center of gravity frame) it is often simpler to construct the velocity of the attached frames and then construct a transform to move the velocity back towards the disassociated frame. In order for this transform to work, it must be a function of the system's shape parameters. In fact, when choosing any generalized coordinate frames, any choice -- either attached to the rigid body or not -- is an acceptable choice as long as there exists a transformation element that is a function of the shape parameter such that the total configuration is still defined by the position and orientation of the frame and the shape parameter. It is therefore often convenient to choose an attached body frame to calculate all relative velocities only to transform back into the global (and often more difficult to derive) coordinate frame. As an example, assume that we chose the frame \emph{$g_2$} to be the coordinate frame. The total body velocity ($\psi$) is then defined as:egin{equation}\label{eq:totalbodyvelocity}
+\zeta[I_3 0^{3\times2}]
+\begin{bmatrix}
+\zeta,
+\dot{r}
+\end{bmatrix}
+\end{equation}
 
 \begin{figure}[H]
 \centering
