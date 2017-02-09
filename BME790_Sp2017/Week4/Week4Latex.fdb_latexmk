@@ -1,5 +1,5 @@
 # Fdb version 3
-["pdflatex"] 1486596397 "Week4Latex.tex" "Week4Latex.pdf" "Week4Latex" 1486596397
+["pdflatex"] 1486661157 "Week4Latex.tex" "Week4Latex.pdf" "Week4Latex" 1486661157
   "/usr/local/texlive/2016/texmf-dist/fonts/enc/dvips/cm-super/cm-super-t1.enc" 1136849721 2971 def0b6c1f0b107b3b936def894055589 ""
   "/usr/local/texlive/2016/texmf-dist/fonts/map/fontname/texfonts.map" 1272929888 3287 e6b82fe08f5336d4d5ebc73fb1152e87 ""
   "/usr/local/texlive/2016/texmf-dist/fonts/tfm/jknappen/ec/ecrm1000.tfm" 1136768653 3584 adb004a0c8e7c46ee66cad73671f37b4 ""
@@ -74,10 +74,10 @@
   "/usr/local/texlive/2016/texmf-var/web2c/pdftex/pdflatex.fmt" 1463979169 3873397 413fbfbbedb8e719ddc392043a7add02 ""
   "/usr/local/texlive/2016/texmf.cnf" 1463979140 577 2938757e76f31531e65cc647e3507693 ""
   "Figure1.pdf" 1486590391 851807 131f490115c0fb8952aad9647a67204b ""
-  "Figure2.pdf" 1486594241 865246 54cffbfff2c095090532a9fbb2ac6420 ""
-  "Week4Latex.aux" 1486596397 960 78f1716fc37b55c91894b792b1d0ef85 ""
-  "Week4Latex.tex" 1486596396 2881 58774a432d50cec7f88c518fd1abd126 ""
+  "Figure2.pdf" 1486660127 866658 a13c63be252fa5c33911d767396aee93 ""
+  "Week4Latex.aux" 1486661157 961 b1f5983cd74a7d352025e7908ea89a94 ""
+  "Week4Latex.tex" 1486661156 2881 642f23ba1591355a1bd5f1e6f2b770fb ""
   (generated)
-  "Week4Latex.pdf"
   "Week4Latex.log"
   "Week4Latex.aux"
+  "Week4Latex.pdf"
