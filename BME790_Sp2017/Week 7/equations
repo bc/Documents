@@ -1,0 +1,128 @@
+=================
+equation 1 
+=================
+g(T) = \int^T_0 \dot{g}(t)dt = \int^T_0 T_eL_g\xi(T)dt = \int^T_0
+\begin{bmatrix}  
+\cos(\theta(t)) & -\sin(\theta(t)) & 0 \\
+\sin(\theta(t)) & \cos(\theta(t)) & 0 \\
+0 & 0 & 1\\
+\end{bmatrix}  
+\xi(t)dt
+
+=================
+equation 2
+=================
+
+
+g(T) = -\int^T_0
+\begin{bmatrix}  
+\cos(\theta(t)) & -\sin(\theta(t)) & 0 \\
+\sin(\theta(t)) & \cos(\theta(t)) & 0 \\
+0 & 0 & 1\\
+\end{bmatrix}  
+A(r)\dot{r}dt
+
+=================
+equation 3
+=================
+
+
+g(r(T)) = -\int^{r(T)}_{r(0)}
+\begin{bmatrix}  
+\cos(\theta(r)) & -\sin(\theta(r)) & 0 \\
+\sin(\theta(r)) & \cos(\theta(r)) & 0 \\
+0 & 0 & 1\\
+\end{bmatrix}  
+A(r)\dot{r}dr
+
+
+=================
+equation 4
+=================
+
+
+\xi = 
+\begin{bmatrix}  
+0 & 0 \\
+0 & 0 \\
+0 & \frac{-I_{rotor}(r)}{I_{body}}
+\end{bmatrix}  
+\begin{pmatrix}  
+\dot{\delta} \\
+\dot{\alpha}
+\end{pmatrix}
+
+=================
+equation 5
+=================
+
+\begin{bmatrix} 
+X ,Y 
+\end{bmatrix} = \nabla Y \cdot X - \nabla X \cdot Y
+
+=================
+equation 6
+=================
+
+\text{span($\mathcal{N}(\omega(q))$)} = 
+\begin{pmatrix}
+1 \\
+0 \\
+0\\
+1/R\\
+1/R
+\end{pmatrix} 
+,
+\begin{pmatrix}
+0 \\
+0 \\
+1\\
+-\omega/R\\
+\omega/R
+\end{pmatrix}  
+\quad 
+\text{(Where $q = (\xi^x, \xi^y, \xi^\theta, \dot{\alpha}_1, \dot{\alpha}_2)^T$)}
+
+=================
+equation 7
+=================
+
+&\text{If }\dot{r}_1 = (\dot{\alpha}_1,\dot{\alpha}_2)^T = \begin{pmatrix}\frac{1}{R},\frac{1}{R}\end{pmatrix}^T \text{ for } \xi = (1,0,0)^T \\
+&\text{and }\dot{r}_2 =  (\dot{\alpha}_1,\dot{\alpha}_2)^T = \begin{pmatrix}\frac{-\omega}{R},\frac{\omega}{R}\end{pmatrix}^T \text{ for } \xi_2 = (0,0,1)^T 
+
+=================
+equation 8
+=================
+[\dot{g}^1,\dot{g}^2]_{g=e} = \begin{pmatrix}
+\sin\theta\\
+-\cos\theta\\
+1
+\end{pmatrix}_{(0,0,0)^T}
+= \begin{pmatrix}
+0\\
+-1\\
+0
+\end{pmatrix}
+
+=================
+equation 9
+=================
+&[u,v] = 
+\begin{pmatrix}
+v^\theta u^y - u^\theta v^y\\
+u^\theta v^x - v^\theta u^x\\
+0
+\end{pmatrix}\\
+&\text{so, } 
+\quad
+[(1,0,0)^T,(0,0,1)^T] = 
+\begin{pmatrix}
+0\cdot 0 - 0 \cdot 0\\
+0\cdot 0  - 1 \cdot 1\\
+0
+\end{pmatrix}
+= \begin{pmatrix}
+0\\
+-1\\
+0
+\end{pmatrix}
