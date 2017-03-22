@@ -1,0 +1,197 @@
+=================
+equation 1 
+=================
+Assume that. \\
+\begin{align}
+R(\vec{\theta}) &= 
+\begin{bmatrix}
+r_{1,1}(\vec{\theta}) & \cdots & r_{1,m}(\vec{\theta}) \\
+\vdots & \ddots & \vdots \\
+r_{n,1}(\vec{\theta}) & \cdots & r_{n,m}(\vec{\theta})
+\end{bmatrix}
+\in \mathbb{R}^{n \times m}\\
+K &= 
+\begin{bmatrix}
+k_1 & \cdots & 0 \\
+\vdots & \ddots & \vdots \\
+0 & \cdots & k_m
+\end{bmatrix}
+\in \mathbb{R}^{m \times m}\\
+\vec{\theta} &= 
+\begin{pmatrix}
+\theta_1 \\
+\vdots \\
+\theta_n
+\end{pmatrix}
+\in
+\mathbb{R}^n\\
+\vec{x} = \Delta\vec{s} + \Delta\vec{l}_o = - \int_{\vec{\theta}_o}^{\vec{\theta}}R(\vec{\phi})d\vec{\phi} + \Delta\vec{l}_o &= 
+\begin{pmatrix}
+x_1 \\
+\vdots \\
+x_m
+\end{pmatrix}
+\in
+\mathbb{R}^m
+\end{align}
+=================
+equation 2
+=================
+\begin{equation*}
+E = \frac{1}{2}\vec{x}^TK\vec{x} = \sum_{i=1}^m \frac{1}{2}k_ix_i^2 
+\end{equation*}
+\begin{equation*}
+\text{where } x_i(\vec{\theta}) = -\sum_{j=1}^n\int_{\theta_{o,j}}^{\theta_j}r_{j,i}(\vec{\phi})d\phi_j + \Delta l_{o,i}
+\end{equation*}
+\begin{equation*}
+\text{is the total excursion of muscle $i \in \{1,\cdots, m\}$.}
+\end{equation*}
+=================
+equation 3 
+=================
+
+The minimum of \emph{E} satisfies $\nabla E = \vec{0}$.
+
+=================
+equation 4
+=================
+\begin{equation*}
+\nabla E = 
+\begin{pmatrix}
+\frac{\partial E}{\partial\theta_1} \\
+\vdots \\
+\frac{\partial E}{\partial\theta_n}
+\end{pmatrix}
+=
+\begin{pmatrix}
+\frac{\partial}{\partial\theta_1} \sum_{i=1}^m \frac{1}{2}k_ix_i^2\\
+\vdots \\
+\frac{\partial}{\partial\theta_n}\sum_{i=1}^m \frac{1}{2}k_ix_i^2
+\end{pmatrix}
+=
+\begin{pmatrix}
+\sum_{i=1}^mk_ix_i\frac{\partial x_i}{\partial\theta_1} \\
+\vdots \\
+\sum_{i=1}^mk_ix_i\frac{\partial x_i}{\partial\theta_n}
+\end{pmatrix}
+\end{equation*}
+
+=================
+equation 5
+=================
+
+\begin{align*}
+\frac{\partial}{\partial\theta_k}x_i(\vec{\theta}) &=
+\frac{\partial}{\partial\theta_k}
+\left(-\sum_{j=1}^n\int_{\theta_{o,j}}^{\theta_j}r_{j,i}(\vec{\phi})d\phi_j + \Delta l_{o,i}\right)\\
+&= \frac{\partial}{\partial\theta_k}\left(-\int_{\theta_{o,k}}^{\theta_k}r_{k,i}(\vec{\phi})d\phi_k\right) = -r_{k,i}(\vec{\theta})
+\end{align*}
+
+
+=================
+equation 6
+=================
+
+\begin{align*}
+\nabla E
+&=
+\begin{pmatrix}
+-\sum_{i=1}^mk_ix_ir_{1,i}(\vec{\theta}) \\
+\vdots \\
+-\sum_{i=1}^m k_i x_ir_{n,i}(\vec{\theta}) 
+\end{pmatrix} \\
+&= -R(\vec{\theta})K\vec{x} \\
+&= -R(\vec{\theta})K\left(\Delta\vec{s} + \Delta\vec{l}_o\right) \\
+&= -R(\vec{\theta})\vec{f}_{m} \\
+&= \vec{\tau} = 0
+\end{align*}
+
+=================
+equation 7
+=================
+
+
+\begin{align*}
+\left(\begin{bmatrix}
+r_1 & -r_2
+\end{bmatrix}
+\left(-\begin{pmatrix}
+k_1 & 0 \\
+0 * k_2
+\end{pmatrix}
+\left(\begin{bmatrix}
+-r_1 \\
+r_2
+\end{bmatrix}
+\Delta\theta\right)\right)
+\end{align*}
+
+=================
+equation 8
+=================
+
+\begin{equation*}
+\vec{\tau}(K) = R\left(-K\left(-R^T\Delta\vec{\theta} + \Delta \vec{l}_o\right)\right) + \vec{\phi}(\vec{\theta}) = 0
+\end{equation*}
+
+=================
+equation 9
+=================
+
+\begin{equation*}
+E(K) = \frac{1}{2}\left(-R^T\Delta\vec{\theta} + \Delta\vec{l}_o\right)^TK\left(-R^T\Delta\vec{\theta} + \Delta\vec{l}_o\right)
+\end{equation*}
+
+=================
+equation 10
+=================
+
+\begin{align*}
+&\min_K \left[E = \frac{1}{2}\left(-R^T\Delta\vec{\theta} + \Delta\vec{l}_o\right)^TK\left(-R^T\Delta\vec{\theta} + \Delta\vec{l}_o\right)\right] \\
+&\text{subject to } \hspace{1em} R\left(-K\left(-R^T\Delta\vec{\theta} + \Delta \vec{l}_o\right)\right) + \vec{\phi}(\vec{\theta}) = 0 \\
+&\quad \text{and} \hspace{8em} k_{min} \leq k_i \leq k_{max} \\
+&\hspace{12.5em}   0 \leq k_{min}\\
+\end{align*}
+
+=================
+equation 11
+=================
+
+&\text{If $\Delta\vec{l}_o = 0$ and $ \vec{\phi} = 0$ then} \\
+&\hspace{3em} RK(R^T\Delta\vec{\theta} - \Delta\vec{l}_o) = RKR^T\Delta\vec{\theta} = 0
+\\
+&\text{For all $K$, this is only possible if $\Delta\vec{\theta} = 0$.} \\
+&\text{If the tendons are pretensioned (i.e., $\Delta\vec{\theta} \neq 0$):} \\
+&\quad RK(R^T\Delta\vec{\theta} - \Delta\vec{l}_o) \rightarrow RKR^T\Delta\vec{\theta} = RK\Delta\vec{l}_o\\
+&\hspace{9em} \rightarrow \Delta\vec{\theta} = (RKR^T)^{-1}RK\Delta\vec{l}_o\\
+&\text{Therefore, the system becomes controllable with some}\\
+&\text{value of $K$ inducing the desired $\Delta\vec{\theta}$}\\
+&\text{When external torques are considered:} \\
+&\hspace{3em} \Delta\vec{\theta} = (RKR^T)^{-1}\left(RK\Delta\vec{l}_o - \vec{\phi}(\vec{\theta})\right)\\
+
+=================
+equation 12
+=================
+
+\Delta\vec{s} = - \int_{\vec{\theta}_o}^{\vec{\theta}_1}\left(R(\vec{\theta})\right)^Td\vec{\theta} \approx -R^T\Delta\vec{\theta}
+
+=================
+equation 13
+=================
+
+\begin{pmatrix}
+x \\
+y 
+\end{pmatrix}
+=
+\begin{pmatrix}
+l_1\cos\theta_1 + l_2\cos(\theta_2-\theta_1) \\
+l_1\sin\theta_1 + l_2\sin(\theta_2-\theta_1)
+\end{pmatrix}
+
+=================
+equation 14
+=================
+
+k_{avail} \in \left\{ k_{min} + n \cdot \Delta k \left| n \leq \frac{k_{max}-k_{min}}{\Delta k} + 1 \right\} \right|
+
