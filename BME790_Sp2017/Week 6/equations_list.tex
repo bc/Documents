@@ -1,0 +1,25 @@
+-A\dot{\vec{\theta}} &= -\frac{1}{D}
+\begin{bmatrix}
+l_2\cdot \cos(\theta_2) + l_3 & -l_1\cdot \cos(\theta_2) - 2\cdot l_2\cdot \cos(\theta_1)\cdot \cos(\theta_2) - l_3\cdot \cos(\theta_1) & l_1 + l_2\cdot \cos(\theta_1) \\
+                      0 &      -l_1\cdot \sin(\theta_2) + l_2\cdot \sin(\theta_1 - \theta_2) + l_3\cdot \sin(\theta_1) &                       0 \\
+        2\cdot \sin(\theta_2) &                                                -2\cdot \sin(\theta_1 + \theta_2) &         2\cdot \sin(\theta_1)
+\end{bmatrix}
+\begin{bmatrix}  
+\frac{l_1}{2} & 0 \\
+0 & 0 \\
+0 & \frac{l_3}{2}
+\end{bmatrix}  
+\begin{pmatrix}  
+\dot{\theta_1} \\
+\dot{\theta_2} 
+\end{pmatrix}  \\
+&= 
+\begin{bmatrix}
+\frac{l_1}{2D}(l_2\cdot \cos(\theta_2) + l_3) &  \frac{l_3}{2D}(l_1 + l_2\cdot \cos(\theta_1)) \\
+                      0 &                  0 \\
+      \frac{l_1 \cdot \sin(\theta_2)}{D}  &         \frac{l_3\cdot \sin(\theta_1)}{D}
+\end{bmatrix}
+\dot{\vec{\theta}}
+
+============================================
+
