@@ -1,0 +1,25 @@
+===================
+1
+===================
+
+\mathcal{M}(\theta)\ddot{\theta} + \mathcal{C}(\theta,\dot{\theta})\dot{\theta} + N(\theta) &= \mathcal{R}(\theta)\mathcal{F}(\theta,\dot{\theta})\vec{u}\\
+&=\mathcal{A}(\theta,\dot{\theta})\vec{u}\\
+&\approx \mathcal{A}(\theta,\dot{\theta})(\vec{\alpha} + \vec{\gamma_s} + \vec{\gamma_d})
+
+===================
+2
+===================
+
+\mathcal{M}(\theta)\ddot{\theta} + \mathcal{C}(\theta,\dot{\theta})\dot{\theta} + N(\theta) &= \mathcal{R}(\theta)\vec{f}_m
+
+
+===================
+3
+===================
+
+u_i = u(\alpha_i, Ia(\gamma_{s,i},\gamma_{d,i}),II(\gamma_{s,i},\gamma_{d,i}))
+
+===================
+4
+===================
+
