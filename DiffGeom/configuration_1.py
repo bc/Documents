@@ -1,18 +1,19 @@
-def SymbolicPseudoRotation(n):
+def SymbolicPseudoRotation(n,AngleSymbol='theta'):
 	import numpy as np 
 	import sympy as sp 
 	assert type(n) == int and n > 0, "n (number of DOF) must be a positive integer"
-	theta = [sp.Symbol('theta'+str(i+1)) for i in range(n)]
-	pseudoR = sp.Matrix(sp.Identity(n+1))
+	assert type(AngleSymbol) == str, "AngleSymbol must be a string."
+	Angle = [sp.Symbol(AngleSymbol+str(i+1)) for i in range(n)]
+	PseudoR = sp.Matrix(sp.Identity(n+1))
 	for i in range(n):
-		pseudoR[0,i+1] = -theta[i]
-	return(pseudoR)
+		PseudoR[0,i+1] = -Angle[i]
+	return(PseudoR)
 
 def testSymbolicPseudoRotation():
 	import sympy as sp
 	import numpy as np
 	assert SymbolicPseudoRotation(3) \
-			== sp.Matrix([	[1,	-sp.Symbol('angle'),	-sp.Symbol('theta2'),	-sp.Symbol('theta3')],\
+			== sp.Matrix([	[1,	-sp.Symbol('theta1'),	-sp.Symbol('theta2'),	-sp.Symbol('theta3')],\
 							[0,	1,						0,						0					],\
 							[0,	0,						1,						0					],\
 							[0,	0,						0,						1					]]),\
@@ -22,20 +23,20 @@ def testSymbolicPseudoRotation():
 
 # testSymbolicPseudoRotation()
 	
-def SymbolicRotationMatrix_SO3(axis,angle):
+def SymbolicRotationMatrix_SO3(RotationalAxis,Angle):
 	import sympy as sp
 	import itertools
-	assert str(type(angle)) == "<class 'sympy.core.symbol.Symbol'>", "angle must be a sympy variable."
-	assert axis in ['x','y','z'], "(rotational) axis must either be 'x', 'y', or 'z'."
+	assert str(type(Angle)) == "<class 'sympy.core.symbol.Symbol'>", "Angle must be a sympy variable."
+	assert RotationalAxis in ['x','y','z'], "(rotational) RotationalAxis must either be 'x', 'y', or 'z'."
 	R = sp.Matrix(sp.Identity(3))
-	if axis == 'x': i = [1,2]
-	if axis == 'y': i = [0,2]
-	if axis == 'z': i = [0,1]
-	trig_indeces = list(itertools.product(i,i))
-	R[trig_indeces[0]] = sp.cos(angle)
-	R[trig_indeces[1]] = -sp.sin(angle)
-	R[trig_indeces[2]] = sp.sin(angle)
-	R[trig_indeces[3]] = sp.cos(angle)	
+	if RotationalAxis == 'x': i = [1,2]
+	if RotationalAxis == 'y': i = [0,2]
+	if RotationalAxis == 'z': i = [0,1]
+	TrigonometricIndeces = list(itertools.product(i,i))
+	R[TrigonometricIndeces[0]] = sp.cos(Angle)
+	R[TrigonometricIndeces[1]] = -sp.sin(Angle)
+	R[TrigonometricIndeces[2]] = sp.sin(Angle)
+	R[TrigonometricIndeces[3]] = sp.cos(Angle)	
 	return(R)
 
 def testSymbolicRotationMatrix_SO3():
@@ -58,42 +59,89 @@ def testSymbolicRotationMatrix_SO3():
 
 # testSymbolicRotationMatrix_SO3()
 
-def SymbolicMomentArmMatrix(m,n):
+def SymbolicMomentArmMatrix(m,n,MomentArmSymbol='r'):
 	import numpy as np
 	import sympy as sp
+	import itertools as it
 	assert type(n) == int and n > 0, "n (number of DOF) must be a positive integer"
 	assert type(m) == int and m > 0, "m (number of muscles) must be a positive integer"
-	MA = sp.Matrix([[sp.Symbol('r_'+str(i+1)+','+str(j+1)) for j in range(m)] for i in range(n)])
+	assert type(MomentArmSymbol) == str, "MomentArmSymbol must be a string"
+	MA = sp.Matrix(np.array([sp.Symbol(MomentArmSymbol + '_' + str(el)) for el in it.product(range(1,n+1),range(1,m+1))]).reshape(n,m))
 	return(MA)
 
-def SymbolicPositionVector(x,y,z):
+def SymbolicPositionVector(StringX='x',StringY='y',StringZ='z'):
 	import sympy as sp
-	for i in [x,y,z]: assert str(type(i)) == "<class 'sympy.core.symbol.Symbol'>", str(i) + " must be a sympy variable."
-	x = sp.Matrix([[x],[y],[z]])
-	return(x)
+	for i in [StringX,StringY,StringZ]: assert type(i) == str,  "Position variables must be a strings."
+	Position = sp.Matrix([[sp.Symbol(StringX)],[sp.Symbol(StringY)],[sp.Symbol(StringZ)]])
+	return(Position)
 
-def SymbolicExcursionVector(m):
+def SymbolicExcursionVector(m,ExcursionSymbol='s'):
 	import sympy as sp
 	assert type(m) == int and m > 0, "m (number of muscles) must be a positive integer."
-	s = [sp.Symbol('s_'+str(i+1)) for i in range(m)]
-	return(s)
+	assert type(ExcursionSymbol) == str, "ExcursionSymbol must be a string."
+	Excursion = [sp.Symbol(ExcursionSymbol+'_'+str(i+1)) for i in range(m)]
+	return(Excursion)
 
-def SymbolicConfiguration_WithoutPosition(m,n):
+def SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol='theta',MomentArmSymbol='r',ExcursionSymbol='s'):
 	import sympy as sp 
 	import numpy as np
 	import scipy.linalg 
-	pseudoR = SymbolicPseudoRotation(n)
+	PseudoR = SymbolicPseudoRotation(n,AngleSymbol=AngleSymbol)
 	DiagPseudoR = []
 	for i in range(m):
-		DiagPseudoR = scipy.linalg.block_diag(DiagPseudoR,pseudoR)
-	interimConfig = np.concatenate((DiagPseudoR,np.zeros(shape = (1,(n+1)*m))),axis=0)
-	MA = SymbolicMomentArmMatrix(m,n)
-	S = SymbolicExcursionVector(m)
+		DiagPseudoR = scipy.linalg.block_diag(DiagPseudoR,PseudoR)
+	InterimConfigurationMatrix = np.concatenate((DiagPseudoR,np.zeros(shape = (1,(n+1)*m))),axis=0)
+	MA = SymbolicMomentArmMatrix(m,n,MomentArmSymbol=MomentArmSymbol)
+	S = SymbolicExcursionVector(m,ExcursionSymbol=ExcursionSymbol)
 	LastColumn = np.concatenate([np.concatenate(([[S[i]]], MA[:,i].T),axis=1) for i in range(m)],axis=1).T
 	LastColumn = np.concatenate((LastColumn, [[1]]),axis=0)
-	ConfigurationMatrix = np.concatenate((interimConfig,LastColumn),axis=1)
+	ConfigurationMatrix = sp.Matrix(np.concatenate((InterimConfigurationMatrix,LastColumn),axis=1))
 	return(ConfigurationMatrix)
-	
 
-	
+def SymbolicLeftLiftedAction_WithoutPosition(m,n,AngleSymbol='theta',MomentArmSymbol='r',ExcursionSymbol='s'):
+	import sympy as sp
+	import numpy as np
+	g = SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol='alpha',MomentArmSymbol='ma',ExcursionSymbol='l')
+	g_tensor = sp.Matrix(np.concatenate([-g[0,1:n+1],g[range(0,(n+1)*m-1,n+1),-1].T,g[[i for i in range((n+1)*m) if i not in range(0,(n+1)*m-1,n+1)],-1].T],axis=1))
+	h = SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol=AngleSymbol,MomentArmSymbol=MomentArmSymbol,ExcursionSymbol=ExcursionSymbol)
+	hg = h*g
+	hg_tensor = sp.Matrix(np.concatenate([-hg[0,1:n+1],hg[range(0,(n+1)*m-1,n+1),-1].T,hg[[i for i in range((n+1)*m) if i not in range(0,(n+1)*m-1,n+1)],-1].T],axis=1))	
+	TgLh = hg_tensor.jacobian([g_tensor])
+	return(TgLh)
+
+def SymbolicInverseConfiguration_WithoutPosition(m,n,AngleSymbol='theta',MomentArmSymbol='r',ExcursionSymbol='s'):
+	import sympy as sp
+	import numpy as np
+	g = SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol=AngleSymbol,MomentArmSymbol=MomentArmSymbol,ExcursionSymbol=ExcursionSymbol)
+	Inverse_g = g**-1
+	Inverse_g_tensor = sp.Matrix(np.concatenate([-Inverse_g[0,1:n+1],Inverse_g[range(0,(n+1)*m-1,n+1),-1].T,Inverse_g[[i for i in range((n+1)*m) if i not in range(0,(n+1)*m-1,n+1)],-1].T],axis=1))	
+	return(Inverse_g,Inverse_g_tensor)
+
+def SymbolicLieAlgebra(m,n,AngleSymbol='theta',MomentArmSymbol='r',ExcursionSymbol='s'):
+	import sympy as sp
+	import numpy as np
+	import itertools as it
+	if AngleSymbol == 'THETA': 
+		Angle_h = 'theta'
+	else:
+		Angle_h = 'THETA'
+	if MomentArmSymbol == 'R':
+		MA_h = 'r'
+	else:
+		MA_h = 'R'
+	if ExcursionSymbol == 'S':
+		S_h = 's'
+	else:
+		S_h = 'S'
+	TgLh = SymbolicLeftLiftedAction_WithoutPosition(m,n,AngleSymbol=Angle_h,MomentArmSymbol=MA_h,ExcursionSymbol='S')
+	Variables = np.concatenate([[sp.Symbol(Angle_h + str(i+1)) for i in range(n)], \
+								[sp.Symbol(MA_h + '_' + str(el)) for el in it.product(range(1,n+1),range(1,m+1))], \
+								[sp.Symbol(S_h +'_'+str(i+1)) for i in range(m)]])
+	_,Inverse_g_tensor = SymbolicInverseConfiguration_WithoutPosition(m,n,AngleSymbol=AngleSymbol,MomentArmSymbol=MomentArmSymbol,ExcursionSymbol=ExcursionSymbol)
+	InverseVariables = np.concatenate([	[sp.Symbol(AngleSymbol + str(i+1)) for i in range(n)], \
+										[sp.Symbol(MomentArmSymbol + '_' + str(el)) for el in it.product(range(1,n+1),range(1,m+1))], \
+										[sp.Symbol(ExcursionSymbol +'_'+str(i+1)) for i in range(m)]])
+	TgLg_inv = TgLh.subs([(str(Variables[i]),str(InverseVariables[i])) for i in range(len(Variables))])
+	TeLg = TgLg_inv**-1
+	return(TeLg)
 
