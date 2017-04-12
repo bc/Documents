@@ -8,7 +8,6 @@ def SymbolicPseudoRotation(n,AngleSymbol='theta'):
 	for i in range(n):
 		PseudoR[0,i+1] = -Angle[i]
 	return(PseudoR)
-
 def testSymbolicPseudoRotation():
 	import sympy as sp
 	import numpy as np
@@ -19,10 +18,8 @@ def testSymbolicPseudoRotation():
 							[0,	0,						0,						1					]]),\
 			"Function failed to replicate PseudoRotationMatrix"
 	assert np.shape(SymbolicPseudoRotation(10)) == (10+1,10+1), \
-			"Function failed to build appropriately sized PseudoRotationMatrix"
-
+			"Function failed to build appropriately sized PseudoRotationMatrix"	
 # testSymbolicPseudoRotation()
-	
 def SymbolicRotationMatrix_SO3(RotationalAxis,Angle):
 	import sympy as sp
 	import itertools
@@ -38,7 +35,6 @@ def SymbolicRotationMatrix_SO3(RotationalAxis,Angle):
 	R[TrigonometricIndeces[2]] = sp.sin(Angle)
 	R[TrigonometricIndeces[3]] = sp.cos(Angle)	
 	return(R)
-
 def testSymbolicRotationMatrix_SO3():
 	import sympy as sp 
 	import numpy as np
@@ -56,9 +52,7 @@ def testSymbolicRotationMatrix_SO3():
 	assert test2 == SymbolicRotationMatrix_SO3('y',angle), "Failed for rotation about 'y' by 'angle'"
 	assert test3 == SymbolicRotationMatrix_SO3('z',angle), "Failed for rotation about 'z' by 'angle'"
 	assert np.shape(SymbolicRotationMatrix_SO3('x',angle)) == (3,r), "Failed to build an SO(3) Matrix"
-
 # testSymbolicRotationMatrix_SO3()
-
 def SymbolicMomentArmMatrix(m,n,MomentArmSymbol='r'):
 	import numpy as np
 	import sympy as sp
@@ -68,20 +62,17 @@ def SymbolicMomentArmMatrix(m,n,MomentArmSymbol='r'):
 	assert type(MomentArmSymbol) == str, "MomentArmSymbol must be a string"
 	MA = sp.Matrix(np.array([sp.Symbol(MomentArmSymbol + '_' + str(el)) for el in it.product(range(1,n+1),range(1,m+1))]).reshape(n,m))
 	return(MA)
-
 def SymbolicPositionVector(StringX='x',StringY='y',StringZ='z'):
 	import sympy as sp
 	for i in [StringX,StringY,StringZ]: assert type(i) == str,  "Position variables must be a strings."
 	Position = sp.Matrix([[sp.Symbol(StringX)],[sp.Symbol(StringY)],[sp.Symbol(StringZ)]])
 	return(Position)
-
 def SymbolicExcursionVector(m,ExcursionSymbol='s'):
 	import sympy as sp
 	assert type(m) == int and m > 0, "m (number of muscles) must be a positive integer."
 	assert type(ExcursionSymbol) == str, "ExcursionSymbol must be a string."
 	Excursion = [sp.Symbol(ExcursionSymbol+'_'+str(i+1)) for i in range(m)]
 	return(Excursion)
-
 def SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol='theta',MomentArmSymbol='r',ExcursionSymbol='s'):
 	import sympy as sp 
 	import numpy as np
@@ -97,27 +88,62 @@ def SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol='theta',MomentArmSymbo
 	LastColumn = np.concatenate((LastColumn, [[1]]),axis=0)
 	ConfigurationMatrix = sp.Matrix(np.concatenate((InterimConfigurationMatrix,LastColumn),axis=1))
 	return(ConfigurationMatrix)
-
+def ReturnSymbolicTensor(m,n,g):
+	import sympy as sp
+	import numpy as np
+	g_tensor = sp.Matrix(np.concatenate([-g[0,1:n+1],g[range(0,(n+1)*m-1,n+1),-1].T,g[[i for i in range((n+1)*m) if i not in range(0,(n+1)*m-1,n+1)],-1].T],axis=1))
+	return(g_tensor)
 def SymbolicLeftLiftedAction_WithoutPosition(m,n,AngleSymbol='theta',MomentArmSymbol='r',ExcursionSymbol='s'):
 	import sympy as sp
 	import numpy as np
-	g = SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol='alpha',MomentArmSymbol='ma',ExcursionSymbol='l')
-	g_tensor = sp.Matrix(np.concatenate([-g[0,1:n+1],g[range(0,(n+1)*m-1,n+1),-1].T,g[[i for i in range((n+1)*m) if i not in range(0,(n+1)*m-1,n+1)],-1].T],axis=1))
+	if AngleSymbol == 'alpha': 
+		Angle_g = 'theta'
+	else:
+		Angle_g = 'alpha'
+	if MomentArmSymbol == 'ma':
+		MA_g = 'r'
+	else:
+		MA_g = 'ma'
+	if ExcursionSymbol == 'l':
+		S_g = 's'
+	else:
+		S_g = 'l'
+	g = SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol=Angle_g,MomentArmSymbol=MA_g,ExcursionSymbol=S_g)
+	g_tensor = ReturnSymbolicTensor(m,n,g)
 	h = SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol=AngleSymbol,MomentArmSymbol=MomentArmSymbol,ExcursionSymbol=ExcursionSymbol)
 	hg = h*g
-	hg_tensor = sp.Matrix(np.concatenate([-hg[0,1:n+1],hg[range(0,(n+1)*m-1,n+1),-1].T,hg[[i for i in range((n+1)*m) if i not in range(0,(n+1)*m-1,n+1)],-1].T],axis=1))	
+	hg_tensor = ReturnSymbolicTensor(m,n,hg)
 	TgLh = hg_tensor.jacobian([g_tensor])
 	return(TgLh)
-
+def SymbolicRightLiftedAction_WithoutPosition(m,n,AngleSymbol='theta',MomentArmSymbol='r',ExcursionSymbol='s'):
+	import sympy as sp
+	import numpy as np
+	if AngleSymbol == 'alpha': 
+		Angle_g = 'theta'
+	else:
+		Angle_g = 'alpha'
+	if MomentArmSymbol == 'ma':
+		MA_g = 'r'
+	else:
+		MA_g = 'ma'
+	if ExcursionSymbol == 'l':
+		S_g = 's'
+	else:
+		S_g = 'l'
+	g = SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol=Angle_g,MomentArmSymbol=MA_g,ExcursionSymbol=S_g)
+	g_tensor = ReturnSymbolicTensor(m,n,g)
+	h = SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol=AngleSymbol,MomentArmSymbol=MomentArmSymbol,ExcursionSymbol=ExcursionSymbol)
+	gh = g*h
+	gh_tensor = ReturnSymbolicTensor(m,n,gh)
+	TgRh = gh_tensor.jacobian([g_tensor])
+	return(TgRh)
 def SymbolicInverseConfiguration_WithoutPosition(m,n,AngleSymbol='theta',MomentArmSymbol='r',ExcursionSymbol='s'):
 	import sympy as sp
 	import numpy as np
 	g = SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol=AngleSymbol,MomentArmSymbol=MomentArmSymbol,ExcursionSymbol=ExcursionSymbol)
 	Inverse_g = g**-1
-	Inverse_g_tensor = sp.Matrix(np.concatenate([-Inverse_g[0,1:n+1],Inverse_g[range(0,(n+1)*m-1,n+1),-1].T,Inverse_g[[i for i in range((n+1)*m) if i not in range(0,(n+1)*m-1,n+1)],-1].T],axis=1))	
-	return(Inverse_g,Inverse_g_tensor)
-
-def SymbolicLieAlgebra(m,n,AngleSymbol='theta',MomentArmSymbol='r',ExcursionSymbol='s'):
+	return(Inverse_g)
+def SymbolicTeLg(m,n,AngleSymbol='theta',MomentArmSymbol='r',ExcursionSymbol='s'):
 	import sympy as sp
 	import numpy as np
 	import itertools as it
@@ -133,15 +159,35 @@ def SymbolicLieAlgebra(m,n,AngleSymbol='theta',MomentArmSymbol='r',ExcursionSymb
 		S_h = 's'
 	else:
 		S_h = 'S'
-	TgLh = SymbolicLeftLiftedAction_WithoutPosition(m,n,AngleSymbol=Angle_h,MomentArmSymbol=MA_h,ExcursionSymbol='S')
-	Variables = np.concatenate([[sp.Symbol(Angle_h + str(i+1)) for i in range(n)], \
-								[sp.Symbol(MA_h + '_' + str(el)) for el in it.product(range(1,n+1),range(1,m+1))], \
-								[sp.Symbol(S_h +'_'+str(i+1)) for i in range(m)]])
-	_,Inverse_g_tensor = SymbolicInverseConfiguration_WithoutPosition(m,n,AngleSymbol=AngleSymbol,MomentArmSymbol=MomentArmSymbol,ExcursionSymbol=ExcursionSymbol)
-	InverseVariables = np.concatenate([	[sp.Symbol(AngleSymbol + str(i+1)) for i in range(n)], \
-										[sp.Symbol(MomentArmSymbol + '_' + str(el)) for el in it.product(range(1,n+1),range(1,m+1))], \
-										[sp.Symbol(ExcursionSymbol +'_'+str(i+1)) for i in range(m)]])
-	TgLg_inv = TgLh.subs([(str(Variables[i]),str(InverseVariables[i])) for i in range(len(Variables))])
+	TgLh = SymbolicLeftLiftedAction_WithoutPosition(m,n,AngleSymbol=Angle_h,MomentArmSymbol=MA_h,ExcursionSymbol=S_h)
+	h = SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol=Angle_h,MomentArmSymbol=MA_h,ExcursionSymbol=S_h)
+	h_tensor = ReturnSymbolicTensor(m,n,h)
+	Inverse_g = SymbolicInverseConfiguration_WithoutPosition(m,n,AngleSymbol=AngleSymbol,MomentArmSymbol=MomentArmSymbol,ExcursionSymbol=ExcursionSymbol)
+	Inverse_g_tensor = ReturnSymbolicTensor(m,n,Inverse_g)
+	TgLg_inv = TgLh.subs([(str(h_tensor[i]),str(Inverse_g_tensor[i])) for i in range(len(h_tensor))])
 	TeLg = TgLg_inv**-1
 	return(TeLg)
-
+def SymbolicTeRg(m,n,AngleSymbol='theta',MomentArmSymbol='r',ExcursionSymbol='s'):
+	import sympy as sp
+	import numpy as np
+	import itertools as it
+	if AngleSymbol == 'THETA': 
+		Angle_h = 'theta'
+	else:
+		Angle_h = 'THETA'
+	if MomentArmSymbol == 'R':
+		MA_h = 'r'
+	else:
+		MA_h = 'R'
+	if ExcursionSymbol == 'S':
+		S_h = 's'
+	else:
+		S_h = 'S'
+	TgRh = SymbolicRightLiftedAction_WithoutPosition(m,n,AngleSymbol=Angle_h,MomentArmSymbol=MA_h,ExcursionSymbol=S_h)
+	h = SymbolicConfiguration_WithoutPosition(m,n,AngleSymbol=Angle_h,MomentArmSymbol=MA_h,ExcursionSymbol=S_h)
+	h_tensor = ReturnSymbolicTensor(m,n,h)
+	Inverse_g = SymbolicInverseConfiguration_WithoutPosition(m,n,AngleSymbol=AngleSymbol,MomentArmSymbol=MomentArmSymbol,ExcursionSymbol=ExcursionSymbol)
+	Inverse_g_tensor = ReturnSymbolicTensor(m,n,Inverse_g)
+	TgRg_inv = TgRh.subs([(str(h_tensor[i]),str(Inverse_g_tensor[i])) for i in range(len(h_tensor))])
+	TeRg = TgRg_inv**-1
+	return(TeRg)
