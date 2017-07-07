@@ -37,7 +37,7 @@ def statusbar(i,N,**kwargs):
 	else:
 		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete           \r',end = '')
 
-def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,8],plot=False):
+def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,8],plot=False,range_of_motion=[[0,170],[-75,60]]):
 	import numpy as np
 	from numpy import pi 
 	from math import cos, sin, acos, asin
@@ -70,7 +70,8 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,8],plot=False):
 		x = X[0]
 		y = X[1]
 		output = acos(((x-l1*cos(theta1))**2 + (y-l1*sin(theta1))**2 - l2**2 - l3**2)/(2*l2*l3))
-		return(output*180/pi)
+		output=output*180/pi
+		return(output)
 
 	def find_beta(X,theta1,theta3,l1,l3):
 		theta1 = theta1*pi/180
@@ -86,7 +87,8 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,8],plot=False):
 		x = X[0]
 		y = X[1]
 		output = acos((x*cos(theta1+beta)+y*sin(theta1+beta)-l1*cos(beta))/(((x-l1*cos(theta1))**2 + (y - l1*sin(theta1))**2)**0.5))+2*beta
-		return(output*180/pi)
+		output = output*180/pi
+		return(output)
 
 	x,y = X[0],X[1]
 	diagonal = ((x-l1*cos(theta1))**2 + (y - l1*sin(theta1))**2)**0.5
@@ -116,7 +118,21 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,8],plot=False):
 			title = "beta: " +"{0:.2f}".format(beta)+", theta 1: " +"{0:.2f}".format(theta1)+ ", theta 2: " +"{0:.2f}".format(theta2)+ ", theta3: " +"{0:.2f}".format(theta3)
 			quick_2D_plot_tool(ax,"X","Y",title)
 			plt.show()
-		return([theta1,theta2,theta3],[theta1,theta2_alt,theta3_alt])
+		if theta2<range_of_motion[0][0] or theta2>range_of_motion[0][1]:
+			Config1 = [None,None,None]
+		elif theta3<range_of_motion[1][0] or theta3>range_of_motion[1][1]:
+			Config1 = [None,None,None]
+		else:
+			Config1 = [theta1,theta2,theta3]
+
+		if theta2_alt<range_of_motion[0][0] or theta2_alt>range_of_motion[0][1]:
+			Config2 = [None,None,None]
+		elif theta3_alt<range_of_motion[1][0] or theta3_alt>range_of_motion[1][1]:
+			Config2 = [None,None,None]
+		else:
+			Config2 = [theta1,theta2_alt,theta3_alt]	
+
+		return(Config1,Config2)
 	except ValueError:
 		# pass
 		return([None,None,None],[None,None,None])
@@ -160,33 +176,44 @@ def quick_2D_plot_tool(ax,xlabel,ylabel,title):
 
 X = find_X_values(reaching_angle=45)
 total = []
-angle1 = np.arange(20,65,0.1)
+angle1 = np.arange(0,130,0.1)
 StartTime = time.time()
-for j in range(len(angle1)):
-	statusbar(j,len(angle1),StartTime=StartTime,Title='45 Degree Reach')
+for i in range(np.shape(X)[1]):
+	statusbar(i,np.shape(X)[1],StartTime=StartTime,Title='45 Degree Reach')
 	total_in_trial = []
-	for i in range(np.shape(X)[1]):
+	for j in range(len(angle1)):
 		config1,config2 = planar_3dof_arm(theta1=angle1[j],X=X[:,i])
-		if config1 != [None,None,None] and config2 !=[None,None,None]:
-			total_in_trial.append([config1,config2])
+		if config1 != [None,None,None]:
+			total_in_trial.append([config1])
+		if config2 != [None,None,None]:
+			total_in_trial.append([config2])
 	if total_in_trial != []: total.append(total_in_trial)
 
-test = np.array(total[3]).T[:,0,:]
+
 
 l1,l2,l3 = 4*2**0.5,4,4
 limb_x = lambda theta: np.cumsum([0,l1*cos(pi*theta[0]/180),l2*cos(pi*theta[0]/180+pi*theta[1]/180),l3*cos(pi*theta[0]/180+pi*theta[1]/180+pi*theta[2]/180)])
 limb_y = lambda theta: np.cumsum([0,l1*sin(pi*theta[0]/180),l2*sin(pi*theta[0]/180+pi*theta[1]/180),l3*sin(pi*theta[0]/180+pi*theta[1]/180+pi*theta[2]/180)])
 
-fig, ax = plt.subplots()
-ax = plt.axes(xlim=(0, 5), ylim=(-1, 12))
-line, = ax.plot(limb_x(test[:,0]),limb_y(test[:,0]),'k',lw=2,marker = 'o',markersize = 10)
-# initialization function: plot the background of each frame
-def init():
-    line.set_data([], [])
-    return line,
-def animate(i):
-	line.set_data(limb_x(test[:,i*400]),limb_y(test[:,i*400]))
-	return(line,)
-quick_2D_plot_tool(ax,"X","Y",title=None)
-ani = animation.FuncAnimation(fig, animate, init_func=init,frames = int(np.shape(total[3])[0]/400), interval=20,blit=True)
+# test = np.array(total[3]).T[:,0,:]
+# fig, ax = plt.subplots()
+# ax = plt.axes(xlim=(0, 5), ylim=(-1, 12))
+# line, = ax.plot(limb_x(test[:,0]),limb_y(test[:,0]),'k',lw=2,marker = 'o',markersize = 10)
+# # initialization function: plot the background of each frame
+# def init():
+#     line.set_data([], [])
+#     return line,
+# def animate(i):
+# 	line.set_data(limb_x(test[:,i*400]),limb_y(test[:,i*400]))
+# 	return(line,)
+# quick_2D_plot_tool(ax,"X","Y",title=None)
+# ani = animation.FuncAnimation(fig, animate, init_func=init,frames = int(np.shape(total[3])[0]/400), interval=20,blit=True)
+# plt.show()
+
+testnumber = 0
+plt.figure()
+ax = plt.gca()
+test = np.concatenate(total[testnumber],axis=0)
+[plt.plot(limb_x(test[i,:]),limb_y(test[i,:]),'k',lw=2,marker='o',markersize=10) for i in range(np.shape(test)[0])]
+quick_2D_plot_tool(ax=ax,title="Test for single posture",xlabel='X',ylabel='Y')
 plt.show()
