@@ -184,9 +184,9 @@ for i in range(np.shape(X)[1]):
 	for j in range(len(angle1)):
 		config1,config2 = planar_3dof_arm(theta1=angle1[j],X=X[:,i])
 		if config1 != [None,None,None]:
-			total_in_trial.append([config1])
+			total_in_trial.append([config1.append(i/np.shape(X)[1])])
 		if config2 != [None,None,None]:
-			total_in_trial.append([config2])
+			total_in_trial.append([config2.append(i/np.shape(X)[1])])
 	if total_in_trial != []: total.append(total_in_trial)
 
 
@@ -216,4 +216,22 @@ ax = plt.gca()
 test = np.concatenate(total[testnumber],axis=0)
 [plt.plot(limb_x(test[i,:]),limb_y(test[i,:]),'k',lw=2,marker='o',markersize=10) for i in range(np.shape(test)[0])]
 quick_2D_plot_tool(ax=ax,title="Test for single posture",xlabel='X',ylabel='Y')
+# plt.show()
+
+[concat_test=[np.concatenate(total[i],axis=0) for i in range(np.shape(total)[0])] 
+concat_test=np.concatenate(concat_test)
+
+from mpl_toolkits.mplot3d import Axes3D
+import random
+
+random.seed()
+sample_index=random.sample(range(np.shape(concat_test)[0]),10000)
+
+fig2 = plt.figure()
+ax2 = fig2.add_subplot(111,projection= '3d')
+ax2.scatter(concat_test[sample_index,0],concat_test[sample_index,1],concat_test[sample_index,2]) 
+ax2.set_ylabel('Elbow')    
+ax2.set_xlabel('Shoulder')   
+ax2.set_zlabel('Wrist') 
+     
 plt.show()
