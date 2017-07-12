@@ -37,7 +37,7 @@ def statusbar(i,N,**kwargs):
 	else:
 		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete           \r',end = '')
 
-def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of_motion=[[0,170],[-75,60]]):
+def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of_motion=[[0,170],[-75,60]],depth=20):
 	import numpy as np
 	from numpy import pi 
 	from math import cos, sin, acos, asin
@@ -65,18 +65,18 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of
 	def plot_results(ax,X,Y,color):
 		ax.plot(X,Y,color,lw = 2)
 
-	def find_theta3(X,theta1,l1,l2,l3):
+	def find_theta3(X,theta1,l1,l2,l3,depth):
 		theta1 = theta1*pi/180
 		x = X[0]
 		y = X[1]
-		if ((x-l1*cos(theta1))**2 + (y-l1*sin(theta1))**2)**0.5 - l2 - l3 == 0: 
+		if ((x-l1*cos(theta1))**2 + (y+depth-l1*sin(theta1))**2)**0.5 - l2 - l3 == 0: 
 			output = 0
 		else:
-			output = acos(((x-l1*cos(theta1))**2 + (y-l1*sin(theta1))**2 - l2**2 - l3**2)/(2*l2*l3))
+			output = acos(((x-l1*cos(theta1))**2 + (y+depth-l1*sin(theta1))**2 - l2**2 - l3**2)/(2*l2*l3))
 		output=output*180/pi
 		return(output)
 
-	def find_beta(X,theta1,theta3,l1,l3):
+	def find_beta(X,theta1,theta3,l1,l3,depth):
 		theta1 = theta1*pi/180
 		theta3 = theta3*pi/180
 		x = X[0]
@@ -84,29 +84,35 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of
 		if theta3 == 0:
 			output = 0
 		else:
-			output = asin(l3*sin(pi-theta3)/(((x-l1*cos(theta1))**2 + (y - l1*sin(theta1))**2)**0.5))
+			output = asin(l3*sin(pi-theta3)/(((x-l1*cos(theta1))**2 + (y+depth-l1*sin(theta1))**2)**0.5))
 		return(output*180/pi)
 
-	def find_theta2(X,theta1,beta,l1):
+	def find_theta2(X,theta1,beta,l1,depth):
 		theta1 = theta1*pi/180
 		beta = beta*pi/180
 		x = X[0]
 		y = X[1]
+		diagonal = ((x-l1*cos(theta1))**2 + (y-(-depth+l1*sin(theta1)))**2)**0.5
 		# output = acos((x*cos(theta1+beta)+y*sin(theta1+beta)-l1*cos(beta))/(((x-l1*cos(theta1))**2 + (y - l1*sin(theta1))**2)**0.5))-2*beta
-		output = asin((y*cos(theta1)-x*sin(theta1))/(((x-l1*cos(theta1))**2 + (y - l1*sin(theta1))**2)**0.5))-beta
+		# output = asin((y*cos(theta1)-x*sin(theta1)+depth*cos(theta1))/diagonal)-beta
+		output = acos((depth*sin(theta1)-l1+y*sin(theta1)+x*cos(theta1))/diagonal)-beta
 		output = output*180/pi
 		return(output)
 
 	x,y = X[0],X[1]
-	diagonal = ((x-l1*cos(pi*theta1/180))**2 + (y - l1*sin(pi*theta1/180))**2)**0.5
+	diagonal = ((x-l1*cos(pi*theta1/180))**2 + (y+depth-l1*sin(pi*theta1/180))**2)**0.5
 	# if diagonal < abs(l2-l3) or diagonal > l2+l3:
 	if diagonal > l2+l3:
 		return([None,None,None],[None,None,None])
 	else:
 		try:
-			theta3 = find_theta3(X,theta1,l1,l2,l3)
-			beta = find_beta(X,theta1,theta3,l1,l3)
-			theta2 = find_theta2(X,theta1,beta,l1)
+			theta3 = find_theta3(X,theta1,l1,l2,l3,depth)
+			beta = find_beta(X,theta1,theta3,l1,l3,depth)
+			theta2 = find_theta2(X,theta1,beta,l1,depth)
+
+			if abs(l1*cos(pi*theta1/180)+l2*cos(pi*theta1/180+pi*theta2/180)+l3*cos(pi*theta1/180+pi*theta2/180+pi*theta3/180)-x)>0.01:
+				theta2=-(theta2+2*beta)
+				theta3=-theta3
 
 			if theta3 != 0:
 				theta3_alt = -theta3
@@ -114,9 +120,9 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of
 
 			if plot==True:
 				limb_x = np.cumsum([0,l1*cos(pi*theta1/180),l2*cos(pi*theta1/180+pi*theta2/180),l3*cos(pi*theta1/180+pi*theta2/180+pi*theta3/180)])
-				limb_y = np.cumsum([0,l1*sin(pi*theta1/180),l2*sin(pi*theta1/180+pi*theta2/180),l3*sin(pi*theta1/180+pi*theta2/180+pi*theta3/180)])
+				limb_y = np.cumsum([-depth,l1*sin(pi*theta1/180),l2*sin(pi*theta1/180+pi*theta2/180),l3*sin(pi*theta1/180+pi*theta2/180+pi*theta3/180)])
 				limb_x_alt = np.cumsum([l1*cos(pi*theta1/180),l2*cos(pi*theta1/180+pi*theta2_alt/180),l3*cos(pi*theta1/180+pi*theta2_alt/180+pi*theta3_alt/180)])
-				limb_y_alt = np.cumsum([l1*sin(pi*theta1/180),l2*sin(pi*theta1/180+pi*theta2_alt/180),l3*sin(pi*theta1/180+pi*theta2_alt/180+pi*theta3_alt/180)])
+				limb_y_alt = np.cumsum([-depth + l1*sin(pi*theta1/180),l2*sin(pi*theta1/180+pi*theta2_alt/180),l3*sin(pi*theta1/180+pi*theta2_alt/180+pi*theta3_alt/180)])
 
 				# ipdb.set_trace()
 				assert np.sum(np.array([limb_x[-1],limb_y[-1]])-np.array([float(el) for el in X]))<0.0001, "Endpoints do not match."
@@ -148,21 +154,20 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of
 			# pass
 			return([None,None,None],[None,None,None])
 
-def find_X_values(reaching_angle=0):
+def find_X_values(x_final):
 	import numpy as np 
 	from numpy import pi
 	from math import sin, cos
-	reaching_angle=reaching_angle*pi/180
-	x = np.array([np.arange(0,10,0.001)])
-	y = np.array([[0]*len(x[0])])
-	X_default = np.concatenate((x,y),axis=0)
-	R = np.matrix([[cos(reaching_angle),-sin(reaching_angle)],[sin(reaching_angle),cos(reaching_angle)]])
-	X = R*X_default + np.concatenate((np.array([[0]*len(x[0])]),np.array([[8]*len(y[0])])),axis=0)
+	t = np.arange(0,1.0001,0.001)
+	x = -x_final[0]*(15*t**4-6*t**5-10*t**3)
+	y = -x_final[1]*(15*t**4-6*t**5-10*t**3)
+	X = np.concatenate(([x],[y]),axis=0)
 	return(np.array(X))
 
 import numpy as np
 from numpy import pi
 from math import cos, sin
+import random
 import matplotlib.pyplot as plt 
 import matplotlib.animation as animation
 import time
@@ -185,16 +190,24 @@ def quick_2D_plot_tool(ax,xlabel,ylabel,title):
 	ax.set_title(title)
 	ax.set_aspect('equal','datalim')
 
-X = find_X_values(reaching_angle=45)
+X = find_X_values([0,-20])
 total = []
 angle1 = np.arange(0,120,0.01)
 movement_length = np.shape(X)[1]
 StartTime = time.time()
+
+HeightInInches = 71
+Height = HeightInInches*2.54
+l1 = 0.186*Height
+l2 = 0.146*Height
+HandLength = 0.108*Height
+l3 = HandLength/2
+reaching_depth = 40
 for i in range(movement_length):
 	statusbar(i,movement_length,StartTime=StartTime,Title='45 Degree Reach')
 	total_in_trial = []
 	for j in range(len(angle1)):
-		config1,config2 = planar_3dof_arm(theta1=angle1[j],X=X[:,i])
+		config1,config2 = planar_3dof_arm(theta1=angle1[j],X=X[:,i],l1=l1,l2=l2,l3=l3,depth=reaching_depth)
 		if config1 != [None,None,None]:
 			config1.append(i/movement_length)
 			total_in_trial.append([config1])
@@ -203,17 +216,9 @@ for i in range(movement_length):
 			total_in_trial.append([config2])
 	if total_in_trial != []: total.append(total_in_trial)
 
-
-HeightInInches = 71
-Height = HeightInInches*2.54
-l1 = 0.186*Height
-l2 = 0.146*Height
-HandLength = 0.108*Height
-l3 = HandLength/2
-
 # l1,l2,l3 = 4*2**0.5,4,4
 limb_x = lambda theta: np.cumsum([0,l1*cos(pi*theta[0]/180),l2*cos(pi*theta[0]/180+pi*theta[1]/180),l3*cos(pi*theta[0]/180+pi*theta[1]/180+pi*theta[2]/180)])
-limb_y = lambda theta: np.cumsum([0,l1*sin(pi*theta[0]/180),l2*sin(pi*theta[0]/180+pi*theta[1]/180),l3*sin(pi*theta[0]/180+pi*theta[1]/180+pi*theta[2]/180)])
+limb_y = lambda theta: np.cumsum([-reaching_depth,l1*sin(pi*theta[0]/180),l2*sin(pi*theta[0]/180+pi*theta[1]/180),l3*sin(pi*theta[0]/180+pi*theta[1]/180+pi*theta[2]/180)])
 
 # test = np.array(total[3]).T[:,0,:]
 # fig, ax = plt.subplots()
@@ -247,7 +252,7 @@ concat_test=np.concatenate(concat_test)
 from mpl_toolkits.mplot3d import Axes3D
 
 random.seed()
-sample_index=random.sample(range(np.shape(concat_test)[0]),3000)
+sample_index=random.sample(range(np.shape(concat_test)[0]),5000)
 
 fig2 = plt.figure()
 ax2 = fig2.add_subplot(111,projection= '3d')
