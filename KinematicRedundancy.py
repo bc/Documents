@@ -23,7 +23,8 @@ def statusbar(i,N,**kwargs):
 	from scipy import interpolate
 	StartTime = kwargs.get("StartTime",False)
 	Title = kwargs.get("Title",'')
-
+	global time_array
+	global TimeLeft
 	assert type(i)==int, "i must be an int"
 	assert type(N)==int, "N must be an int"
 	assert N>i, "N must be greater than i"
@@ -34,8 +35,6 @@ def statusbar(i,N,**kwargs):
 	if Title != '': Title = ' '*(25-len(Title)) + Title + ': '
 	statusbar = Title +'[' + '\u25a0'*int((i+1)/(N/50)) + '\u25a1'*(50-int((i+1)/(N/50))) + '] '
 	if StartTime != False:
-		global time_array
-		global TimeLeft
 		if i==0:
 			time_array = []
 			TimeLeft = '--'
@@ -46,10 +45,9 @@ def statusbar(i,N,**kwargs):
 			time_array.append(time.time()-StartTime)
 			TimeLeft = '{0:1.1f}'.format(float(interpolate.interp1d(np.arange(len(time_array)),time_array,fill_value='extrapolate')(49)))
 		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) \
-			+ 'sec, (est. ' + TimeLeft + ' sec left)        \r', end='')
+			+ 'sec, (est. ' + TimeLeft,' sec left)		\r', end='')
 	else:
 		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete           \r',end = '')
-
 def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of_motion=[[0,170],[-75,60]],depth=20):
 	import numpy as np
 	from numpy import pi 
@@ -74,10 +72,6 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of
 		ax.set_ylabel(ylabel)
 		ax.set_title(title)
 		ax.set_aspect('equal','datalim')
-
-	def plot_results(ax,X,Y,color):
-		ax.plot(X,Y,color,lw = 2)
-
 	def find_theta3(X,theta1,l1,l2,l3,depth):
 		theta1 = theta1*pi/180
 		x = X[0]
@@ -88,7 +82,6 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of
 			output = acos(((x-l1*cos(theta1))**2 + (y+depth-l1*sin(theta1))**2 - l2**2 - l3**2)/(2*l2*l3))
 		output=output*180/pi
 		return(output)
-
 	def find_beta(X,theta1,theta3,l1,l3,depth):
 		theta1 = theta1*pi/180
 		theta3 = theta3*pi/180
@@ -99,7 +92,6 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of
 		else:
 			output = asin(l3*sin(pi-theta3)/(((x-l1*cos(theta1))**2 + (y+depth-l1*sin(theta1))**2)**0.5))
 		return(output*180/pi)
-
 	def find_theta2(X,theta1,beta,l1,depth):
 		theta1 = theta1*pi/180
 		beta = beta*pi/180
@@ -166,31 +158,21 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of
 		except ValueError:
 			# pass
 			return([None,None,None],[None,None,None])
-
-def find_X_values(x_final):
+def find_X_values(t,x_final):
 	import numpy as np 
 	from numpy import pi
 	from math import sin, cos
-	t = np.arange(0,1.1,0.1)
 	x = -x_final[0]*(15*t**4-6*t**5-10*t**3)
 	y = -x_final[1]*(15*t**4-6*t**5-10*t**3)
 	X = np.concatenate(([x],[y]),axis=0)
 	return(np.array(X))
-
-import numpy as np
-from numpy import pi
-from math import cos, sin
-import random
-import matplotlib.pyplot as plt 
-import matplotlib.animation as animation
-import time
-import ipdb
 def quick_2D_plot_tool(ax,xlabel,ylabel,title):
 	"""
 	This will take in the x and y labels as well as a figure title and
 	format an already established figure to remove the box, place the
 	tick marks outwards, and set aspect ratio to equal.
 	"""
+	import matplotlib.pyplot as plt 
 	ax = plt.gca()
 	ax.spines['left'].set_position('zero')
 	ax.spines['right'].set_color('none')
@@ -203,8 +185,19 @@ def quick_2D_plot_tool(ax,xlabel,ylabel,title):
 	ax.set_title(title)
 	ax.set_aspect('equal','datalim')
 
-X = find_X_values([0,-20])
-total2 = []
+import numpy as np
+from numpy import pi
+from math import cos, sin
+import random
+import matplotlib.pyplot as plt 
+import matplotlib.animation as animation
+import time
+import ipdb
+
+final_x = [0,-20]
+t = np.arange(0,1.1,0.1)
+X = find_X_values(t,final_x)
+all_configurations_at_step = []
 angle1 = np.arange(0,120,0.1)
 movement_length = np.shape(X)[1]
 StartTime = time.time()
@@ -220,7 +213,7 @@ for i in range(movement_length):
 	# statusbar(i,movement_length,StartTime=StartTime,Title='45 Degree Reach')
 	total_in_trial = []
 	for j in range(len(angle1)):
-		statusbar(len(angle1)*i+j,movement_length*len(angle1),StartTime=StartTime,Title='45 Degree Reach')
+		statusbar(len(angle1)*i+j,movement_length*len(angle1),StartTime=StartTime,Title='Reaching Task')
 		config1,config2 = planar_3dof_arm(theta1=angle1[j],X=X[:,i],l1=l1,l2=l2,l3=l3,depth=reaching_depth)
 		if config1 != [None,None,None]:
 			config1.append(i/(movement_length-1))
@@ -228,61 +221,18 @@ for i in range(movement_length):
 		if config2 != [None,None,None]:
 			config2.append(i/(movement_length-1))
 			total_in_trial.append([config2])
-	if total_in_trial != []: total2.append(total_in_trial)
-
+	if total_in_trial != []: all_configurations_at_step.append(total_in_trial)
+print('\n')
 # l1,l2,l3 = 4*2**0.5,4,4
 limb_x = lambda theta: np.cumsum([0,l1*cos(pi*theta[0]/180),l2*cos(pi*theta[0]/180+pi*theta[1]/180),l3*cos(pi*theta[0]/180+pi*theta[1]/180+pi*theta[2]/180)])
 limb_y = lambda theta: np.cumsum([-reaching_depth,l1*sin(pi*theta[0]/180),l2*sin(pi*theta[0]/180+pi*theta[1]/180),l3*sin(pi*theta[0]/180+pi*theta[1]/180+pi*theta[2]/180)])
+endpoint_x = lambda theta1,theta2,theta3: l1*cos(pi*theta1/180)+l2*cos(pi*theta1/180+pi*theta2/180)+l3*cos(pi*theta1/180+pi*theta2/180+pi*theta3/180)
+endpoint_y = lambda theta1,theta2,theta3: -reaching_depth+l1*sin(pi*theta1/180)+l2*sin(pi*theta1/180+pi*theta2/180)+l3*sin(pi*theta1/180+pi*theta2/180+pi*theta3/180)
 
-# test = np.array(total[3]).T[:,0,:]
-# fig, ax = plt.subplots()
-# ax = plt.axes(xlim=(0, 5), ylim=(-1, 12))
-# line, = ax.plot(limb_x(test[:,0]),limb_y(test[:,0]),'k',lw=2,marker = 'o',markersize = 10)
-# # initialization function: plot the background of each frame
-# def init():
-#     line.set_data([], [])
-#     return line,
-# def animate(i):
-# 	line.set_data(limb_x(test[:,i*400]),limb_y(test[:,i*400]))
-# 	return(line,)
-# quick_2D_plot_tool(ax,"X","Y",title=None)
-# ani = animation.FuncAnimation(fig, animate, init_func=init,frames = int(np.shape(total[3])[0]/400), interval=20,blit=True)
-# plt.show()
-# import random
-# random.seed()
-
-# # testnumber = 0
-# testnumber = random.randint(0,len(total))
-# plt.figure()
-# ax = plt.gca()
-# test = np.concatenate(total[testnumber],axis=0)
-# [plt.plot(limb_x(test[i,:]),limb_y(test[i,:]),'k',lw=2,marker='o',markersize=10) for i in range(np.shape(test)[0])]
-# quick_2D_plot_tool(ax=ax,title="Test for single posture",xlabel='X',ylabel='Y')
-# # plt.show()
-
-# concat_test=[np.concatenate(total[i],axis=0) for i in range(np.shape(total)[0])] 
-# concat_test=np.concatenate(concat_test)
-
-# from mpl_toolkits.mplot3d import Axes3D
-
-# random.seed()
-# sample_index=random.sample(range(np.shape(concat_test)[0]),5000)
-
-# fig2 = plt.figure()
-# ax2 = fig2.add_subplot(111,projection= '3d')
-# scatterplot = ax2.scatter(concat_test[sample_index,0],concat_test[sample_index,1],concat_test[sample_index,2],c=concat_test[sample_index,3]) 
-# ax2.set_ylabel('Elbow')    
-# ax2.set_xlabel('Shoulder')   
-# ax2.set_zlabel('Wrist') 
-# fig2.colorbar(scatterplot)
-     
-# plt.show()
-
-def find_X_dot_values(x_final):
+def find_X_dot_values(t,x_final):
 	import numpy as np 
 	from numpy import pi
 	from math import sin, cos
-	t = np.arange(0,1.1,0.1)
 	x = -x_final[0]*(60*t**3-30*t**4-30*t**2)
 	y = -x_final[1]*(60*t**3-30*t**4-30*t**2)
 	X = np.concatenate(([x],[y]),axis=0)
@@ -297,16 +247,20 @@ def jacobian(theta,l1,l2,l3):
 	return(J)
 def is_acceptable_joint_velocity(next_X_dot,current_theta,next_theta,l1,l2,l3):
 	current_theta,next_theta = np.array(current_theta),np.array(next_theta)
-	delta_t = next_theta[0,3]-current_theta[0,3]
+	# because X_dot is a function of unitless time we do not need to make theta_dot a function of time.
+	delta_t = (next_theta[0,3]-current_theta[0,3])
 	theta_dot = np.array([[next_theta[0,0]-current_theta[0,0]],[next_theta[0,1]-current_theta[0,1]],[next_theta[0,2]-current_theta[0,2]]])*(1/delta_t)
 	J = jacobian(next_theta[0,:3],l1,l2,l3)
 	X_dot = np.array([[next_X_dot[0]],[next_X_dot[1]]])
-	result = ((J*theta_dot-X_dot)<0.001).all()
+	result = ((J*theta_dot-X_dot)<0.01).all()
 	return(result)
 def return_allowable_jump_indices(current,all_possible_next,X_dot,l1,l2,l3):
 	import numpy as np
 	from itertools import compress
-	is_jump_acceptable = np.array([((np.array(current)-np.array(el))<3.84).all() for el in all_possible_next])
+	delta_t = (all_possible_next[0][0][3]-current[0][3])*0.5
+	maximum_degrees_per_second =  13.4*180/np.pi
+	maximum_degrees_per_timestep = maximum_degrees_per_second*delta_t
+	is_jump_acceptable = np.array([((np.array(current)-np.array(el))<maximum_degrees_per_timestep).all() for el in all_possible_next])
 	allowable_jump_indices = list(compress(range(len(is_jump_acceptable)), is_jump_acceptable))
 	if allowable_jump_indices != []:
 		allowable_jumps = np.array([all_possible_next[el] for el in allowable_jump_indices])
@@ -318,12 +272,122 @@ def return_allowable_jump_indices(current,all_possible_next,X_dot,l1,l2,l3):
 		return(with_correct_velocity_index)
 	else:
 		return([])
-X_dot = find_X_dot_values([0,-20])
-trajectories = []
-for i in range(len(total2)-1):
+from itertools import compress
+X_dot = find_X_dot_values(t,final_x)
+jump_indices_for_step = []
+postures_per_position = [len(all_configurations_at_step[i]) for i in range(len(all_configurations_at_step)-1)]
+total_postures = int(sum(postures_per_position))
+StartTime = time.time()
+count = 0
+for i in range(len(all_configurations_at_step)-1):	
 	allowable_jump_indices = []
-	statusbar(i,len(total2)-1)
-	for j in range(len(total2[i])):
-		allowable_jump_indices.append(return_allowable_jump_indices(total2[i][j],total2[i+1],X_dot.T[i+1],l1,l2,l3))
-	trajectories.append(allowable_jump_indices)
+	for j in range(len(all_configurations_at_step[i])):
+		statusbar(count,total_postures,Title='Find Jumps',StartTime=StartTime)
+		allowable_jump_indices.append(return_allowable_jump_indices(all_configurations_at_step[i][j],all_configurations_at_step[i+1],X_dot.T[i+1],l1,l2,l3))
+		count+=1
+	jump_indices_for_step.append(allowable_jump_indices)
+print('\n')
+random_trajectories = []
+StartTime=time.time()
+for j in range(100):
+	statusbar(j,100,Title='Find Trajectories',StartTime=StartTime)
+	start_over = True
+	while start_over == True:
+		next_is_empty = True
+		# Testing starting index value for dead ends
+		while next_is_empty == True:
+			assert not all([jump_indices_for_step[0][i] == [] for i in range(len(jump_indices_for_step[0]))]), "No viable starting postures. Consider finer deltas."
+			starting_index = random.choice(range(len(jump_indices_for_step[0])))
+			possible_trajectory = [starting_index]
+			if jump_indices_for_step[0][starting_index] != []:
+				next_index = starting_index
+				next_is_empty = False
+		# Generating random steps along the trajectory
+		for i in range(len(X.T)-1):
+			jumps = jump_indices_for_step[i][next_index]
+			# Testing each possible jump for dead ends on the next step
+			# Does not apply to last step as there is no additional step afterwards
+			if i < len(X.T)-2:
+				dead_end_jumps = np.array([jump_indices_for_step[i+1][el]==[] for el in jumps])
+				possible_jumps = [jumps[el] for el in list(compress(range(len(~dead_end_jumps)),~dead_end_jumps))]
+				if possible_jumps == []:
+					print("No trajectory could be made. Complete: " + str(len(possible_trajectory)/len(X.T)))
+					start_over = True
+					dead_end = True
+					break
+				else:
+					next_index = random.choice(possible_jumps)
+					possible_trajectory.append(next_index)
+			# Last step
+			else:
+				possible_jumps = jump_indices_for_step[i][next_index]
+				next_index = random.choice(possible_jumps)
+				possible_trajectory.append(next_index)
+		# Testing to make sure the index list has the same length as the trajectory
+		if len(possible_trajectory)==len(X.T): 
+			start_over=False
+			random_trajectories.append(possible_trajectory)
+		else:
+			print("something fishy going on here...")
+random_configuration_trajectories = [np.concatenate(([all_configurations_at_step[i][random_trajectories[j][i]] for i in range(len(X.T))]),axis=0).T for j in range(len(random_trajectories))]
 
+
+# fig, ax = plt.subplots()
+# ax = plt.axes(xlim=(-40, 40), ylim=(-45, 25))
+# line, = ax.plot(limb_x(random_configuration_trajectories[0][:3,0]),\
+# 				limb_y(random_configuration_trajectories[0][:3,0]),'k',lw=2,marker = 'o',markersize = 10)
+# # initialization function: plot the background of each frame
+# def init():
+#     line.set_data([], [])
+#     return line,
+# def animate(i):
+# 	line.set_data(limb_x(random_configuration_trajectories[0][:3,i]),\
+# 		limb_y(random_configuration_trajectories[0][:3,i]))
+# 	return(line,)
+# quick_2D_plot_tool(ax,"X","Y",title=None)
+# ani = animation.FuncAnimation(fig, animate, init_func=init,frames = 11, interval=20,blit=True)
+# plt.show()
+
+# random.seed()
+
+# # testnumber = 0
+# testnumber = random.randint(0,len(total))
+# plt.figure()
+# ax = plt.gca()
+# test = np.concatenate(total[testnumber],axis=0)
+# [plt.plot(limb_x(test[i,:]),limb_y(test[i,:]),'k',lw=2,marker='o',markersize=10) for i in range(np.shape(test)[0])]
+# quick_2D_plot_tool(ax=ax,title="Test for single posture",xlabel='X',ylabel='Y')
+# # plt.show()
+
+concat_test=[np.concatenate(all_configurations_at_step[i],axis=0) for i in range(np.shape(all_configurations_at_step)[0])] 
+concat_test=np.concatenate(concat_test)
+
+from mpl_toolkits.mplot3d import Axes3D
+
+random.seed()
+sample_index=random.sample(range(np.shape(concat_test)[0]),1000)
+
+fig2 = plt.figure()
+ax2 = fig2.add_subplot(111,projection= '3d')
+scatterplot = ax2.scatter(concat_test[sample_index,0],concat_test[sample_index,1],concat_test[sample_index,2],\
+				c=concat_test[sample_index,3]) 
+ax2.set_ylabel('Elbow')    
+ax2.set_xlabel('Shoulder')   
+ax2.set_zlabel('Wrist') 
+fig2.colorbar(scatterplot)
+
+fig3 = plt.figure()
+ax3 = fig3.add_subplot(111,projection= '3d')
+# trisurf = ax3.plot_trisurf(concat_test[sample_index,0],concat_test[sample_index,1],concat_test[sample_index,2]) 
+scatterplot2 = ax3.scatter(concat_test[sample_index,0],concat_test[sample_index,1],concat_test[sample_index,2],\
+				c=concat_test[sample_index,3]) 
+[ax3.plot(random_configuration_trajectories[i][0],\
+			random_configuration_trajectories[i][1],\
+			random_configuration_trajectories[i][2],\
+			'k') for i in range(100)]
+ax3.set_ylabel('Elbow')    
+ax3.set_xlabel('Shoulder')   
+ax3.set_zlabel('Wrist') 
+fig3.colorbar(scatterplot2)
+ 
+plt.show()
