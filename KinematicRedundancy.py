@@ -31,8 +31,8 @@ def statusbar(i,N,**kwargs):
 	assert N>0, "N must be a positive integer"
 	assert i>=0, "i must not be negative (can be zero)"
 	assert type(Title) == str, "Title should be a string"
-	assert len(Title) <= 25, "Title should be less than 25 characters"
-	if Title != '': Title = ' '*(25-len(Title)) + Title + ': '
+	assert len(Title) <= 22, "Title should be less than 25 characters"
+	if Title != '': Title = ' '*(22-len(Title)) + Title + ': '
 	statusbar = Title +'[' + '\u25a0'*int((i+1)/(N/50)) + '\u25a1'*(50-int((i+1)/(N/50))) + '] '
 	if StartTime != False:
 		if i==0:
@@ -160,8 +160,6 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of
 			return([None,None,None],[None,None,None])
 def find_X_values(t,x_final):
 	import numpy as np 
-	from numpy import pi
-	from math import sin, cos
 	x = -x_final[0]*(15*t**4-6*t**5-10*t**3)
 	y = -x_final[1]*(15*t**4-6*t**5-10*t**3)
 	X = np.concatenate(([x],[y]),axis=0)
@@ -184,55 +182,8 @@ def quick_2D_plot_tool(ax,xlabel,ylabel,title):
 	ax.set_ylabel(ylabel)
 	ax.set_title(title)
 	ax.set_aspect('equal','datalim')
-
-import numpy as np
-from numpy import pi
-from math import cos, sin
-import random
-import matplotlib.pyplot as plt 
-import matplotlib.animation as animation
-import time
-import ipdb
-
-final_x = [0,-20]
-t = np.arange(0,1.1,0.1)
-X = find_X_values(t,final_x)
-all_configurations_at_step = []
-angle1 = np.arange(0,120,0.1)
-movement_length = np.shape(X)[1]
-StartTime = time.time()
-
-HeightInInches = 71
-Height = HeightInInches*2.54
-l1 = 0.186*Height
-l2 = 0.146*Height
-HandLength = 0.108*Height
-l3 = HandLength/2
-reaching_depth = 40
-for i in range(movement_length):
-	# statusbar(i,movement_length,StartTime=StartTime,Title='45 Degree Reach')
-	total_in_trial = []
-	for j in range(len(angle1)):
-		statusbar(len(angle1)*i+j,movement_length*len(angle1),StartTime=StartTime,Title='Reaching Task')
-		config1,config2 = planar_3dof_arm(theta1=angle1[j],X=X[:,i],l1=l1,l2=l2,l3=l3,depth=reaching_depth)
-		if config1 != [None,None,None]:
-			config1.append(i/(movement_length-1))
-			total_in_trial.append([config1])
-		if config2 != [None,None,None]:
-			config2.append(i/(movement_length-1))
-			total_in_trial.append([config2])
-	if total_in_trial != []: all_configurations_at_step.append(total_in_trial)
-print('\n')
-# l1,l2,l3 = 4*2**0.5,4,4
-limb_x = lambda theta: np.cumsum([0,l1*cos(pi*theta[0]/180),l2*cos(pi*theta[0]/180+pi*theta[1]/180),l3*cos(pi*theta[0]/180+pi*theta[1]/180+pi*theta[2]/180)])
-limb_y = lambda theta: np.cumsum([-reaching_depth,l1*sin(pi*theta[0]/180),l2*sin(pi*theta[0]/180+pi*theta[1]/180),l3*sin(pi*theta[0]/180+pi*theta[1]/180+pi*theta[2]/180)])
-endpoint_x = lambda theta1,theta2,theta3: l1*cos(pi*theta1/180)+l2*cos(pi*theta1/180+pi*theta2/180)+l3*cos(pi*theta1/180+pi*theta2/180+pi*theta3/180)
-endpoint_y = lambda theta1,theta2,theta3: -reaching_depth+l1*sin(pi*theta1/180)+l2*sin(pi*theta1/180+pi*theta2/180)+l3*sin(pi*theta1/180+pi*theta2/180+pi*theta3/180)
-
 def find_X_dot_values(t,x_final):
 	import numpy as np 
-	from numpy import pi
-	from math import sin, cos
 	x = -x_final[0]*(60*t**3-30*t**4-30*t**2)
 	y = -x_final[1]*(60*t**3-30*t**4-30*t**2)
 	X = np.concatenate(([x],[y]),axis=0)
@@ -252,19 +203,19 @@ def is_acceptable_joint_velocity(next_X_dot,current_theta,next_theta,l1,l2,l3):
 	theta_dot = np.array([[next_theta[0,0]-current_theta[0,0]],[next_theta[0,1]-current_theta[0,1]],[next_theta[0,2]-current_theta[0,2]]])*(1/delta_t)
 	J = jacobian(next_theta[0,:3],l1,l2,l3)
 	X_dot = np.array([[next_X_dot[0]],[next_X_dot[1]]])
-	result = ((J*theta_dot-X_dot)<0.01).all()
+	result = (abs((J*theta_dot/0.5-np.matrix(X_dot).T))<.1).all()
 	return(result)
-def return_allowable_jump_indices(current,all_possible_next,X_dot,l1,l2,l3):
+def return_allowable_jump_indices(delta_t,current,all_possible_next,X_dot,l1,l2,l3):
 	import numpy as np
 	from itertools import compress
-	delta_t = (all_possible_next[0][0][3]-current[0][3])*0.5
 	maximum_degrees_per_second =  13.4*180/np.pi
-	maximum_degrees_per_timestep = maximum_degrees_per_second*delta_t
-	is_jump_acceptable = np.array([((np.array(current)-np.array(el))<maximum_degrees_per_timestep).all() for el in all_possible_next])
+	maximum_degrees_per_timestep = maximum_degrees_per_second*(0.5*delta_t)
+	is_jump_acceptable = np.array([(np.abs((np.array(current)-np.array(el)))<maximum_degrees_per_timestep).all() for el in all_possible_next])
 	allowable_jump_indices = list(compress(range(len(is_jump_acceptable)), is_jump_acceptable))
 	if allowable_jump_indices != []:
 		allowable_jumps = np.array([all_possible_next[el] for el in allowable_jump_indices])
 		# ipdb.set_trace()
+		# with_correct_velocity_index=allowable_jump_indices
 		with_correct_velocity_index = []
 		for i in range(len(allowable_jumps)):
 			if is_acceptable_joint_velocity(X_dot,current,allowable_jumps[i],l1,l2,l3):
@@ -272,31 +223,87 @@ def return_allowable_jump_indices(current,all_possible_next,X_dot,l1,l2,l3):
 		return(with_correct_velocity_index)
 	else:
 		return([])
+
+import numpy as np
+from numpy import pi
+from math import cos, sin
+import random
+import matplotlib.pyplot as plt 
+import matplotlib.animation as animation
+import time
+import ipdb
 from itertools import compress
+from mpl_toolkits.mplot3d import Axes3D
+
+final_x = [0,-20]
+delta_t = 0.1
+t = np.arange(0,1+delta_t,delta_t)
+X = find_X_values(t,final_x)
+all_configurations_at_step = []
+angle1 = np.arange(0,120,0.1)
+movement_length = np.shape(X)[1]
+StartTime = time.time()
+
+HeightInInches = 71
+Height = HeightInInches*2.54
+l1 = 0.186*Height
+l2 = 0.146*Height
+HandLength = 0.108*Height
+l3 = HandLength/2
+reaching_depth = 40
+# l1,l2,l3 = 4*2**0.5,4,4
+
+limb_x = lambda theta: np.cumsum([0,l1*cos(pi*theta[0]/180),l2*cos(pi*theta[0]/180+pi*theta[1]/180),l3*cos(pi*theta[0]/180+pi*theta[1]/180+pi*theta[2]/180)])
+limb_y = lambda theta: np.cumsum([-reaching_depth,l1*sin(pi*theta[0]/180),l2*sin(pi*theta[0]/180+pi*theta[1]/180),l3*sin(pi*theta[0]/180+pi*theta[1]/180+pi*theta[2]/180)])
+endpoint_x = lambda theta1,theta2,theta3: l1*cos(pi*theta1/180)+l2*cos(pi*theta1/180+pi*theta2/180)+l3*cos(pi*theta1/180+pi*theta2/180+pi*theta3/180)
+endpoint_y = lambda theta1,theta2,theta3: -reaching_depth+l1*sin(pi*theta1/180)+l2*sin(pi*theta1/180+pi*theta2/180)+l3*sin(pi*theta1/180+pi*theta2/180+pi*theta3/180)
+
+for i in range(movement_length):
+	total_in_trial = []
+	for j in range(len(angle1)):
+		statusbar(len(angle1)*i+j,movement_length*len(angle1),StartTime=StartTime,Title='Reaching Task')
+		config1,config2 = planar_3dof_arm(theta1=angle1[j],X=X[:,i],l1=l1,l2=l2,l3=l3,depth=reaching_depth)
+		if config1 != [None,None,None]:
+			config1.append(i/(movement_length-1))
+			total_in_trial.append([config1])
+		if config2 != [None,None,None]:
+			config2.append(i/(movement_length-1))
+			total_in_trial.append([config2])
+	if total_in_trial != []: all_configurations_at_step.append(total_in_trial)
+print('\n')
+
 X_dot = find_X_dot_values(t,final_x)
-jump_indices_for_step = []
+
 postures_per_position = [len(all_configurations_at_step[i]) for i in range(len(all_configurations_at_step)-1)]
 total_postures = int(sum(postures_per_position))
-StartTime = time.time()
 count = 0
+StartTime = time.time()
+
+jump_indices_for_step = []
 for i in range(len(all_configurations_at_step)-1):	
 	allowable_jump_indices = []
 	for j in range(len(all_configurations_at_step[i])):
 		statusbar(count,total_postures,Title='Find Jumps',StartTime=StartTime)
-		allowable_jump_indices.append(return_allowable_jump_indices(all_configurations_at_step[i][j],all_configurations_at_step[i+1],X_dot.T[i+1],l1,l2,l3))
+		allowable_jump_indices.append(return_allowable_jump_indices(delta_t,all_configurations_at_step[i][j],all_configurations_at_step[i+1],X_dot.T[i+1],l1,l2,l3))
 		count+=1
 	jump_indices_for_step.append(allowable_jump_indices)
 print('\n')
-random_trajectories = []
+
+
 StartTime=time.time()
+
+random_trajectories = []
 for j in range(100):
 	statusbar(j,100,Title='Find Trajectories',StartTime=StartTime)
+	assert not all([jump_indices_for_step[0][i] == [] for i in range(len(jump_indices_for_step[0]))]), \
+				"No viable starting postures. Consider finer deltas."
 	start_over = True
 	while start_over == True:
+		random.seed()
+		dead_end = False
 		next_is_empty = True
 		# Testing starting index value for dead ends
 		while next_is_empty == True:
-			assert not all([jump_indices_for_step[0][i] == [] for i in range(len(jump_indices_for_step[0]))]), "No viable starting postures. Consider finer deltas."
 			starting_index = random.choice(range(len(jump_indices_for_step[0])))
 			possible_trajectory = [starting_index]
 			if jump_indices_for_step[0][starting_index] != []:
@@ -310,8 +317,8 @@ for j in range(100):
 			if i < len(X.T)-2:
 				dead_end_jumps = np.array([jump_indices_for_step[i+1][el]==[] for el in jumps])
 				possible_jumps = [jumps[el] for el in list(compress(range(len(~dead_end_jumps)),~dead_end_jumps))]
-				if possible_jumps == []:
-					print("No trajectory could be made. Complete: " + str(len(possible_trajectory)/len(X.T)))
+				if possible_jumps == []: 
+					print("Dead end at step " + str(len(possible_trajectory)) + '/' + str(len(X.T)))
 					start_over = True
 					dead_end = True
 					break
@@ -324,11 +331,12 @@ for j in range(100):
 				next_index = random.choice(possible_jumps)
 				possible_trajectory.append(next_index)
 		# Testing to make sure the index list has the same length as the trajectory
-		if len(possible_trajectory)==len(X.T): 
-			start_over=False
-			random_trajectories.append(possible_trajectory)
-		else:
-			print("something fishy going on here...")
+		if dead_end == False:
+			if len(possible_trajectory)==len(X.T): 
+				start_over=False
+				random_trajectories.append(possible_trajectory)
+			else:
+				print("something fishy going on here...")
 random_configuration_trajectories = [np.concatenate(([all_configurations_at_step[i][random_trajectories[j][i]] for i in range(len(X.T))]),axis=0).T for j in range(len(random_trajectories))]
 
 
@@ -361,8 +369,6 @@ random_configuration_trajectories = [np.concatenate(([all_configurations_at_step
 
 concat_test=[np.concatenate(all_configurations_at_step[i],axis=0) for i in range(np.shape(all_configurations_at_step)[0])] 
 concat_test=np.concatenate(concat_test)
-
-from mpl_toolkits.mplot3d import Axes3D
 
 random.seed()
 sample_index=random.sample(range(np.shape(concat_test)[0]),1000)
