@@ -20,6 +20,7 @@ def statusbar(i,N,**kwargs):
 
 	"""
 	import time
+	from scipy import interpolate
 	StartTime = kwargs.get("StartTime",False)
 	Title = kwargs.get("Title",'')
 
@@ -33,7 +34,19 @@ def statusbar(i,N,**kwargs):
 	if Title != '': Title = ' '*(25-len(Title)) + Title + ': '
 	statusbar = Title +'[' + '\u25a0'*int((i+1)/(N/50)) + '\u25a1'*(50-int((i+1)/(N/50))) + '] '
 	if StartTime != False:
-		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) + 'sec        \r', end='')
+		global time_array
+		global TimeLeft
+		if i==0:
+			time_array = []
+			TimeLeft = '--'
+		elif i==int(0.02*N):
+			time_array.append(time.time()-StartTime)
+			TimeLeft = '{0:1.1f}'.format(time_array[-1]*(N/(i+1)))
+		elif i%int(0.02*N)==0:
+			time_array.append(time.time()-StartTime)
+			TimeLeft = '{0:1.1f}'.format(float(interpolate.interp1d(np.arange(len(time_array)),time_array,fill_value='extrapolate')(49)))
+		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) \
+			+ 'sec, (est. ' + TimeLeft + ' sec left)        \r', end='')
 	else:
 		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete           \r',end = '')
 
@@ -158,7 +171,7 @@ def find_X_values(x_final):
 	import numpy as np 
 	from numpy import pi
 	from math import sin, cos
-	t = np.arange(0,1.0001,0.001)
+	t = np.arange(0,1.1,0.1)
 	x = -x_final[0]*(15*t**4-6*t**5-10*t**3)
 	y = -x_final[1]*(15*t**4-6*t**5-10*t**3)
 	X = np.concatenate(([x],[y]),axis=0)
@@ -191,8 +204,8 @@ def quick_2D_plot_tool(ax,xlabel,ylabel,title):
 	ax.set_aspect('equal','datalim')
 
 X = find_X_values([0,-20])
-total = []
-angle1 = np.arange(0,120,0.01)
+total2 = []
+angle1 = np.arange(0,120,0.1)
 movement_length = np.shape(X)[1]
 StartTime = time.time()
 
@@ -204,17 +217,18 @@ HandLength = 0.108*Height
 l3 = HandLength/2
 reaching_depth = 40
 for i in range(movement_length):
-	statusbar(i,movement_length,StartTime=StartTime,Title='45 Degree Reach')
+	# statusbar(i,movement_length,StartTime=StartTime,Title='45 Degree Reach')
 	total_in_trial = []
 	for j in range(len(angle1)):
+		statusbar(len(angle1)*i+j,movement_length*len(angle1),StartTime=StartTime,Title='45 Degree Reach')
 		config1,config2 = planar_3dof_arm(theta1=angle1[j],X=X[:,i],l1=l1,l2=l2,l3=l3,depth=reaching_depth)
 		if config1 != [None,None,None]:
-			config1.append(i/movement_length)
+			config1.append(i/(movement_length-1))
 			total_in_trial.append([config1])
 		if config2 != [None,None,None]:
-			config2.append(i/movement_length)
+			config2.append(i/(movement_length-1))
 			total_in_trial.append([config2])
-	if total_in_trial != []: total.append(total_in_trial)
+	if total_in_trial != []: total2.append(total_in_trial)
 
 # l1,l2,l3 = 4*2**0.5,4,4
 limb_x = lambda theta: np.cumsum([0,l1*cos(pi*theta[0]/180),l2*cos(pi*theta[0]/180+pi*theta[1]/180),l3*cos(pi*theta[0]/180+pi*theta[1]/180+pi*theta[2]/180)])
@@ -234,32 +248,82 @@ limb_y = lambda theta: np.cumsum([-reaching_depth,l1*sin(pi*theta[0]/180),l2*sin
 # quick_2D_plot_tool(ax,"X","Y",title=None)
 # ani = animation.FuncAnimation(fig, animate, init_func=init,frames = int(np.shape(total[3])[0]/400), interval=20,blit=True)
 # plt.show()
-import random
-random.seed()
+# import random
+# random.seed()
 
-# testnumber = 0
-testnumber = random.randint(0,len(total))
-plt.figure()
-ax = plt.gca()
-test = np.concatenate(total[testnumber],axis=0)
-[plt.plot(limb_x(test[i,:]),limb_y(test[i,:]),'k',lw=2,marker='o',markersize=10) for i in range(np.shape(test)[0])]
-quick_2D_plot_tool(ax=ax,title="Test for single posture",xlabel='X',ylabel='Y')
+# # testnumber = 0
+# testnumber = random.randint(0,len(total))
+# plt.figure()
+# ax = plt.gca()
+# test = np.concatenate(total[testnumber],axis=0)
+# [plt.plot(limb_x(test[i,:]),limb_y(test[i,:]),'k',lw=2,marker='o',markersize=10) for i in range(np.shape(test)[0])]
+# quick_2D_plot_tool(ax=ax,title="Test for single posture",xlabel='X',ylabel='Y')
+# # plt.show()
+
+# concat_test=[np.concatenate(total[i],axis=0) for i in range(np.shape(total)[0])] 
+# concat_test=np.concatenate(concat_test)
+
+# from mpl_toolkits.mplot3d import Axes3D
+
+# random.seed()
+# sample_index=random.sample(range(np.shape(concat_test)[0]),5000)
+
+# fig2 = plt.figure()
+# ax2 = fig2.add_subplot(111,projection= '3d')
+# scatterplot = ax2.scatter(concat_test[sample_index,0],concat_test[sample_index,1],concat_test[sample_index,2],c=concat_test[sample_index,3]) 
+# ax2.set_ylabel('Elbow')    
+# ax2.set_xlabel('Shoulder')   
+# ax2.set_zlabel('Wrist') 
+# fig2.colorbar(scatterplot)
+     
 # plt.show()
 
-concat_test=[np.concatenate(total[i],axis=0) for i in range(np.shape(total)[0])] 
-concat_test=np.concatenate(concat_test)
+def find_X_dot_values(x_final):
+	import numpy as np 
+	from numpy import pi
+	from math import sin, cos
+	t = np.arange(0,1.1,0.1)
+	x = -x_final[0]*(60*t**3-30*t**4-30*t**2)
+	y = -x_final[1]*(60*t**3-30*t**4-30*t**2)
+	X = np.concatenate(([x],[y]),axis=0)
+	return(np.array(X))
+def jacobian(theta,l1,l2,l3):
+	import numpy as np
+	from numpy import pi
+	from math import cos, sin
+	theta1,theta2,theta3 = [pi*el/180 for el in theta]
+	J = np.matrix([[-l1*sin(theta1)-l2*sin(theta1+theta2)-l3*sin(theta1+theta2+theta3),-l2*sin(theta1+theta2)-l3*sin(theta1+theta2+theta3),-l3*sin(theta1+theta2+theta3)],\
+					[l1*cos(theta1)+l2*cos(theta1+theta2)+l3*cos(theta1+theta2+theta3),l2*cos(theta1+theta2)+l3*cos(theta1+theta2+theta3),l3*cos(theta1+theta2+theta3)]])
+	return(J)
+def is_acceptable_joint_velocity(next_X_dot,current_theta,next_theta,l1,l2,l3):
+	current_theta,next_theta = np.array(current_theta),np.array(next_theta)
+	delta_t = next_theta[0,3]-current_theta[0,3]
+	theta_dot = np.array([[next_theta[0,0]-current_theta[0,0]],[next_theta[0,1]-current_theta[0,1]],[next_theta[0,2]-current_theta[0,2]]])*(1/delta_t)
+	J = jacobian(next_theta[0,:3],l1,l2,l3)
+	X_dot = np.array([[next_X_dot[0]],[next_X_dot[1]]])
+	result = ((J*theta_dot-X_dot)<0.001).all()
+	return(result)
+def return_allowable_jump_indices(current,all_possible_next,X_dot,l1,l2,l3):
+	import numpy as np
+	from itertools import compress
+	is_jump_acceptable = np.array([((np.array(current)-np.array(el))<3.84).all() for el in all_possible_next])
+	allowable_jump_indices = list(compress(range(len(is_jump_acceptable)), is_jump_acceptable))
+	if allowable_jump_indices != []:
+		allowable_jumps = np.array([all_possible_next[el] for el in allowable_jump_indices])
+		# ipdb.set_trace()
+		with_correct_velocity_index = []
+		for i in range(len(allowable_jumps)):
+			if is_acceptable_joint_velocity(X_dot,current,allowable_jumps[i],l1,l2,l3):
+				with_correct_velocity_index.append(allowable_jump_indices[i])
+		return(with_correct_velocity_index)
+	else:
+		return([])
+X_dot = find_X_dot_values([0,-20])
+trajectories = []
+for i in range(len(total2)-1):
+	allowable_jump_indices = []
+	statusbar(i,len(total2)-1)
+	for j in range(len(total2[i])):
+		allowable_jump_indices.append(return_allowable_jump_indices(total2[i][j],total2[i+1],X_dot.T[i+1],l1,l2,l3))
+	trajectories.append(allowable_jump_indices)
 
-from mpl_toolkits.mplot3d import Axes3D
-
-random.seed()
-sample_index=random.sample(range(np.shape(concat_test)[0]),5000)
-
-fig2 = plt.figure()
-ax2 = fig2.add_subplot(111,projection= '3d')
-scatterplot = ax2.scatter(concat_test[sample_index,0],concat_test[sample_index,1],concat_test[sample_index,2],c=concat_test[sample_index,3]) 
-ax2.set_ylabel('Elbow')    
-ax2.set_xlabel('Shoulder')   
-ax2.set_zlabel('Wrist') 
-fig2.colorbar(scatterplot)
-     
-plt.show()
