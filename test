@@ -1,0 +1,4 @@
+import numpy as np
+𝜏 = 4
+
+print(𝜏*2)
