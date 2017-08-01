@@ -1,7 +1,7 @@
 def statusbar(i,N,**kwargs):
 	"""
-	i is the current iteration (must be an int) and N is the length of 
-	the range (must be an int). i must also be in [0,N). 
+	i is the current iteration (must be an int) and N is the length of
+	the range (must be an int). i must also be in [0,N).
 
 	~~~~~~~~~~~~~~
 	**kwargs
@@ -50,9 +50,9 @@ def statusbar(i,N,**kwargs):
 		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete           \r',end = '')
 def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of_motion=[[0,170],[-75,60]],depth=20):
 	import numpy as np
-	from numpy import pi 
+	from numpy import pi
 	from math import cos, sin, acos, asin
-	import matplotlib.pyplot as plt 
+	import matplotlib.pyplot as plt
 	import ipdb
 
 	def quick_2D_plot_tool(ax,xlabel,ylabel,title):
@@ -76,7 +76,7 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of
 		theta1 = theta1*pi/180
 		x = X[0]
 		y = X[1]
-		if ((x-l1*cos(theta1))**2 + (y+depth-l1*sin(theta1))**2)**0.5 - l2 - l3 == 0: 
+		if ((x-l1*cos(theta1))**2 + (y+depth-l1*sin(theta1))**2)**0.5 - l2 - l3 == 0:
 			output = 0
 		else:
 			output = acos(((x-l1*cos(theta1))**2 + (y+depth-l1*sin(theta1))**2 - l2**2 - l3**2)/(2*l2*l3))
@@ -152,14 +152,14 @@ def planar_3dof_arm(theta1=45,l1=4*2**0.5,l2=4,l3=4,X=[0,20],plot=False,range_of
 			elif theta3_alt<range_of_motion[1][0] or theta3_alt>range_of_motion[1][1]:
 				Config2 = [None,None,None]
 			else:
-				Config2 = [theta1,theta2_alt,theta3_alt]	
+				Config2 = [theta1,theta2_alt,theta3_alt]
 
 			return(Config1,Config2)
 		except ValueError:
 			# pass
 			return([None,None,None],[None,None,None])
 def find_X_values(t,x_final):
-	import numpy as np 
+	import numpy as np
 	x = -x_final[0]*(15*t**4-6*t**5-10*t**3)
 	y = -x_final[1]*(15*t**4-6*t**5-10*t**3)
 	X = np.concatenate(([x],[y]),axis=0)
@@ -170,7 +170,7 @@ def quick_2D_plot_tool(ax,xlabel,ylabel,title):
 	format an already established figure to remove the box, place the
 	tick marks outwards, and set aspect ratio to equal.
 	"""
-	import matplotlib.pyplot as plt 
+	import matplotlib.pyplot as plt
 	ax = plt.gca()
 	ax.spines['left'].set_position('zero')
 	ax.spines['right'].set_color('none')
@@ -183,7 +183,7 @@ def quick_2D_plot_tool(ax,xlabel,ylabel,title):
 	ax.set_title(title)
 	ax.set_aspect('equal','datalim')
 def find_X_dot_values(t,x_final):
-	import numpy as np 
+	import numpy as np
 	x = -x_final[0]*(60*t**3-30*t**4-30*t**2)
 	y = -x_final[1]*(60*t**3-30*t**4-30*t**2)
 	X = np.concatenate(([x],[y]),axis=0)
@@ -228,7 +228,7 @@ import numpy as np
 from numpy import pi
 from math import cos, sin
 import random
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import time
 import ipdb
@@ -280,7 +280,7 @@ count = 0
 StartTime = time.time()
 
 jump_indices_for_step = []
-for i in range(len(all_configurations_at_step)-1):	
+for i in range(len(all_configurations_at_step)-1):
 	allowable_jump_indices = []
 	for j in range(len(all_configurations_at_step[i])):
 		statusbar(count,total_postures,Title='Find Jumps',StartTime=StartTime)
@@ -317,7 +317,7 @@ for j in range(100):
 			if i < len(X.T)-2:
 				dead_end_jumps = np.array([jump_indices_for_step[i+1][el]==[] for el in jumps])
 				possible_jumps = [jumps[el] for el in list(compress(range(len(~dead_end_jumps)),~dead_end_jumps))]
-				if possible_jumps == []: 
+				if possible_jumps == []:
 					print("Dead end at step " + str(len(possible_trajectory)) + '/' + str(len(X.T)))
 					start_over = True
 					dead_end = True
@@ -332,7 +332,7 @@ for j in range(100):
 				possible_trajectory.append(next_index)
 		# Testing to make sure the index list has the same length as the trajectory
 		if dead_end == False:
-			if len(possible_trajectory)==len(X.T): 
+			if len(possible_trajectory)==len(X.T):
 				start_over=False
 				random_trajectories.append(possible_trajectory)
 			else:
@@ -367,7 +367,7 @@ random_configuration_trajectories = [np.concatenate(([all_configurations_at_step
 # quick_2D_plot_tool(ax=ax,title="Test for single posture",xlabel='X',ylabel='Y')
 # # plt.show()
 
-concat_test=[np.concatenate(all_configurations_at_step[i],axis=0) for i in range(np.shape(all_configurations_at_step)[0])] 
+concat_test=[np.concatenate(all_configurations_at_step[i],axis=0) for i in range(np.shape(all_configurations_at_step)[0])]
 concat_test=np.concatenate(concat_test)
 
 random.seed()
@@ -376,24 +376,23 @@ sample_index=random.sample(range(np.shape(concat_test)[0]),1000)
 fig2 = plt.figure()
 ax2 = fig2.add_subplot(111,projection= '3d')
 scatterplot = ax2.scatter(concat_test[sample_index,0],concat_test[sample_index,1],concat_test[sample_index,2],\
-				c=concat_test[sample_index,3]) 
-ax2.set_ylabel('Elbow')    
-ax2.set_xlabel('Shoulder')   
-ax2.set_zlabel('Wrist') 
+				c=concat_test[sample_index,3])
+ax2.set_ylabel('Elbow')
+ax2.set_xlabel('Shoulder')
+ax2.set_zlabel('Wrist')
 fig2.colorbar(scatterplot)
 
 fig3 = plt.figure()
 ax3 = fig3.add_subplot(111,projection= '3d')
-# trisurf = ax3.plot_trisurf(concat_test[sample_index,0],concat_test[sample_index,1],concat_test[sample_index,2]) 
+# trisurf = ax3.plot_trisurf(concat_test[sample_index,0],concat_test[sample_index,1],concat_test[sample_index,2])
 scatterplot2 = ax3.scatter(concat_test[sample_index,0],concat_test[sample_index,1],concat_test[sample_index,2],\
-				c=concat_test[sample_index,3]) 
+				c=concat_test[sample_index,3])
 [ax3.plot(random_configuration_trajectories[i][0],\
 			random_configuration_trajectories[i][1],\
 			random_configuration_trajectories[i][2],\
 			'k') for i in range(100)]
-ax3.set_ylabel('Elbow')    
-ax3.set_xlabel('Shoulder')   
-ax3.set_zlabel('Wrist') 
+ax3.set_ylabel('Elbow')
+ax3.set_xlabel('Shoulder')
+ax3.set_zlabel('Wrist')
 fig3.colorbar(scatterplot2)
- 
 plt.show()
