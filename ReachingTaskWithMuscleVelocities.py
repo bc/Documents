@@ -241,10 +241,10 @@ def MA_function(Coefficients, Angles):
 	"""
 	Note: Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
 	"""
-	import numpy as np 
+	import numpy as np
 	assert type(Coefficients) == list, "Coefficients must be a list."
 	assert len(Coefficients) in [5,16,18], "Coefficients must be a list of length 5, 16, or 18."
-	if len(Coefficients)==5: 
+	if len(Coefficients)==5:
 		MomentArm = (np.matrix(Coefficients)*np.matrix([1,Angles,Angles**2,Angles**3,Angles**4]).T)[0,0]
 	elif len(Coefficients)==16:
 		MomentArm = (np.matrix(Coefficients)*np.matrix([1, Angles[0], Angles[1], Angles[0]*Angles[1], Angles[0]**2, \
@@ -264,14 +264,14 @@ def MA_function_integral(Coefficients, Angles):
 	"""
 	Note: Angles should be a number if Coefficients has a length of 1 or 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
 	"""
-	import numpy as np 
+	import numpy as np
 	import ipdb
 	assert type(Coefficients) == list or type(Coefficients) == int or type(Coefficients) == float, "Coefficients must be a list, int, or float."
 	if type(Coefficients) not in [int,float]:
 		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
 	if type(Coefficients) in [int,float]:
 		MomentArmIntegral = Coefficients*Angles
-	elif len(Coefficients)==5: 
+	elif len(Coefficients)==5:
 		integral = np.multiply(np.matrix([1,Angles,Angles**2,Angles**3,Angles**4]),(1,1/2,1/3,1/4,1/5))*Angles
 		MomentArmIntegral = (np.matrix(Coefficients)*integral.T)[0,0]
 	elif len(Coefficients)==16:
@@ -301,8 +301,8 @@ def return_MA_matrix(A1,A2):
 	The angle of radial/ulnar deviation is set to zero for the fixed wrist apparatus of the model paradigm.
 	These functions have been verified to match the previous posture dependent MAs from Ramsey (2010) - SEE ERRATUM
 	"""
-	import numpy as np 
-	from numpy import pi 
+	import numpy as np
+	from numpy import pi
 
 	#R_tranpose Column 1
 	r1DELTa = 19 # in mm
@@ -350,15 +350,15 @@ def calculate_muscle_velocities(A1,A2,Ȧ1,Ȧ2):
 	MuscleVelocity = R.T*(np.matrix([Ȧ1,Ȧ2]).T)
 	OptimalMuscleLength = np.array([(98),     (93),      (137),      (116),      (134),    (86),   \
 	                  				(173),    (49),       (63),       (59),       (81),    (51),   \
-	                   				(84),     (64),       (62),       (68),        (70)] ) # in mm	
+	                   				(84),     (64),       (62),       (68),        (70)] ) # in mm
 	NormalizedMuscleVelocity = np.array([[MuscleVelocity[i][0,0]/OptimalMuscleLength[i] for i in range(len(MuscleVelocity))]])
 	return(NormalizedMuscleVelocity)
 def eccentric_velocities(NormalizedMuscleVelocity):
-	import numpy as np 
+	import numpy as np
 	PositiveMuscleVelocities = [NormalizedMuscleVelocity.T[i,:][NormalizedMuscleVelocity.T[i,:]>0] for i in range(np.shape(NormalizedMuscleVelocity)[1])]
 	return(PositiveMuscleVelocities)
 def concentric_velocities(NormalizedMuscleVelocity):
-	import numpy as np 
+	import numpy as np
 	NegativeMuscleVelocities = [NormalizedMuscleVelocity.T[i,:][NormalizedMuscleVelocity.T[i,:]<0] for i in range(np.shape(NormalizedMuscleVelocity)[1])]
 	return(NegativeMuscleVelocities)
 def cost_function(X,type="avg"):
@@ -373,13 +373,13 @@ def cost_function(X,type="avg"):
 		cost = sum([el**2 for el in X])**0.5
 	return(cost)
 def eccentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,type ='l2norm'):
-	import numpy as np 
+	import numpy as np
 	PositiveMuscleVelocities = eccentric_velocities(NormalizedMuscleVelocity)
 	TotalPositiveExcursion = [np.trapz(el,dx=t_end*dt) for el in PositiveMuscleVelocities]
 	EccentricCost = cost_function(TotalPositiveExcursion,type=type)
 	return(EccentricCost)
 def concentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,type = 'l2norm'):
-	import numpy as np 
+	import numpy as np
 	NegativeMuscleVelocities = concentric_velocities(NormalizedMuscleVelocity)
 	TotalNegativeExcursion = [np.trapz(el,dx=t_end*dt) for el in NegativeMuscleVelocities]
 	ConcentricCost = cost_function(TotalNegativeExcursion,type=type)
@@ -388,8 +388,8 @@ def return_initial_muscle_length(Coefficients,OptimalMuscleLength):
 	"""
 	Coefficients should be a list with the coefficients for each joint angle.
 	"""
-	import numpy as np 
-	from math import pi 
+	import numpy as np
+	from math import pi
 	global A1,A2
 	# Shoulder functions are constant. Therefore the input will only be A1[0] or 0.
 	Angle1Initial = A1[0]
@@ -417,18 +417,18 @@ def calculate_muscle_lengths():
 	DELTp_Coefficients = [-8, 0]
 	BIC_Coefficients = [15, [8.4533,36.6147,2.4777,-19.432,2.0571,0,13.6502,0,0,-5.6172,0,-2.0854,0,0,0,0]]
 	TRI_Coefficients = [-15, [-24.5454,-8.8691,9.3509,-1.7518,0]]
-	BRA_Coefficients = [0, [16.1991,-16.1463,24.5512,-6.3335,0]] 
-	BRD_Coefficients = [0, [15.2564,-11.8355,2.8129,-5.7781,44.8143,0,2.9032,0,0,-13.4956,0,-0.3940,0,0,0,0]] 
-	PRO_Coefficients = [0, [11.0405,-1.0079,0.3933,-10.4824,-12.1639,-0.4369,36.9174,3.5232,-10.4223,21.2604,-37.2444,10.2666,-11.0060,14.5974,-3.9919,1.7526,-2.0089,0.5460]] 
-	FCR_Coefficients = [0, 14] 
-	ECRB_Coefficients = [0, [-11.256,17.8548,1.6398,-0.5073,-2.8827,0,-0.0942,0,0,0,0,0,0,0,0,0]] 
-	ECRL_Coefficients = [0, [-7.7034,16.3913,7.4361,-1.7566,0,-1.3336,0,0.0742,0,0,0,0,0,0,0,0]] 
-	FCU_Coefficients = [0, 19] 
-	FDS_Coefficients = [0, 20] 
-	PL_Coefficients = [0, 25] 
-	ECU_Coefficients = [0, -23] 
-	EDM_Coefficients = [0, -10] 
-	EDC_Coefficients = [0, -20] 
+	BRA_Coefficients = [0, [16.1991,-16.1463,24.5512,-6.3335,0]]
+	BRD_Coefficients = [0, [15.2564,-11.8355,2.8129,-5.7781,44.8143,0,2.9032,0,0,-13.4956,0,-0.3940,0,0,0,0]]
+	PRO_Coefficients = [0, [11.0405,-1.0079,0.3933,-10.4824,-12.1639,-0.4369,36.9174,3.5232,-10.4223,21.2604,-37.2444,10.2666,-11.0060,14.5974,-3.9919,1.7526,-2.0089,0.5460]]
+	FCR_Coefficients = [0, 14]
+	ECRB_Coefficients = [0, [-11.256,17.8548,1.6398,-0.5073,-2.8827,0,-0.0942,0,0,0,0,0,0,0,0,0]]
+	ECRL_Coefficients = [0, [-7.7034,16.3913,7.4361,-1.7566,0,-1.3336,0,0.0742,0,0,0,0,0,0,0,0]]
+	FCU_Coefficients = [0, 19]
+	FDS_Coefficients = [0, 20]
+	PL_Coefficients = [0, 25]
+	ECU_Coefficients = [0, -23]
+	EDM_Coefficients = [0, -10]
+	EDC_Coefficients = [0, -20]
 
 	AllCoefficients = [DELTa_Coefficients, CB_Coefficients, DELTp_Coefficients, BIC_Coefficients, \
 						TRI_Coefficients, BRA_Coefficients, BRD_Coefficients, PRO_Coefficients, \
@@ -455,8 +455,8 @@ def calculate_muscle_lengths():
 									- (MA_function_integral(AllCoefficients[j][0],Angle1Current) - MA_function_integral(AllCoefficients[j][0],Angle1Initial)) \
 									- (MA_function_integral(AllCoefficients[j][1],Angle2Current) - MA_function_integral(AllCoefficients[j][1],Angle2Initial))
 			MuscleLengths[j].append(TemporaryMuscleLength)
-import numpy as np 
-import matplotlib.pyplot as plt 
+import numpy as np
+import matplotlib.pyplot as plt
 import math
 t_end = 0.5
 dt = 0.0001
@@ -464,7 +464,7 @@ t = np.arange(0,1+dt,dt)*t_end
 # 0.80*(L1+L2) = 0.4586
 Xi = [-0.4586/2,0.4586/2]
 Xf = [0.4586/2,0.4586/2]# [0.4586/(2**0.5),0.1 + 0.4586/(2**0.5)]
-# forward 
+# forward
 
 reaching_task(Xi=Xi, Xf=Xf,dt=dt, t_end=t_end)
 calculate_muscle_lengths()
@@ -474,7 +474,8 @@ for i in range(1,len(A1)):
 	NormalizedMuscleVelocity_Forward = np.concatenate((NormalizedMuscleVelocity_Forward,calculate_muscle_velocities(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
 
 plt.figure()
-plt.plot(t,NormalizedMuscleVelocity_Forward)
+color = iter(plt.cm.rainbow(np.linspace(0,1,17)))
+[plt.plot(t,NormalizedMuscleVelocity_Forward[:,i],c=next(color)) for i in range(17)]
 ax1a = plt.gca()
 ax1a.set_xlim(0,t_end*(1.3))
 ax1a.set_title('Forward Direction')
@@ -499,7 +500,7 @@ ax1b.set_ylabel('Joint Angles (in radians)')
 ax1b.legend(["Shoulder","Elbow"])
 
 plt.figure()
-plt.plot(A1,A2)
+plt.plot(A1,A2,'g')
 ax1c = plt.gca()
 ax1c.set_title("Forward Direction\nConfiguration Space Trajectory")
 ax1c.set_ylabel("Shouler Angle (in radians)")
@@ -509,7 +510,8 @@ EccentricCost_Forward = eccentric_cost(NormalizedMuscleVelocity_Forward,t_end=t_
 ConcentricCost_Forward = concentric_cost(NormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt)
 
 plt.figure()
-[plt.plot(t,MuscleLengths_Forward[i]) for i in range(17)]
+color = iter(plt.cm.rainbow(np.linspace(0,1,17)))
+[plt.plot(t,MuscleLengths_Forward[i],c=next(color)) for i in range(17)]
 ax1d = plt.gca()
 ax1d.set_xlim(0,t_end*(1.3))
 ax1d.set_title('Forward Direction')
@@ -530,7 +532,8 @@ for i in range(1,len(A1)):
 	NormalizedMuscleVelocity_Reverse = np.concatenate((NormalizedMuscleVelocity_Reverse,calculate_muscle_velocities(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
 
 plt.figure()
-plt.plot(t,NormalizedMuscleVelocity_Reverse)
+color = iter(plt.cm.rainbow(np.linspace(0,1,17)))
+[plt.plot(t,NormalizedMuscleVelocity_Reverse[:,i],c=next(color)) for i in range(17)]
 ax2a = plt.gca()
 ax2a.set_xlim(0,t_end*(1.3))
 ax2a.set_title('Reversed Direction')
@@ -542,8 +545,8 @@ ax2a.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Ec
 ax2a.legend(["DELTa","CB","DELTp","BIC","TRI","BRA","BRD","PRO","FCR","ECRB","ECRL","FCU","FDS","PL","ECU","EDM","EDC"])
 
 plt.figure()
-plt.plot(t,A1,'r')
-plt.plot(t,A2,'r--')
+plt.plot(t,A1,'b')
+plt.plot(t,A2,'b--')
 ax2b = plt.gca()
 ax2b.set_xlim(0,t_end*(1.3))
 ax2b.set_title('Reversed Direction')
@@ -555,7 +558,7 @@ ax2b.set_ylabel('Joint Angles (in radians)')
 ax2b.legend(["Shoulder","Elbow"])
 
 plt.figure()
-plt.plot(A1,A2)
+plt.plot(A1,A2,'b')
 ax2c = plt.gca()
 ax2c.set_title("Reversed Direction\nConfiguration Space Trajectory")
 ax2c.set_ylabel("Shouler Angle (in radians)")
@@ -565,7 +568,8 @@ EccentricCost_Reverse = eccentric_cost(NormalizedMuscleVelocity_Reverse,t_end=t_
 ConcentricCost_Reverse = concentric_cost(NormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt)
 
 plt.figure()
-[plt.plot(t,MuscleLengths_Reverse[i]) for i in range(17)]
+color = iter(plt.cm.rainbow(np.linspace(0,1,17)))
+[plt.plot(t,MuscleLengths_Reverse[i],c=next(color)) for i in range(17)]
 ax2d = plt.gca()
 ax2d.set_xlim(0,t_end*(1.3))
 ax2d.set_title('Reverse Direction')
@@ -580,7 +584,7 @@ ax2d.legend(["DELTa","CB","DELTp","BIC","TRI","BRA","BRD","PRO","FCR","ECRB","EC
 plt.figure()
 plt.plot(np.arange(0,2*math.ceil(max([EccentricCost_Forward,ConcentricCost_Forward]))+1,1), np.arange(0,2*math.ceil(max([EccentricCost_Forward,ConcentricCost_Forward]))+1,1),'0.75',linestyle='--')
 plt.scatter([EccentricCost_Forward],[ConcentricCost_Forward],facecolor ='g', edgecolor = 'k', marker='o',s=100)
-plt.scatter([EccentricCost_Reverse],[ConcentricCost_Reverse],facecolor ='r', edgecolor = 'k', marker='o',s=100)
+plt.scatter([EccentricCost_Reverse],[ConcentricCost_Reverse],facecolor ='b', edgecolor = 'k', marker='o',s=100)
 ax3 = plt.gca()
 ax3.set_xlim(0,2*math.ceil(max([EccentricCost_Forward,EccentricCost_Reverse])))
 ax3.set_ylim(0,2*math.ceil(max([EccentricCost_Forward,EccentricCost_Reverse])))
