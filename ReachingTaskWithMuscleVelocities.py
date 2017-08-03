@@ -303,7 +303,7 @@ def return_MA_matrix(A1,A2):
 	"""
 	import numpy as np
 	from numpy import pi
-
+	# MAs taken from Ramsay (2009), Holzbaur, FVC, Rankin (2012)
 	#R_tranpose Column 1
 	r1DELTa = 19 # in mm
 	r1CB = 20 # in mm
@@ -323,6 +323,7 @@ def return_MA_matrix(A1,A2):
 	r1EDM = 0 # in mm
 	r1EDC = 0 # in mm
 
+	# Note: Ramsay (2009) suggests these muscles have contributions to WFE
 	#R_tranpose Column 2
 	r2DELTa = 0 # in mm
 	r2CB = 0 # in mm
@@ -332,14 +333,14 @@ def return_MA_matrix(A1,A2):
 	r2BRA = MA_function([16.1991,-16.1463,24.5512,-6.3335,0],A2) # in mm
 	r2BRD = MA_function([15.2564,-11.8355,2.8129,-5.7781,44.8143,0,2.9032,0,0,-13.4956,0,-0.3940,0,0,0,0],[A2,pi]) # in mm
 	r2PRO = MA_function([11.0405,-1.0079,0.3933,-10.4824,-12.1639,-0.4369,36.9174,3.5232,-10.4223,21.2604,-37.2444,10.2666,-11.0060,14.5974,-3.9919,1.7526,-2.0089,0.5460],[A2,pi]) # in mm
-	r2FCR = 14 # in mm
+	r2FCR = 20 # in mm
 	r2ECRB = MA_function([-11.256,17.8548,1.6398,-0.5073,-2.8827,0,-0.0942,0,0,0,0,0,0,0,0,0],[A2,pi]) # in mm
 	r2ECRL = MA_function([-7.7034,16.3913,7.4361,-1.7566,0,-1.3336,0,0.0742,0,0,0,0,0,0,0,0],[A2,pi]) # in mm
-	r2FCU = 19 # in mm
+	r2FCU = 20 # in mm
 	r2FDS = 20 # in mm
-	r2PL = 25 # in mm
-	r2ECU = -23 # in mm
-	r2EDM = -10 # in mm
+	r2PL = 20 # in mm
+	r2ECU = -20 # in mm
+	r2EDM = -20 # in mm
 	r2EDC = -20 # in mm
 
 	MomentArmMatrix = np.matrix([[r1DELTa,r1CB,r1DELTp,r1BIC,r1TRI,r1BRA,r1BRD,r1PRO,r1FCR,r1ECRB,r1ECRL,r1FCU,r1FDS,r1PL,r1ECU,r1EDM,r1EDC],\
@@ -461,9 +462,27 @@ import math
 t_end = 0.5
 dt = 0.0001
 t = np.arange(0,1+dt,dt)*t_end
+
 # 0.80*(L1+L2) = 0.4586
-Xi = [-0.4586/2,0.4586/2]
-Xf = [0.4586/2,0.4586/2]# [0.4586/(2**0.5),0.1 + 0.4586/(2**0.5)]
+
+# Side to Side, Path Length = 0.8⋅(L1+L2) = 0.4586
+# Xi = [-0.4586/2,0.1+0.4586/2]
+# Xf = [0.4586/2,0.1+0.4586/2]
+
+# Center Reach, Path Length = 0.8⋅(L1+L2) = 0.4586
+# Xi = [0,0.1]
+# Xf = [0,0.1 + 0.4586]
+
+# Left Diagonal Reach, Path Length = 0.8⋅(L1+L2) = 0.4586
+# Xi = [0,0.1]
+# Xf = [-0.4586/(2**0.5),0.1 + 0.4586/(2**0.5)]
+
+# Right Diagonal Reach, Path Length = 0.8⋅(L1+L2) = 0.4586
+Xi = [0,0.1]
+Xf = [0.4586/(2**0.5),0.1 + 0.4586/(2**0.5)]
+
+
+
 # forward
 
 reaching_task(Xi=Xi, Xf=Xf,dt=dt, t_end=t_end)
@@ -593,5 +612,30 @@ ax3.set_title('Eccentric vs. Concentric Cost\nFor Forward and Reverse Movments')
 ax3.set_xlabel('Eccentric Cost (in $\hat{l}_{o}$)')
 ax3.set_ylabel('Concentric Cost (in $\hat{l}_{o}$)')
 ax3.legend(['Equal Cost Line','Forward Direction','Reversed Direction'])
+#
 
+# Using Default Reaching Directions Listed Above...
+# CostValues ={'CenterForward': np.array([[ 1.3220062 ,  2.10011198]]),\
+# 				'CenterReverse': np.array([[ 2.10011198,  1.3220062 ]]),\
+# 					'LeftForward': np.array([[ 1.24643599,  1.88616011]]),\
+# 						'LeftReverse': np.array([[ 1.88616011,  1.24643599]]),\
+# 							'RightForward': np.array([[ 1.1047386 ,  1.92105444]]),\
+# 								'RightReverse': np.array([[ 1.92105444,  1.1047386 ]]),\
+# 									'SideForward': np.array([[ 0.37931692,  0.53156831]]),\
+# 										'SideReverse': np.array([[ 0.53156831,  0.37931692]])}
+# plt.figure()
+# MaximumCost = max([max(CostValues[key][0]) for key in CostValues.keys()])
+# plt.plot(np.arange(0,2*math.ceil(MaximumCost)+1,1), np.arange(0,2*math.ceil(MaximumCost)+1,1),'0.75',linestyle='--')
+# facecolor = iter(['k','#9f9f9f','b','#9f9f9f','r','#9f9f9f','g','#9f9f9f'])
+# edgecolor = iter(['k','k','k','b','k','r','k','g'])
+# [plt.scatter(CostValues[key][0,0],CostValues[key][0,1],c=next(facecolor),edgecolor=next(edgecolor),marker='o',s=75) for key in CostValues.keys()]
+# ax4 = plt.gca()
+# ax4.set_xlim(0,math.ceil(MaximumCost))
+# ax4.set_ylim(0,math.ceil(MaximumCost))
+# ax4.set_aspect('equal')
+# ax4.set_title('Eccentric vs. Concentric Cost\nFor Forward and Reverse Movments')
+# ax4.set_xlabel('Eccentric Cost (in $\hat{l}_{o}$)')
+# ax4.set_ylabel('Concentric Cost (in $\hat{l}_{o}$)')
+# # ax4.legend(['Equal Cost Line','Center (Forward)','Center (Reverse)','Left (Forward)','Left (Reverse)','Right (Forward)','Right (Reverse)','Side-to-Side (Forward)','Side-to-Side (Reverse)'],loc='upper right')
+#
 plt.show()
