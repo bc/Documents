@@ -215,13 +215,13 @@ def global_R_matrix():
 	src = 'Ramsay', eq = 1, Coefficients = [-24.5454,-8.8691,9.3509,-1.7518,0]
 	src = 'Pigeon', dof = 'elbow', eq = None, Coefficients = Pigeon_coeff_conversion([-23.287,-3.0284,12.886,-19.092,13.277,-3.5171])
 
-	DELTa SFE MA is listed as 33.02 mm in Pigeon and estimated as 19 mm. Using Pigeon Coefficients convention, Kuechle (1997) has the DELTp MA for [-140,90] as Pigeon_coeff_conversion([ 1.34293189,  0.20316226, -0.02339031,  0.27807828,  0.,  0.]).
+	DELTa SFE MA is listed as 33.02 mm in Pigeon and estimated as 19 mm. Using Pigeon Coefficients convention, Kuechle (1997) has the DELTp MA for [-140,90] as Pigeon_coeff_conversion([ 1.34293189,  0.20316226, -0.02339031,  0.27807828,  0.,  0.]). This will yield a piecewise function that creates jumps with the new velocity formulation. Instead, we are going to try Pigeon_coeff_conversion([ 1.27928795,  0.20480346,  0.08917734,  0.32207214, -0.23928223,  0.]) so that the function is within range and continuous during the ROM. Threshold (pi/2) has been removed for this new MA function.
 
-	DELTp SFE MA is listed as -78.74 mm in Pigeon and estimated as -8 mm. Using Pigeon Coefficients convention, Kuechle (1997) has the DELTp MA for [-140,90] as Pigeon_coeff_conversion([ 2.28547177,  0.39721238, -0.33900829, -0.36146546,  0.,  0.]).
+	DELTp SFE MA is listed as -78.74 mm in Pigeon and estimated as -8 mm. Using Pigeon Coefficients convention, Kuechle (1997) has the DELTp MA for [-140,90] as Pigeon_coeff_conversion([ 2.28547177,  0.39721238, -0.33900829, -0.36146546,  0.,  0.]). This will yield a piecewise function that creates jumps with the new velocity formulation. Instead, we are going to try Pigeon_coeff_conversion([-2.38165173, -0.4486164 ,  0.58655808,  0.65003255, -0.82736695,0.20812998]) so that the function is within range and continuous during the ROM. Threshold (pi/2) has been removed for this new MA function.
 
 	PC (Clavicle attachment of Pectoralis) SFE MA is listed as 50.80 mm in Pigeon.
 
-    CB SFE MA was estimated in Holzbaur (2005) as 20 mm while Bassett (1990) estimates from 7 cadavers the MA to be 36 mm.
+	CB SFE MA was estimated in Holzbaur (2005) as 20 mm while Bassett (1990) estimates from 7 cadavers the MA to be 36 mm.
 	"""
 	import sympy as sp
 	import numpy as np
@@ -246,11 +246,11 @@ def global_R_matrix():
 		'Corrected No' : None, \
 		'Relative Abundance' : None,\
 		'Optimal Muscle Length' : None,\
-        'Group' : 'flexor'}
+	    'Group' : 'flexor'}
 	DELTa_Coefficients = {\
 		'Shoulder' : {\
-			'MA' : Pigeon_coeff_conversion([ 1.34293189,  0.20316226, -0.02339031,  0.27807828,  0.,  0.]),\
-			'src' : 'Pigeon', 'eq' : None, 'threshold' : np.pi/2, \
+			'MA' : Pigeon_coeff_conversion([ 1.27928795,  0.20480346,  0.08917734,  0.32207214, -0.23928223,  0.        ]),\
+			'src' : 'Pigeon', 'eq' : None, 'threshold' : None, \
 			'dof' : 'Shoulder'}, \
 		'Elbow' : {\
 			'MA' : 0,\
@@ -261,7 +261,7 @@ def global_R_matrix():
 		'Corrected No' : 426.3/3, \
 		'Relative Abundance' : 0.43,\
 		'Optimal Muscle Length' : 98,\
-        'Group' : 'flexor'}
+	    'Group' : 'flexor'}
 	CB_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 20, \
@@ -276,11 +276,11 @@ def global_R_matrix():
 		'Corrected No' : 147.3, \
 		'Relative Abundance' : 0.83,\
 		'Optimal Muscle Length' : 93,\
-        'Group' : 'flexor'}
+	    'Group' : 'flexor'}
 	DELTp_Coefficients = {\
 		'Shoulder' : {\
-			'MA' : Pigeon_coeff_conversion([ -2.28547177,  -0.39721238, 0.33900829, 0.36146546,  0.,  0.]), \
-			'src' : 'Pigeon', 'eq' : None, 'threshold' : np.pi/2, \
+			'MA' : Pigeon_coeff_conversion([-2.38165173, -0.4486164 ,  0.58655808,  0.65003255, -0.82736695,0.20812998]), \
+			'src' : 'Pigeon', 'eq' : None, 'threshold' : None, \
 			'dof' : 'Shoulder'}, \
 		'Elbow' : {\
 			'MA' : 0,\
@@ -291,7 +291,7 @@ def global_R_matrix():
 		'Corrected No' : 426.3/3, \
 		'Relative Abundance' : 0.43,\
 		'Optimal Muscle Length' : 137,\
-        'Group' : 'extensor'}
+	    'Group' : 'extensor'}
 	BIC_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : [29.21,0,0,0,0,0],\
@@ -306,7 +306,7 @@ def global_R_matrix():
 		'Corrected No' : 292.6,\
 		'Relative Abundance' : 1.1,\
 		'Optimal Muscle Length' : 116,\
-        'Group' : 'flexor'}
+	    'Group' : 'flexor'}
 	TRI_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : [-25.40,0,0,0,0,0], \
@@ -321,7 +321,7 @@ def global_R_matrix():
 		'Corrected No' : (223.7+269.6+221.8),\
 		'Relative Abundance' : (0.89+0.82+0.44)/3,\
 		'Optimal Muscle Length' : 134,\
-        'Group' : 'extensor'}
+	    'Group' : 'extensor'}
 	BRA_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0,\
@@ -336,7 +336,7 @@ def global_R_matrix():
 		'Corrected No' : 272.1,\
 		'Relative Abundance' : 0.94,\
 		'Optimal Muscle Length' : 86,\
-        'Group' : 'flexor'}
+	    'Group' : 'flexor'}
 	BRD_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0, \
@@ -351,7 +351,7 @@ def global_R_matrix():
 		'Corrected No' : 190.2,\
 		'Relative Abundance' : 0.37,\
 		'Optimal Muscle Length' : 173,\
-        'Group' : 'flexor'}
+	    'Group' : 'flexor'}
 	PRO_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0,\
@@ -366,7 +366,7 @@ def global_R_matrix():
 		'Corrected No' : 185.5, \
 		'Relative Abundance' : 1.3,\
 		'Optimal Muscle Length' : 49,\
-        'Group' : 'flexor'}
+	    'Group' : 'flexor'}
 	FCR_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0, \
@@ -381,7 +381,7 @@ def global_R_matrix():
 		'Corrected No' : 125.7, \
 		'Relative Abundance' : 1.0,\
 		'Optimal Muscle Length' : 63,\
-        'Group' : 'flexor'}
+	    'Group' : 'flexor'}
 	ECRB_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0,\
@@ -396,7 +396,7 @@ def global_R_matrix():
 		'Corrected No' : 132.7, \
 		'Relative Abundance' : 0.77,\
 		'Optimal Muscle Length' : 59,\
-        'Group' : 'extensor'}
+	    'Group' : 'extensor'}
 	ECRL_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0,\
@@ -411,7 +411,7 @@ def global_R_matrix():
 		'Corrected No' : 155.2, \
 		'Relative Abundance' : 0.48,\
 		'Optimal Muscle Length' : 81,\
-        'Group' : 'extensor'}
+	    'Group' : 'extensor'}
 	FCU_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0,\
@@ -426,7 +426,7 @@ def global_R_matrix():
 		'Corrected No' : 141.2,\
 		'Relative Abundance' : 1.2,\
 		'Optimal Muscle Length' : 51,\
-        'Group' : 'flexor'}
+	    'Group' : 'flexor'}
 	FDS_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0,\
@@ -441,7 +441,7 @@ def global_R_matrix():
 		'Corrected No' : 224.9,\
 		'Relative Abundance' : 1.6,\
 		'Optimal Muscle Length' : 84,\
-        'Group' : 'flexor'}
+	    'Group' : 'flexor'}
 	PL_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0,\
@@ -456,7 +456,7 @@ def global_R_matrix():
 		'Corrected No' : None, \
 		'Relative Abundance' : None,\
 		'Optimal Muscle Length' : 64,\
-        'Group' : 'flexor'}
+	    'Group' : 'flexor'}
 	ECU_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0,\
@@ -471,7 +471,7 @@ def global_R_matrix():
 		'Corrected No' : 118,\
 		'Relative Abundance' : 1.3,\
 		'Optimal Muscle Length' : 62,\
-        'Group' : 'extensor'}
+	    'Group' : 'extensor'}
 	EDM_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0, \
@@ -486,7 +486,7 @@ def global_R_matrix():
 		'Corrected No' : 59.8, \
 		'Relative Abundance' : 0.89,\
 		'Optimal Muscle Length' : 68,\
-        'Group' : 'extensor'}
+	    'Group' : 'extensor'}
 	EDC_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0, \
@@ -501,7 +501,7 @@ def global_R_matrix():
 		'Corrected No' : 152.6, \
 		'Relative Abundance' : 1.4,\
 		'Optimal Muscle Length' : 70,\
-        'Group' : 'extensor'}
+	    'Group' : 'extensor'}
 	AN_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : 0,\
@@ -516,7 +516,7 @@ def global_R_matrix():
 		'Corrected No' : None, \
 		'Relative Abundance' : None,\
 		'Optimal Muscle Length' : None,\
-        'Group' : 'extensor'}
+	    'Group' : 'extensor'}
 
 	global AllCoefficients
 	# AllCoefficients = [DELTa_Coefficients, CB_Coefficients, DELTp_Coefficients, BIC_Coefficients, \
@@ -554,35 +554,68 @@ def return_MA_matrix(A1,A2):
 	MomentArmMatrix = RMatrix_Transpose.subs([(q1,A1),(q2,A2),(q_PS,pi/2)]).T
 	return(MomentArmMatrix)
 def calculate_weighted_muscle_velocities_ISOLATED_ROTATION(A1,A2,Ȧ1,Ȧ2,dof='Elbow'):
-    import numpy as np
-    import sympy as sp
-    global q1,q2,q_PS,AllCoefficients
-    R = return_MA_matrix(A1,A2)
-    if dof =='Elbow':
-        MomentArmList = [1]
-    elif dof == 'Shoulder':
-        MomentArmList = [0]
-    else:
-        MomentArmList = [0,1]
-    #dR = np.concatenate([sp.diff(RMatrix_Transpose[:,0],q1).subs(q1,A1),sp.diff(RMatrix_Transpose[:,1],q2).subs([(q2,A2),(q_PS,np.pi/2)])],axis=1)
-    MuscleVelocity = -R.T*(np.matrix([Ȧ1,Ȧ2]).T)#-dR*(np.matrix(np.multiply([A1,A2],[Ȧ1,Ȧ2])).T)#
-    MuscleList = AllCoefficients.keys()
-    # WeightedNormalizedMuscleVelocity = np.array([[float(MuscleVelocity[i,0])/AllCoefficients[list(MuscleList)[i]]['Optimal Muscle Length'] for i in range(len(MuscleVelocity))]])
+	"""
+	v = (-dR/dϑ)⋅(dϑ/dt)⋅ϑ + (-R)⋅(dϑ/dt)
+	(dsⱼ/dϑ₁)⋅(dϑ₁/dt) = √((dϑ₁/dt)²⋅(dr₁ⱼ/dϑ₁)² + (dϑ₁/dt)²⋅(r₁ⱼ)²)
+	(dsⱼ/dt) = sum([√(el) for el in diag(dϑ/dt)(J²_{Rⱼ})(dϑ/dt) + diag(Rⱼ)(diag(dϑ/dt)²)(dϑ₁/dt)])
 
-    WeightedNormalizedMuscleVelocity = np.array([[float(MuscleVelocity[i,0])*abs(sum([R.T[i,col] for col in MomentArmList])/1000)*AllCoefficients[list(MuscleList)[i]]['Corrected No']/AllCoefficients[list(MuscleList)[i]]['Optimal Muscle Length'] for i in range(len(AllCoefficients))]])
-    return(WeightedNormalizedMuscleVelocity)
+	Need to hard code whether the rotation causes lengthening or shortening. This is determined by the sign of -r₁ⱼ⋅dϑ₁/dt for each d.o.f.
+	"""
+	import numpy as np
+	import sympy as sp
+	global q1,q2,q_PS,AllCoefficients,RMatrix_Transpose
+	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()])
+	R = return_MA_matrix(A1,A2)
+	# J²_{Rⱼ} --> The squared jacobian of each column of the R matrix w.r.t. {ϑ₁,...,ϑₙ}
+	SquaredJacobians = [RMatrix_Transpose[i,:].jacobian([q1,q2]).subs([(q1,A1),(q2,A2),(q_PS,np.pi/2)])**2 for i in range(np.shape(RMatrix_Transpose)[0])]
+	sign_convention = lambda j: -np.sign(np.multiply([Ȧ1,Ȧ2],R[:,j].T))
+	MuscleVelocity = [float(sign_convention(j)\
+		*np.matrix([el**0.5 for el in \
+			diagonal([Ȧ1,Ȧ2])*SquaredJacobians[j]*np.matrix([[Ȧ1],[Ȧ2]]) \
+				+ diagonal(R[:,j])*(diagonal([Ȧ1,Ȧ2])**2)*R[:,j]]).T) \
+					for j in range(np.shape(R)[1])]
+	if dof =='Elbow':
+	    MomentArmList = [1]
+	elif dof == 'Shoulder':
+	    MomentArmList = [0]
+	else:
+	    MomentArmList = [0,1]
+	#dR = np.concatenate([sp.diff(RMatrix_Transpose[:,0],q1).subs(q1,A1),sp.diff(RMatrix_Transpose[:,1],q2).subs([(q2,A2),(q_PS,np.pi/2)])],axis=1)
+	# MuscleVelocity = -R.T*(np.matrix([Ȧ1,Ȧ2]).T)#-dR*(np.matrix(np.multiply([A1,A2],[Ȧ1,Ȧ2])).T)#
+	MuscleList = AllCoefficients.keys()
+	# WeightedNormalizedMuscleVelocity = np.array([[float(MuscleVelocity[i,0])/AllCoefficients[list(MuscleList)[i]]['Optimal Muscle Length'] for i in range(len(MuscleVelocity))]])
+
+	WeightedNormalizedMuscleVelocity = np.array([[MuscleVelocity[i]*abs(sum([R.T[i,col] for col in MomentArmList])/1000)*AllCoefficients[list(MuscleList)[i]]['Corrected No']/AllCoefficients[list(MuscleList)[i]]['Optimal Muscle Length'] for i in range(len(AllCoefficients))]])
+	return(WeightedNormalizedMuscleVelocity)
+def diagonal(X):
+	import sympy as sp
+	import numpy as np
+	return(sp.Matrix(np.diagflat(X)))
 def calculate_muscle_velocities(A1,A2,Ȧ1,Ȧ2):
-    import numpy as np
-    import sympy as sp
-    global q1,q2,q_PS,AllCoefficients
-    R = return_MA_matrix(A1,A2)
-    #dR = np.concatenate([sp.diff(RMatrix_Transpose[:,0],q1).subs(q1,A1),sp.diff(RMatrix_Transpose[:,1],q2).subs([(q2,A2),(q_PS,np.pi/2)])],axis=1)
-    MuscleVelocity = -R.T*(np.matrix([Ȧ1,Ȧ2]).T)#-dR*(np.matrix(np.multiply([A1,A2],[Ȧ1,Ȧ2])).T)#
-    MuscleList = list(AllCoefficients.keys())
-    # WeightedNormalizedMuscleVelocity = np.array([[float(MuscleVelocity[i,0])/AllCoefficients[list(MuscleList)[i]]['Optimal Muscle Length'] for i in range(len(MuscleVelocity))]])
+	"""
+	v = (-dR/dϑ)⋅(dϑ/dt)⋅ϑ + (-R)⋅(dϑ/dt)
+	(dsⱼ/dϑ₁)⋅(dϑ₁/dt) = √((dϑ₁/dt)²⋅(dr₁ⱼ/dϑ₁)² + (dϑ₁/dt)²⋅(r₁ⱼ)²)
+	(dsⱼ/dt) = sum([√(el) for el in diag(dϑ/dt)(J²_{Rⱼ})(dϑ/dt) + diag(Rⱼ)(diag(dϑ/dt)²)(dϑ₁/dt)])
 
-    NormalizedMuscleVelocity = np.array([[float(MuscleVelocity[i,0])/AllCoefficients[MuscleList[i]]['Optimal Muscle Length'] for i in range(len(AllCoefficients))]])
-    return(NormalizedMuscleVelocity)
+	Need to hard code whether the rotation causes lengthening or shortening. This is determined by the sign of -r₁ⱼ⋅dϑ₁/dt for each d.o.f.
+	"""
+	import numpy as np
+	import sympy as sp
+	global q1,q2,q_PS,AllCoefficients,RMatrix_Transpose
+	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()])
+	R = return_MA_matrix(A1,A2)
+	# J²_{Rⱼ} --> The squared jacobian of each column of the R matrix w.r.t. {ϑ₁,...,ϑₙ}
+	SquaredJacobians = [RMatrix_Transpose[i,:].jacobian([q1,q2]).subs([(q1,A1),(q2,A2),(q_PS,np.pi/2)])**2 for i in range(np.shape(RMatrix_Transpose)[0])]
+	sign_convention = lambda j: -np.sign(np.multiply([Ȧ1,Ȧ2],R[:,j].T))
+	MuscleVelocity = [float(sign_convention(j)\
+		*np.matrix([el**0.5 for el in \
+			diagonal([Ȧ1,Ȧ2])*SquaredJacobians[j]*np.matrix([[Ȧ1],[Ȧ2]]) \
+				+ diagonal(R[:,j])*(diagonal([Ȧ1,Ȧ2])**2)*R[:,j]]).T) \
+					for j in range(np.shape(R)[1])]
+	# dR = np.concatenate([sp.diff(RMatrix_Transpose[:,0],q1).subs(q1,A1),sp.diff(RMatrix_Transpose[:,1],q2).subs([(q2,A2),(q_PS,np.pi/2)])],axis=1)
+	# MuscleVelocity = -R.T*(np.matrix([Ȧ1,Ȧ2]).T)#-dR*(np.matrix(np.multiply([A1,A2],[Ȧ1,Ȧ2])).T)
+	NormalizedMuscleVelocity = np.array([[MuscleVelocity[i]/OptimalMuscleLength[i] for i in range(len(MuscleVelocity))]])
+	return(NormalizedMuscleVelocity)
 def eccentric_velocities(NormalizedMuscleVelocity):
 	import numpy as np
 	PositiveMuscleVelocities = [NormalizedMuscleVelocity.T[i,:][NormalizedMuscleVelocity.T[i,:]>0] for i in range(np.shape(NormalizedMuscleVelocity)[1])]
@@ -621,19 +654,25 @@ import math
 import time
 from matplotlib.backends.backend_pdf import PdfPages
 
+	# Save Output Figures?
+
+SaveOutputFigures = False
+
 	# DescriptiveTitle should be something to identify the trial either by degree of freedom, (i.e., Elbow or Shoulder) or by what has changed in the most current iteration (e.g., CB_Ramsay, DELTa_Est, etc.). Spaces will be replaced by '_' symbolbs for the filename but kept for figure titles.
 
-DescriptiveTitle = 'Isolated Elbow'
+DescriptiveTitle = 'Isolated Shoulder'
 
-	# Open PDF files to write plots to
+if SaveOutputFigures == True:
 
-pdf_forward = PdfPages(DescriptiveTitle.replace(' ','_') + '_Forward.pdf')
-pdf_reverse = PdfPages(DescriptiveTitle.replace(' ','_') + '_Reverse.pdf')
-pdf_bar = PdfPages(DescriptiveTitle.replace(' ','_') + '_bar.pdf')
+		# Open PDF files to write plots to
+
+	pdf_forward = PdfPages(DescriptiveTitle.replace(' ','_') + '_Forward.pdf')
+	pdf_reverse = PdfPages(DescriptiveTitle.replace(' ','_') + '_Reverse.pdf')
+	pdf_bar = PdfPages(DescriptiveTitle.replace(' ','_') + '_bar.pdf')
 
 	# Specify isolated DOF and define reaching locations
 
-dof = 'Elbow'
+dof = 'Shoulder'
 
 if dof == 'Elbow':
 	# Elbow Rotation
@@ -705,7 +744,7 @@ else:
 ax1a.set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
 [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1a.lines)]
 ax1a.legend(OrderedMuscleList)
-pdf_forward.savefig(fig1a)
+
 
 	# Plot Normalized Muscle Velocity (Forward)
 
@@ -721,7 +760,7 @@ else:
 ax1b.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Eccentric')
 [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1b.lines)]
 ax1b.legend(OrderedMuscleList)
-pdf_forward.savefig(fig1b)
+
 
 	# Calculate Costs from Afferent-Weighted Muscle Velocities (Forward)
 
@@ -756,7 +795,7 @@ else:
 ax2a.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Eccentric')
 [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2a.lines)]
 ax2a.legend(OrderedMuscleList)
-pdf_reverse.savefig(fig2a)
+
 
 	# Plot Normalized Muscle Velocity (Reverse)
 
@@ -772,7 +811,7 @@ else:
 ax2b.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Eccentric')
 [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2b.lines)]
 ax2b.legend(OrderedMuscleList)
-pdf_reverse.savefig(fig2b)
+
 
 	# Calculate Costs from Afferent-Weighted Muscle Velocities (Reverse)
 
@@ -806,14 +845,23 @@ ax4.set_yticks([0,3,6])
 ax4.set_yticklabels(['0','','6'])
 ax4.set_title('Eccentric Cost\nFor Forward and Reverse Movements')
 ax4.set_ylabel('Sum of Afferent-Weighted Muscle Lengthening')
-pdf_bar.savefig(fig4)
 
-	# Need to close the PDF files in order to write properly
+if SaveOutputFigures == True:
 
-pdf_forward.close()
-pdf_reverse.close()
-pdf_bar.close()
+	pdf_forward.savefig(fig1a)
+	pdf_forward.savefig(fig1b)
+	pdf_reverse.savefig(fig2a)
+	pdf_reverse.savefig(fig2b)
+	pdf_bar.savefig(fig4)
 
-	# Close any open plots
+		# Need to close the PDF files in order to write properly
 
-plt.close('all')
+	pdf_forward.close()
+	pdf_reverse.close()
+	pdf_bar.close()
+
+		# Close any open plots
+
+	plt.close('all')
+
+plt.show()
