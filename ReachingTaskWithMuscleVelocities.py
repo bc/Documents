@@ -1261,242 +1261,242 @@ ax1e.set_title(DescriptiveTitle+'\nAfferent-Weighted Normalized Muscle Velocity'
 [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1e.lines)]
 ax1e.legend(OrderedMuscleList)
 
-plt.show()
+
+
+
+	# Plot Normalized Muscle Velocity (Forward)
+
+fig1a = plt.figure()
+[plt.plot(t,NormalizedMuscleVelocity_Forward[:,i]) for i in OrderNumber]
+ax1a = plt.gca()
+ax1a.set_xlim(0,t_end*(1.3))
+ax1a.set_ylim(-1.5,1.5)
+ax1a.set_title(DescriptiveTitle+'\nNormalized Muscle Velocity')
+if t_end!=1:
+	ax1a.set_xlabel('Time (s)')
+else:
+	ax1a.set_xlabel('Normalized Time')
+ax1a.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Eccentric')
+[j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1a.lines)]
+ax1a.legend(OrderedMuscleList)
+
+
+	# Plot Joint Angles (Forward)
+
+fig1b = plt.figure()
+plt.plot(t,A1,'g')
+plt.plot(t,A2,'g:')
+ax1b = plt.gca()
+ax1b.set_xlim(0,t_end*(1.3))
+ax1b.set_title(DescriptiveTitle+'\nAngle vs. Time')
+if t_end!=1:
+	ax1b.set_xlabel('Time (s)')
+else:
+	ax1b.set_xlabel('Normalized Time')
+ax1b.set_ylabel('Joint Angles (in radians)')
+ax1b.legend(["Shoulder","Elbow"])
+
+
+	# Plot Configuration Space (Forward)
+
+fig1c = plt.figure()
+plt.plot(A1,A2,'g')
+ax1c = plt.gca()
+ax1c.set_title(DescriptiveTitle+'\nConfiguration Space')
+ax1c.set_ylabel("Shouler Angle (in radians)")
+ax1c.set_xlabel("Elbow Angle (in radians)")
+
+
+	# Calculate Costs from Afferent-Weighted Muscle Velocities
+
+EccentricCost_Forward = eccentric_cost(WeightedNormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt,type='l1norm')
+ConcentricCost_Forward = concentric_cost(WeightedNormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt,type='l1norm')
+
+# # Plot Muscle Lengths (Forward)
 #
-#
-# 	# Plot Normalized Muscle Velocity (Forward)
-#
-# fig1a = plt.figure()
-# [plt.plot(t,NormalizedMuscleVelocity_Forward[:,i]) for i in OrderNumber]
-# ax1a = plt.gca()
-# ax1a.set_xlim(0,t_end*(1.3))
-# ax1a.set_ylim(-1.5,1.5)
-# ax1a.set_title(DescriptiveTitle+'\nNormalized Muscle Velocity')
+# fig1d = plt.figure()
+# [plt.plot(t,MuscleLengths_Forward[i]) for i in OrderNumber]
+# ax1d = plt.gca()
+# ax1d.set_xlim(0,t_end*(1.3))
+# ax1d.set_title(DescriptiveTitle+'\nMuscle Lengths')
 # if t_end!=1:
-# 	ax1a.set_xlabel('Time (s)')
+# 	ax1d.set_xlabel('Time (s)')
 # else:
-# 	ax1a.set_xlabel('Normalized Time')
-# ax1a.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Eccentric')
-# [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1a.lines)]
-# ax1a.legend(OrderedMuscleList)
+# 	ax1d.set_xlabel('Normalized Time')
+# ax1d.set_ylabel('Muscle Lengths (in mm)')
+# [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1d.lines)]
+# ax1d.legend(OrderedMuscleList)
+
+
+	# Reverse Direction
+
+reaching_task(Xi=Xf, Xf=Xi,dt=dt, t_end=t_end)
+# calculate_muscle_lengths()
+# MuscleLengths_Reverse = MuscleLengths
+WeightedNormalizedMuscleVelocity_Reverse = calculate_weighted_muscle_velocities_REACHING_TASK(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
+NormalizedMuscleVelocity_Reverse = calculate_muscle_velocities(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
+StartTime = time.time()
+statusbar(0,len(A1),Title = 'Reverse Vm',StartTime=StartTime)
+for i in range(1,len(A1)):
+    statusbar(i,len(A1),Title = 'Reverse Vm',StartTime=StartTime)
+    WeightedNormalizedMuscleVelocity_Reverse = np.concatenate((WeightedNormalizedMuscleVelocity_Reverse,calculate_weighted_muscle_velocities_REACHING_TASK(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
+    NormalizedMuscleVelocity_Reverse = np.concatenate((NormalizedMuscleVelocity_Reverse,calculate_muscle_velocities(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
+print('\n')
+
+	# Plot Afferent-Weighted Muscle Velocity (Reverse)
+
+fig2e = plt.figure()
+[plt.plot(t,WeightedNormalizedMuscleVelocity_Reverse[:,i]) for i in OrderNumber]
+ax2e = plt.gca()
+ax2e.set_xlim(0,t_end*(1.3))
+ax2e.set_ylim(-12,12)
+ax2e.set_title(DescriptiveTitle+'\nAfferent-Weighted Normalized Muscle Velocity')
+if t_end!=1:
+	ax2e.set_xlabel('Time (s)')
+else:
+	ax2e.set_xlabel('Normalized Time')
+ax2e.set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+[j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2e.lines)]
+ax2e.legend(OrderedMuscleList)
+
+
+	# Plot Normalized Muscle Velocity (Reverse)
+
+fig2a = plt.figure()
+[plt.plot(t,NormalizedMuscleVelocity_Reverse[:,i]) for i in OrderNumber]
+ax2a = plt.gca()
+ax2a.set_xlim(0,t_end*(1.3))
+ax2a.set_ylim(-1.5,1.5)
+ax2a.set_title(DescriptiveTitle+'\nNormalized Muscle Velocity')
+if t_end!=1:
+	ax2a.set_xlabel('Time (s)')
+else:
+	ax2a.set_xlabel('Normalized Time')
+ax2a.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Eccentric')
+[j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2a.lines)]
+ax2a.legend(OrderedMuscleList)
+
+
+	# Plot Joint Angles (Reverse)
+
+fig2b = plt.figure()
+plt.plot(t,A1,'b')
+plt.plot(t,A2,'b:')
+ax2b = plt.gca()
+ax2b.set_xlim(0,t_end*(1.3))
+ax2b.set_title(DescriptiveTitle+'\nAngle vs. Time')
+if t_end!=1:
+	ax2b.set_xlabel('Time (s)')
+else:
+	ax2b.set_xlabel('Normalized Time')
+ax2b.set_ylabel('Joint Angles (in radians)')
+ax2b.legend(["Shoulder","Elbow"])
+
+
+	# Plot Configuration Space (Reverse)
+
+fig2c = plt.figure()
+plt.plot(A1,A2,'b')
+ax2c = plt.gca()
+ax2c.set_title(DescriptiveTitle+'\nConfiguration Space')
+ax2c.set_ylabel("Shouler Angle (in radians)")
+ax2c.set_xlabel("Elbow Angle (in radians)")
+
+
+	# Calculate Costs from Afferent-Weighted Muscle Velocities
+
+EccentricCost_Reverse = eccentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,type='l1norm')
+ConcentricCost_Reverse = concentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,type='l1norm')
+
+# # Plot Muscle Lengths (Reverse)
 #
-#
-# 	# Plot Joint Angles (Forward)
-#
-# fig1b = plt.figure()
-# plt.plot(t,A1,'g')
-# plt.plot(t,A2,'g:')
-# ax1b = plt.gca()
-# ax1b.set_xlim(0,t_end*(1.3))
-# ax1b.set_title(DescriptiveTitle+'\nAngle vs. Time')
+# fig2d = plt.figure()
+# [plt.plot(t,MuscleLengths_Reverse[i]) for i in OrderNumber]
+# ax2d = plt.gca()
+# ax2d.set_xlim(0,t_end*(1.3))
+# ax2d.set_title(DescriptiveTitle+'\nMuscle Lengths')
 # if t_end!=1:
-# 	ax1b.set_xlabel('Time (s)')
+# 	ax2d.set_xlabel('Time (s)')
 # else:
-# 	ax1b.set_xlabel('Normalized Time')
-# ax1b.set_ylabel('Joint Angles (in radians)')
-# ax1b.legend(["Shoulder","Elbow"])
-#
-#
-# 	# Plot Configuration Space (Forward)
-#
-# fig1c = plt.figure()
-# plt.plot(A1,A2,'g')
-# ax1c = plt.gca()
-# ax1c.set_title(DescriptiveTitle+'\nConfiguration Space')
-# ax1c.set_ylabel("Shouler Angle (in radians)")
-# ax1c.set_xlabel("Elbow Angle (in radians)")
-#
-#
-# 	# Calculate Costs from Afferent-Weighted Muscle Velocities
-#
-# EccentricCost_Forward = eccentric_cost(WeightedNormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt,type='l1norm')
-# ConcentricCost_Forward = concentric_cost(WeightedNormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt,type='l1norm')
-#
-# # # Plot Muscle Lengths (Forward)
-# #
-# # fig1d = plt.figure()
-# # [plt.plot(t,MuscleLengths_Forward[i]) for i in OrderNumber]
-# # ax1d = plt.gca()
-# # ax1d.set_xlim(0,t_end*(1.3))
-# # ax1d.set_title(DescriptiveTitle+'\nMuscle Lengths')
-# # if t_end!=1:
-# # 	ax1d.set_xlabel('Time (s)')
-# # else:
-# # 	ax1d.set_xlabel('Normalized Time')
-# # ax1d.set_ylabel('Muscle Lengths (in mm)')
-# # [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1d.lines)]
-# # ax1d.legend(OrderedMuscleList)
-#
-#
-# 	# Reverse Direction
-#
-# reaching_task(Xi=Xf, Xf=Xi,dt=dt, t_end=t_end)
-# # calculate_muscle_lengths()
-# # MuscleLengths_Reverse = MuscleLengths
-# WeightedNormalizedMuscleVelocity_Reverse = calculate_weighted_muscle_velocities_REACHING_TASK(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
-# NormalizedMuscleVelocity_Reverse = calculate_muscle_velocities(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
-# StartTime = time.time()
-# statusbar(0,len(A1),Title = 'Reverse Vm',StartTime=StartTime)
-# for i in range(1,len(A1)):
-#     statusbar(i,len(A1),Title = 'Reverse Vm',StartTime=StartTime)
-#     WeightedNormalizedMuscleVelocity_Reverse = np.concatenate((WeightedNormalizedMuscleVelocity_Reverse,calculate_weighted_muscle_velocities_REACHING_TASK(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
-#     NormalizedMuscleVelocity_Reverse = np.concatenate((NormalizedMuscleVelocity_Reverse,calculate_muscle_velocities(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
-# print('\n')
-#
-# 	# Plot Afferent-Weighted Muscle Velocity (Reverse)
-#
-# fig2e = plt.figure()
-# [plt.plot(t,WeightedNormalizedMuscleVelocity_Reverse[:,i]) for i in OrderNumber]
-# ax2e = plt.gca()
-# ax2e.set_xlim(0,t_end*(1.3))
-# ax2e.set_ylim(-12,12)
-# ax2e.set_title(DescriptiveTitle+'\nAfferent-Weighted Normalized Muscle Velocity')
-# if t_end!=1:
-# 	ax2e.set_xlabel('Time (s)')
-# else:
-# 	ax2e.set_xlabel('Normalized Time')
-# ax2e.set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
-# [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2e.lines)]
-# ax2e.legend(OrderedMuscleList)
-#
-#
-# 	# Plot Normalized Muscle Velocity (Reverse)
-#
-# fig2a = plt.figure()
-# [plt.plot(t,NormalizedMuscleVelocity_Reverse[:,i]) for i in OrderNumber]
-# ax2a = plt.gca()
-# ax2a.set_xlim(0,t_end*(1.3))
-# ax2a.set_ylim(-1.5,1.5)
-# ax2a.set_title(DescriptiveTitle+'\nNormalized Muscle Velocity')
-# if t_end!=1:
-# 	ax2a.set_xlabel('Time (s)')
-# else:
-# 	ax2a.set_xlabel('Normalized Time')
-# ax2a.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Eccentric')
-# [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2a.lines)]
-# ax2a.legend(OrderedMuscleList)
-#
-#
-# 	# Plot Joint Angles (Reverse)
-#
-# fig2b = plt.figure()
-# plt.plot(t,A1,'b')
-# plt.plot(t,A2,'b:')
-# ax2b = plt.gca()
-# ax2b.set_xlim(0,t_end*(1.3))
-# ax2b.set_title(DescriptiveTitle+'\nAngle vs. Time')
-# if t_end!=1:
-# 	ax2b.set_xlabel('Time (s)')
-# else:
-# 	ax2b.set_xlabel('Normalized Time')
-# ax2b.set_ylabel('Joint Angles (in radians)')
-# ax2b.legend(["Shoulder","Elbow"])
-#
-#
-# 	# Plot Configuration Space (Reverse)
-#
-# fig2c = plt.figure()
-# plt.plot(A1,A2,'b')
-# ax2c = plt.gca()
-# ax2c.set_title(DescriptiveTitle+'\nConfiguration Space')
-# ax2c.set_ylabel("Shouler Angle (in radians)")
-# ax2c.set_xlabel("Elbow Angle (in radians)")
-#
-#
-# 	# Calculate Costs from Afferent-Weighted Muscle Velocities
-#
-# EccentricCost_Reverse = eccentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,type='l1norm')
-# ConcentricCost_Reverse = concentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,type='l1norm')
-#
-# # # Plot Muscle Lengths (Reverse)
-# #
-# # fig2d = plt.figure()
-# # [plt.plot(t,MuscleLengths_Reverse[i]) for i in OrderNumber]
-# # ax2d = plt.gca()
-# # ax2d.set_xlim(0,t_end*(1.3))
-# # ax2d.set_title(DescriptiveTitle+'\nMuscle Lengths')
-# # if t_end!=1:
-# # 	ax2d.set_xlabel('Time (s)')
-# # else:
-# # 	ax2d.set_xlabel('Normalized Time')
-# # ax2d.set_ylabel('Muscle Lengths (in mm)')
-# # [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2d.lines)]
-# # ax2d.legend(OrderedMuscleList)
-#
-#
-# # plt.figure()
-# # plt.plot(np.arange(0,2*math.ceil(max([EccentricCost_Forward,ConcentricCost_Forward]))+1,1), np.arange(0,2*math.ceil(max([EccentricCost_Forward,ConcentricCost_Forward]))+1,1),'0.75',linestyle='--')
-# # plt.scatter([EccentricCost_Forward],[ConcentricCost_Forward],facecolor ='g', edgecolor = 'k', marker='o',s=100)
-# # plt.scatter([EccentricCost_Reverse],[ConcentricCost_Reverse],facecolor ='b', edgecolor = 'k', marker='o',s=100)
-# # ax3 = plt.gca()
-# # ax3.set_xlim(0,2*math.ceil(max([EccentricCost_Forward,EccentricCost_Reverse])))
-# # ax3.set_ylim(0,2*math.ceil(max([EccentricCost_Forward,EccentricCost_Reverse])))
-# # ax3.set_aspect('equal')
-# # ax3.set_title('Eccentric vs. Concentric Cost\nFor Forward and Reverse Movments')
-# # ax3.set_xlabel('Eccentric Cost (in $\hat{l}_{o}$)')
-# # ax3.set_ylabel('Concentric Cost (in $\hat{l}_{o}$)')
-# # ax3.legend(['Equal Cost Line','Forward Direction','Reversed Direction'])
-#
-#
-# # Using Default Reaching Directions Listed Above...
-# # CostValues ={'CenterForward' : np.array([[ 1.3220062 ,  2.10011198]]),\
-# # 				'CenterReverse' : np.array([[ 2.10011198,  1.3220062 ]]),\
-# # 					'LeftForward' : np.array([[ 1.24643599,  1.88616011]]),\
-# # 						'LeftReverse' : np.array([[ 1.88616011,  1.24643599]]),\
-# # 							'RightForward' : np.array([[ 1.1047386 ,  1.92105444]]),\
-# # 								'RightReverse' : np.array([[ 1.92105444,  1.1047386 ]]),\
-# # 									'SideForward' : np.array([[ 0.37931692,  0.53156831]]),\
-# # 										'SideReverse' : np.array([[ 0.53156831,  0.37931692]])}
-# # plt.figure()
-# # MaximumCost = max([max(CostValues[key][0]) for key in CostValues.keys()])
-# # plt.plot(np.arange(0,2*math.ceil(MaximumCost)+1,1), np.arange(0,2*math.ceil(MaximumCost)+1,1),'0.75',linestyle='--')
-# # facecolor = iter(['k','#9f9f9f','b','#9f9f9f','r','#9f9f9f','g','#9f9f9f'])
-# # edgecolor = iter(['k','k','k','b','k','r','k','g'])
-# # [plt.scatter(CostValues[key][0,0],CostValues[key][0,1],c=next(facecolor),edgecolor=next(edgecolor),marker='o',s=75) for key in CostValues.keys()]
-# # ax4 = plt.gca()
-# # ax4.set_xlim(0,math.ceil(MaximumCost))
-# # ax4.set_ylim(0,math.ceil(MaximumCost))
-# # ax4.set_aspect('equal')
-# # ax4.set_title('Eccentric vs. Concentric Cost\nFor Forward and Reverse Movments')
-# # ax4.set_xlabel('Eccentric Cost (in $\hat{l}_{o}$)')
-# # ax4.set_ylabel('Concentric Cost (in $\hat{l}_{o}$)')
-# # # ax4.legend(['Equal Cost Line','Center (Forward)','Center (Reverse)','Left (Forward)','Left (Reverse)','Right (Forward)','Right (Reverse)','Side-to-Side (Forward)','Side-to-Side (Reverse)'],loc='upper right')
-# #
-#
-# 	# Plot bar graph comparing the two directions
-#
-# fig2 = plt.figure()
-# plt.bar(np.arange(2),[EccentricCost_Reverse,EccentricCost_Forward])
+# 	ax2d.set_xlabel('Normalized Time')
+# ax2d.set_ylabel('Muscle Lengths (in mm)')
+# [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2d.lines)]
+# ax2d.legend(OrderedMuscleList)
+
+
+# plt.figure()
+# plt.plot(np.arange(0,2*math.ceil(max([EccentricCost_Forward,ConcentricCost_Forward]))+1,1), np.arange(0,2*math.ceil(max([EccentricCost_Forward,ConcentricCost_Forward]))+1,1),'0.75',linestyle='--')
+# plt.scatter([EccentricCost_Forward],[ConcentricCost_Forward],facecolor ='g', edgecolor = 'k', marker='o',s=100)
+# plt.scatter([EccentricCost_Reverse],[ConcentricCost_Reverse],facecolor ='b', edgecolor = 'k', marker='o',s=100)
+# ax3 = plt.gca()
+# ax3.set_xlim(0,2*math.ceil(max([EccentricCost_Forward,EccentricCost_Reverse])))
+# ax3.set_ylim(0,2*math.ceil(max([EccentricCost_Forward,EccentricCost_Reverse])))
+# ax3.set_aspect('equal')
+# ax3.set_title('Eccentric vs. Concentric Cost\nFor Forward and Reverse Movments')
+# ax3.set_xlabel('Eccentric Cost (in $\hat{l}_{o}$)')
+# ax3.set_ylabel('Concentric Cost (in $\hat{l}_{o}$)')
+# ax3.legend(['Equal Cost Line','Forward Direction','Reversed Direction'])
+
+
+# Using Default Reaching Directions Listed Above...
+# CostValues ={'CenterForward' : np.array([[ 1.3220062 ,  2.10011198]]),\
+# 				'CenterReverse' : np.array([[ 2.10011198,  1.3220062 ]]),\
+# 					'LeftForward' : np.array([[ 1.24643599,  1.88616011]]),\
+# 						'LeftReverse' : np.array([[ 1.88616011,  1.24643599]]),\
+# 							'RightForward' : np.array([[ 1.1047386 ,  1.92105444]]),\
+# 								'RightReverse' : np.array([[ 1.92105444,  1.1047386 ]]),\
+# 									'SideForward' : np.array([[ 0.37931692,  0.53156831]]),\
+# 										'SideReverse' : np.array([[ 0.53156831,  0.37931692]])}
+# plt.figure()
+# MaximumCost = max([max(CostValues[key][0]) for key in CostValues.keys()])
+# plt.plot(np.arange(0,2*math.ceil(MaximumCost)+1,1), np.arange(0,2*math.ceil(MaximumCost)+1,1),'0.75',linestyle='--')
+# facecolor = iter(['k','#9f9f9f','b','#9f9f9f','r','#9f9f9f','g','#9f9f9f'])
+# edgecolor = iter(['k','k','k','b','k','r','k','g'])
+# [plt.scatter(CostValues[key][0,0],CostValues[key][0,1],c=next(facecolor),edgecolor=next(edgecolor),marker='o',s=75) for key in CostValues.keys()]
 # ax4 = plt.gca()
-# ax4.set_xticklabels(('Reverse','Forward'))
-# ax4.set_ylim(0,18)
-# ax4.set_yticks([0,9,18])
-# ax4.set_yticklabels(['0','','18'])
-# ax4.set_title(DescriptiveTitle + '\nEccentric Cost for Forward and Reverse Movements')
-# ax4.set_ylabel('Sum of Afferent-Weighted Muscle Lengthening')
-# ax4.set_xticks([0,1])
+# ax4.set_xlim(0,math.ceil(MaximumCost))
+# ax4.set_ylim(0,math.ceil(MaximumCost))
+# ax4.set_aspect('equal')
+# ax4.set_title('Eccentric vs. Concentric Cost\nFor Forward and Reverse Movments')
+# ax4.set_xlabel('Eccentric Cost (in $\hat{l}_{o}$)')
+# ax4.set_ylabel('Concentric Cost (in $\hat{l}_{o}$)')
+# # ax4.legend(['Equal Cost Line','Center (Forward)','Center (Reverse)','Left (Forward)','Left (Reverse)','Right (Forward)','Right (Reverse)','Side-to-Side (Forward)','Side-to-Side (Reverse)'],loc='upper right')
 #
-#
-# 	# Need to write PDF files and close the PDF files/figures
-# if SaveOutputFigures == True:
-# 	pdf_forward.savefig(fig1e)
-# 	pdf_forward.savefig(fig1a)
-# 	pdf_forward.savefig(fig1b)
-# 	pdf_forward.savefig(fig1c)
-# 	# pdf_forward.savefig(fig1d)
-# 	pdf_reverse.savefig(fig2e)
-# 	pdf_reverse.savefig(fig2a)
-# 	pdf_reverse.savefig(fig2b)
-# 	pdf_reverse.savefig(fig2c)
-# 	# pdf_reverse.savefig(fig2d)
-# 	pdf_bar.savefig(fig2)
-#
-# 	pdf_forward.close()
-# 	pdf_reverse.close()
-# 	pdf_bar.close()
-#
-# 		# Close any open plots
-#
-# 	plt.close('all')
-#
-# plt.show()
+
+	# Plot bar graph comparing the two directions
+
+fig2 = plt.figure()
+plt.bar(np.arange(2),[EccentricCost_Reverse,EccentricCost_Forward])
+ax4 = plt.gca()
+ax4.set_xticklabels(('Reverse','Forward'))
+ax4.set_ylim(0,18)
+ax4.set_yticks([0,9,18])
+ax4.set_yticklabels(['0','','18'])
+ax4.set_title(DescriptiveTitle + '\nEccentric Cost for Forward and Reverse Movements')
+ax4.set_ylabel('Sum of Afferent-Weighted Muscle Lengthening')
+ax4.set_xticks([0,1])
+
+
+	# Need to write PDF files and close the PDF files/figures
+if SaveOutputFigures == True:
+	pdf_forward.savefig(fig1e)
+	pdf_forward.savefig(fig1a)
+	pdf_forward.savefig(fig1b)
+	pdf_forward.savefig(fig1c)
+	# pdf_forward.savefig(fig1d)
+	pdf_reverse.savefig(fig2e)
+	pdf_reverse.savefig(fig2a)
+	pdf_reverse.savefig(fig2b)
+	pdf_reverse.savefig(fig2c)
+	# pdf_reverse.savefig(fig2d)
+	pdf_bar.savefig(fig2)
+
+	pdf_forward.close()
+	pdf_reverse.close()
+	pdf_bar.close()
+
+		# Close any open plots
+
+	plt.close('all')
+
+plt.show()
