@@ -50,7 +50,7 @@ def statusbar(i,N,**kwargs):
 		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete           \r',end = '')
 def set_link_lengths(New_L1=0.256,New_L2=0.405,EOM = "Uno"):
     """
-    Sets the global link lengths for a 2 DOF planar reaching task. Changes the values of the link lengths. New_L1 and New_L2 must be numbers. Set EOM to Uno of Zadravec.
+    Sets the link lengths for a 2 DOF planar reaching task. Changes the values of the link lengths. New_L1 and New_L2 must be numbers. Set EOM to Uno of Zadravec.
     """
     assert type(New_L1) == int or type(New_L1)==float, "New_L1 must be a number."
     assert type(New_L2) == int or type(New_L2)==float, "New_L2 must be a number."
@@ -77,27 +77,23 @@ def create_angle_lists():
 	Ȧ1,Ȧ2=[],[]
 	Ä1,Ä2=[],[]
 def inverse_kinematics(X):
-	"""
-	Takes in a (2,N) list/array with values for x and y (endpoint) and maps to the  A1 and A2 with the current angles (in radians) from the inverse kinematics.
-	"""
-	import numpy as np
-	from math import acos, sin, cos, atan, atan2
-	from numpy import pi
-	assert np.shape(X)[0]==2, "X must be either a (2,len(X)) list/array"
-	x,y = np.split(X,2,axis=0) # Returns 2 (1,N) arrays
-	"""
-	Math Logic:
-	x² + y² > (L₁+L₂)² = L₁² + 2L₁L₂ + L₂² > L₁² + L₂²
-	x² + y² - L₁² - L₂² > 0
-	a₂ = cos⁻¹((x² + y² - L₁² - L₂²)/2L₁L₂) ∊ (0,π/2)
-
-	Map functions take in (N,1) list/arrays -- i.e., only length-1 arrays can be converted to Python scalars needed for the map function. Therefore, the transpose is needed to change (1,N) to (N,1)
-	"""
-	a2 = lambda x,y: acos((x**2 + y**2 - L1**2 - L2**2)/(2*L1*L2))
-	a1 = lambda x,y,a2: atan2(y,x) - atan2(L2*sin(a2),(L1+L2*cos(a2)))
-	global A1,A2
-	A2 = np.array(list(map(a2,x.T,y.T)), dtype='float128', ndmin=2) # Returns a (1,N) array
-	A1 = np.array(list(map(a1,x.T,y.T,A2.T)), dtype='float128', ndmin=2) # Returns a (1,N) array
+    """
+    Takes in either a (2,) or (2,1) list/array with values for x and y (endpoint) and updates the lists A1 and A2 with the current angles (in radians) from the inverse kinematics.
+    """
+    import numpy as np
+    from math import acos, sin, cos, atan, atan2
+    from numpy import pi
+    assert len(X)==2, "X must be either a (2,) or (2,1) list/array"
+    x,y = X
+    if np.shape(X) == (2,1): x,y = x[0],y[0]
+    # x² + y² > (L₁+L₂)² = L₁² + 2L₁L₂ + L₂² > L₁² + L₂²
+    # x² + y² - L₁² - L₂² > 0
+    # a₂ = cos⁻¹((x² + y² - L₁² - L₂²)/2L₁L₂) ∊ (0,π/2)
+    a2 = acos((x**2 + y**2 - L1**2 - L2**2)/(2*L1*L2))
+    a1 = atan2(y,x) - atan2(L2*sin(a2),(L1+L2*cos(a2)))
+    global A1,A2
+    A1.append(a1)
+    A2.append(a2)
 def set_initial_and_final_positions(ReachType):
 	"""
 	This takes in a string -- either 'Center','Right','Left', or 'Sideways' -- and returns the necessary initial and final positions for the movement, based on Flash/Hogan (1985).
@@ -135,185 +131,107 @@ def set_initial_and_final_positions(ReachType):
 	return(Xi,Xf)
 def find_X_values(t,Xi,Xf):
 	"""
-	This takes t (a numpy.ndarray (dtype = 'float128', ndmin = 2) of normalized time ∈ [0,1]) and either a (2,) or (2,1) list/array with values for both initial and final x and y (endpoint). To avoid singularities, ||X[i]|| cannot be greater than L1 + L2.
-
-	Returns a (2,t.shape) array of dtype = 'float128', ndmin = 2.
+	This takes t (a numpy.ndarray of normalized time ∈ [0,1]) and either a (2,) or (2,1) list/array with values for both initial and final x and y (endpoint). To avoid singularities, ||X[i]|| cannot be greater than L1 + L2.
 	"""
 	import numpy as np
-	assert type(t) == np.ndarray, "t must be a (1,N) 'float128' numpy.ndarray"
-	assert np.shape(t) == (1,t.size), "t must be a (1,N) 'float128' numpy.ndarray"
-	assert t.dtype == 'float128', "t must be a (1,N) 'float128' numpy.ndarray"
+	import ipdb
 	assert len(Xf)==2, "Xf must be either a (2,) or (2,1) list/array"
 	assert len(Xi)==2, "Xi must be either a (2,) or (2,1) list/array"
 	xi,yi = Xi
 	xf,yf = Xf
 	if np.shape(Xi) == (2,1): xi,yi = xi[0],yi[0]
 	if np.shape(Xf) == (2,1): xf,yf = xf[0],yf[0]
-	x = xi + (xf-xi)*(10*t**3 - 15*t**4 + 6*t**5) # Returns an (1,N) array
-	y = yi + (yf-yi)*(10*t**3 - 15*t**4 + 6*t**5) # Returns an (1,N) array
-	X = np.concatenate((x,y),axis=0) # Returns an (2,N) array
-
-		# Test of singularities
+	x = xi + (xf-xi)*(10*t**3 - 15*t**4 + 6*t**5)
+	y = yi + (yf-yi)*(10*t**3 - 15*t**4 + 6*t**5)
+	X = np.array(np.concatenate(([x],[y]),axis=0))
+	# ipdb.set_trace()
 	assert (sum(X**2)**0.5<L1+L2).all(), "Trajectory creates singularities."
-
 	return(X)
 def find_Ẋ_values(t,Xi,Xf,t_end = 1):
-	"""
-	This takes t (a numpy.ndarray (dtype = 'float128', ndmin = 2) of normalized time ∈ [0,1]) and either a (2,) or (2,1) list/array with values for both initial and final x and y (endpoint).
-
-	Returns a (2,t.shape) array of dtype = 'float128', ndmin = 2.
-	"""
-	import numpy as np
-	assert type(t) == np.ndarray, "t must be a (1,N) 'float128' numpy.ndarray"
-	assert np.shape(t) == (1,t.size), "t must be a (1,N) 'float128' numpy.ndarray"
-	assert t.dtype == 'float128', "t must be a (1,N) 'float128' numpy.ndarray"
-	assert len(Xf)==2, "Xf must be either a (2,) or (2,1) list/array"
-	assert len(Xi)==2, "Xi must be either a (2,) or (2,1) list/array"
-	xi,yi = Xi
-	xf,yf = Xf
-	if np.shape(Xi) == (2,1): xi,yi = xi[0],yi[0]
-	if np.shape(Xf) == (2,1): xf,yf = xf[0],yf[0]
-	ẋ = (xf-xi)*(30*t**2 - 60*t**3 + 30*t**4)/t_end # Returns an (1,N) array
-	ẏ = (yf-yi)*(30*t**2 - 60*t**3 + 30*t**4)/t_end # Returns an (1,N) array
-	Ẋ = np.concatenate((ẋ,ẏ),axis=0) # Returns an (2,N) array
-	return(Ẋ)
+    """
+    This takes t (a numpy.ndarray of normalized time ∈ [0,1]) and either a (2,) or (2,1) list/array with values for both initial and final x and y (endpoint). To avoid singularities, ||X[i]|| cannot be greater than L1 + L2.
+    """
+    import numpy as np
+    assert len(Xi)==2, "Xi must be either a (2,) or (2,1) list/array"
+    assert len(Xf)==2, "Xf must be either a (2,) or (2,1) list/array"
+    xi,yi = Xi
+    xf,yf = Xf
+    if np.shape(Xi) == (2,1): xi,yi = xi[0],yi[0]
+    if np.shape(Xf) == (2,1): xf,yf = xf[0],yf[0]
+    ẋ = (xf-xi)*(30*t**2 - 60*t**3 + 30*t**4)/t_end
+    ẏ = (yf-yi)*(30*t**2 - 60*t**3 + 30*t**4)/t_end
+    Ẋ = np.array(np.concatenate(([ẋ],[ẏ]),axis=0))
+    return(Ẋ)
 def find_Ẍ_values(t,Xi,Xf,t_end=1):
-	"""
-	This takes t (a numpy.ndarray (dtype = 'float128', ndmin = 2) of normalized time ∈ [0,1]) and either a (2,) or (2,1) list/array with values for both initial and final x and y (endpoint).
-
-	Returns a (2,t.shape) array of dtype = 'float128', ndmin = 2.
-	"""
-	import numpy as np
-	assert type(t) == np.ndarray, "t must be a (1,N) 'float128' numpy.ndarray"
-	assert np.shape(t) == (1,t.size), "t must be a (1,N) 'float128' numpy.ndarray"
-	assert t.dtype == 'float128', "t must be a (1,N) 'float128' numpy.ndarray"
-	assert len(Xf)==2, "Xf must be either a (2,) or (2,1) list/array"
-	assert len(Xi)==2, "Xi must be either a (2,) or (2,1) list/array"
-	xi,yi = Xi
-	xf,yf = Xf
-	if np.shape(Xi) == (2,1): xi,yi = xi[0],yi[0]
-	if np.shape(Xf) == (2,1): xf,yf = xf[0],yf[0]
-	ẍ = (xf-xi)*(60*t - 180*t**2 + 120*t**3)/(t_end**2) # Returns an (1,N) array
-	ÿ = (yf-yi)*(60*t - 180*t**2 + 120*t**3)/(t_end**2) # Returns an (1,N) array
-	Ẍ = np.concatenate((ẍ,ÿ),axis=0) # Returns an (2,N) array
-	return(Ẍ)
+    """
+    This takes t (a numpy.ndarray of normalized time ∈ [0,1]) and either a (2,) or (2,1) list/array with values for both initial and final x and y (endpoint).
+    """
+    import numpy as np
+    assert len(Xi)==2, "Xi must be either a (2,) or (2,1) list/array"
+    assert len(Xf)==2, "Xf must be either a (2,) or (2,1) list/array"
+    xi,yi = Xi
+    xf,yf = Xf
+    if np.shape(Xi) == (2,1): xi,yi = xi[0],yi[0]
+    if np.shape(Xf) == (2,1): xf,yf = xf[0],yf[0]
+    ẍ = (xf-xi)*(60*t - 180*t**2 + 120*t**3)/(t_end**2)
+    ÿ = (yf-yi)*(60*t - 180*t**2 + 120*t**3)/(t_end**2)
+    Ẍ = np.array(np.concatenate(([ẍ],[ÿ]),axis=0))
+    return(Ẍ)
 def return_X_values(t,Xi,Xf,t_end):
-	X = find_X_values(t,Xi,Xf)
-	Ẋ = find_Ẋ_values(t,Xi,Xf,t_end=t_end)
-	Ẍ = find_Ẍ_values(t,Xi,Xf,t_end=t_end)
-	return(X,Ẋ,Ẍ)
-def jacobian(a1,a2):
+    X = find_X_values(t,Xi,Xf)
+    Ẋ = find_Ẋ_values(t,Xi,Xf,t_end=t_end)
+    Ẍ = find_Ẍ_values(t,Xi,Xf,t_end=t_end)
+    return(X,Ẋ,Ẍ)
+def jacobian():
 	import numpy as np
 	from math import cos, sin
-	J = np.matrix([[-L1*sin(a1)-L2*sin(a1+a2),-L2*sin(a1+a2)],\
-								[L1*cos(a1)+L2*cos(a1+a2),L2*cos(a1+a2)]], dtype = 'float128')
+	J = np.matrix([[-L1*sin(A1[-1])-L2*sin(A1[-1]+A2[-1]),-L2*sin(A1[-1]+A2[-1])],\
+				[L1*cos(A1[-1])+L2*cos(A1[-1]+A2[-1]),L2*cos(A1[-1]+A2[-1])]])
 	return(J)
-def inverse_jacobian(a1,a2):
-	import numpy as np
-	from math import cos, sin
-	det_J = L1*L2*cos(a1 + a2)*sin(a1) - L1*L2*sin(a1 + a2)*cos(a1)
-	J_inv = (1/det_J)*np.matrix([[- L2*cos(a1 + a2), 						- L2*sin(a1 + a2)],\
-								[L1*cos(a1)+L2*cos(a1 + a2),	L2*sin(a1 + a2) + L1*sin(a1)]], \
-								dtype = 'float128')
-	return(J_inv)
 def update_angular_velocity(Ẋ):
-	import numpy as np
-	global A1,A2 # both are (1,N) arrays
-	"""
-	Note: numpy.float128 does not support inverse matrix operators. Luckily, this is an always invertible 2x2 matrix (J is nonsingular within the ROM because a₂ ∊ (0,π/2)), so the inverse Jacobian function has been mapped instead.
-	"""
-	# J = list(map(jacobian,A1.T,A2.T)) # Returns a list of shape (N,2,2)
-	J_inv = list(map(inverse_jacobian,A1.T,A2.T)) # Returns a list of shape (N,2,2)
-	"""
-	In order to map properly, X (shape (2,N)) must be be first split into N (2,1) arrays (length-1). Therefore, the third argument to map() does not need to be transposed. Similar logic follows for why J_inv is not transposed, as it is has N (2,2) matrix arrays. Changing the output to an array aids in creating arrays Ȧ1 and Ȧ2.
-	"""
-	Ȧ = list(map(lambda j_inv,ẋ: np.array(j_inv*ẋ), \
-						J_inv, np.split(Ẋ,np.shape(Ẋ)[1],axis=1)))
-	global Ȧ1,Ȧ2
-	Ȧ1,Ȧ2 = np.split(np.concatenate(Ȧ, axis=1), 2, axis=0) # both are (1,N) arrays
+    import numpy as np
+    J = jacobian()
+    Ȧ = J**(-1)*np.array([Ẋ]).T
+    global Ȧ1,Ȧ2
+    Ȧ1.append(Ȧ[0,0])
+    Ȧ2.append(Ȧ[1,0])
 def update_angular_acceleration(Ẋ,Ẍ):
-	from math import cos,sin
-	import numpy as np
-
-	assert np.shape(Ẋ)[0]==2, "Ẋ must be a (2,len(Ẋ)) list/array"
-	assert np.shape(Ẍ)[0]==2, "Ẍ must be a (2,len(Ẍ)) list/array"
-	ẍ,ÿ = np.split(Ẍ,2,axis=0)
-	global A1,A2,Ȧ1,Ȧ2
-	"""
-		dȦ1/dt = (δȦ1/δA1)*(dA1/dt)
-					+ (δȦ1/δA2)*(dA2/dt)
-						+ (δȦ1/δẊ[0])*(dẊ[0]/dt)
-							+ (δȦ1/δẊ[1])*(dẊ[1]/dt)
-
-		dȦ2/dt = (δȦ2/δA1)*(dA1/dt)
-					+ (δȦ2/δA2)*(dA2/dt)
-						+ (δȦ2/δẊ[0])*(dẊ[0]/dt)
-							+ (δȦ2/δẊ[1])*(dẊ[1]/dt)
-	"""
-	ä1 = lambda a1,a2,ȧ1,ȧ2,ẋ,ẏ,ẍ,ÿ: \
-		((-sin(a1+a2)*ẋ+cos(a1+a2)*ẏ)/(L1*sin(a2)))*ȧ1 \
-		+ (((-sin(a1+a2)*ẋ+cos(a1+a2)*ẏ)*L1*sin(a2) - \
-		(cos(a1+a2)*ẋ+sin(a1+a2)*ẏ)*L1*cos(a2))/((L1**2)*(sin(a2)**2)))*ȧ2 \
-		+ (cos(a1+a2)/(L1*sin(a2)))*ẍ \
-		+ (sin(a1+a2)/(L1*sin(a2)))*ÿ
-	ä2 = lambda a1,a2,ȧ1,ȧ2,ẋ,ẏ,ẍ,ÿ: \
-		(((L1*sin(a1)+L2*sin(a1+a2))*ẋ + (-L1*cos(a1)-L2*cos(a1+a2))*ẏ)/(L1*L2*sin(a2)))*ȧ1 \
-		+ (((L2*sin(a1+a2)*ẋ + (-L2*cos(a1+a2))*ẏ)*(L1*L2*sin(a2)) \
-		- ((-L1*cos(a1)-L2*cos(a1+a2))*ẋ + (-L1*sin(a1)-L2*sin(a1+a2))*ẏ)*(L1*L2*cos(a2)))\
-		/((L1*L2*sin(a2))**2))*ȧ2 \
-		+ ((-L1*cos(a1)-L2*cos(a1+a2))/(L1*L2*sin(a2)))*ẍ + \
-		((-L1*sin(a1)-L2*sin(a1+a2))/(L1*L2*sin(a2)))*ÿ
-
-	global Ä1,Ä2
-	Ä1 = np.array(list(map(ä1,A1.T,A2.T,Ȧ1.T,Ȧ2.T,Ẋ[0].T,Ẋ[1].T,Ẍ[0].T,Ẍ[1].T))\
-					,dtype = 'float128',ndmin=2).T # returns a (1,N) array
-	Ä2 = np.array(list(map(ä2,A1.T,A2.T,Ȧ1.T,Ȧ2.T,Ẋ[0].T,Ẋ[1].T,Ẍ[0].T,Ẍ[1].T))\
-					,dtype = 'float128',ndmin=2).T # returns a (1,N) array
+    from math import cos,sin
+    import numpy as np
+    assert len(Ẋ)==2, "Ẋ must be either a (2,) or (2,1) list/array"
+    assert len(Ẍ)==2, "Ẍ must be either a (2,) or (2,1) list/array"
+    ẋ,ẏ = Ẋ
+    ẍ,ÿ = Ẍ
+    if np.shape(Ẋ) == (2,1): ẋ,ẏ = ẋ[0],ẏ[0]
+    if np.shape(Ẍ) == (2,1): ẍ,ÿ = ẍ[0],ÿ[0]
+    a1,a2 = A1[-1],A2[-1]
+    ȧ1,ȧ2 = Ȧ1[-1],Ȧ2[-1]
+    ä1 = ( ( (ȧ1+ȧ2)*(ẏ*cos(a1+a2)-ẋ*sin(a1+a2)) \
+            + ẍ*cos(a1+a2) \
+            + ÿ*sin(a1+a2) ) * L1*sin(a2) \
+            - \
+            (ẋ*cos(a1+a2) + ẏ*sin(a1+a2)) * L1*cos(a2)*ȧ2 ) \
+            / ((L1*sin(a2))**2)
+    ä2 = ( ( \
+            ((ȧ1+ȧ2)*L2*sin(a1+a2) + ȧ1*L1*sin(a1))*ẋ \
+            + (-L2*cos(a1+a2) - L1*cos(a1))*ẍ \
+            + (-(ȧ1+ȧ2)*L2*cos(a1+a2) - ȧ1*L1*cos(a1))*ẏ \
+            + (-L2*sin(a1+a2)-L1*sin(a1))*ÿ ) \
+            * (L1*L2*sin(a2)) \
+            - \
+            ( (-L2*cos(a1+a2) - L1*cos(a1))*ẋ \
+            + (-L2*sin(a1+a2) - L1*sin(a1))*ẏ ) * (L1*L2*cos(a2)*ȧ2) \
+            ) \
+            / (L1*L2*sin(a2)**2)
+    global Ä1,Ä2
+    Ä1.append(ä1)
+    Ä2.append(ä2)
 def update_angle_lists(X,Ẋ,Ẍ):
-	"""
-	Takes in three (2,N) endpoint arrays and returns global lists for angles 1 and 2 of shape (1,N).
-	"""
-	import numpy as np
-	inverse_kinematics(X)
-	update_angular_velocity(Ẋ)
-	update_angular_acceleration(Ẋ,Ẍ)
-def test_inverse_kinematics(X,Ẋ,Ẍ):
-	import numpy as np
-	from math import cos,sin
-	import matplotlib.pyplot as plt
-	recovered_x = np.array(list(map(lambda a1,a2: L1*cos(a1) + L2*cos(a1+a2),A1.T,A2.T)),\
-	 						dtype='float128',ndmin=2)
-	recovered_y = np.array(list(map(lambda a1,a2: L1*sin(a1) + L2*sin(a1+a2),A1.T,A2.T)),\
-	 						dtype='float128',ndmin=2)
-
-	recovered_dX = np.concatenate([np.array(jacobian(A1[0,i],A2[0,i])*np.matrix([[Ȧ1[0,i]],[Ȧ2[0,i]]])) for i in range(np.shape(A1)[1])],axis=1)
-	recovered_dx,recovered_dy = np.split(recovered_dX,2,axis=0)
-
-	recovered_ddx = np.array(list(map(lambda a1,a2,ȧ1,ȧ2,ä1,ä2:\
-	 	-L1*cos(a1)*(ȧ1**2)-L1*sin(a1)*ä1-L2*cos(a1+a2)*((ȧ1+ȧ2)**2)-L2*sin(a1+a2)*(ä1+ä2),\
-		A1.T,A2.T,Ȧ1.T,Ȧ2.T,Ä1.T,Ä2.T)),dtype = 'float128',ndmin=2)
-	recovered_ddy = np.array(list(map(lambda a1,a2,ȧ1,ȧ2,ä1,ä2:\
-	 	-L1*sin(a1)*(ȧ1**2)+L1*cos(a1)*ä1-L2*sin(a1+a2)*((ȧ1+ȧ2)**2)+L2*cos(a1+a2)*(ä1+ä2),\
-		A1.T,A2.T,Ȧ1.T,Ȧ2.T,Ä1.T,Ä2.T)),dtype = 'float128',ndmin=2)
-
-	plt.figure()
-	ax1 = plt.gca()
-	ax1.set_title('Recovered Position')
-	plt.plot(X[0],'r', recovered_x[0],'b')
-	plt.plot(X[1],'r', recovered_y[0],'b')
-
-	plt.figure()
-	ax2 = plt.gca()
-	ax2.set_title('Recovered Velocity')
-	plt.plot(Ẋ[0],'r', recovered_dx[0],'b')
-	plt.plot(Ẋ[1],'r', recovered_dy[0],'b')
-
-	plt.figure()
-	ax3 = plt.gca()
-	ax3.set_title('Recovered Acceleration')
-	plt.plot(Ẍ[0],'r', recovered_ddx,'b')
-	plt.plot(Ẍ[1],'r', recovered_ddy,'b')
-	plt.show()
+    import numpy as np
+    for i in range(np.shape(X)[1]):
+        inverse_kinematics(X[:,i])
+        update_angular_velocity(Ẋ[:,i])
+        update_angular_acceleration(Ẋ[:,i],Ẍ[:,i])
 def calculate_torques(EOM="Uno"):
 	from math import cos,sin
 	import numpy as np
@@ -334,34 +252,23 @@ def calculate_torques(EOM="Uno"):
 	    α = I1 + I2 + m1*(c1**2) + m2*(L1**2 + c2**2)
 	    β = m2*L1*c2
 	    δ = I2 + m2*(c2**2)
-	C_matrix = lambda a1,a2,ȧ1,ȧ2: \
+	C = lambda a1,a2,ȧ1,ȧ2: \
 	        np.matrix([ [-β*ȧ2*sin(a2),     -β*(ȧ1 + ȧ2)*sin(a2)],
 	                    [β*ȧ1*sin(a2),      0]]) # kg⋅m² (N⋅m⋅s²)
-	M_matrix = lambda a1,a2: \
+	M = lambda a1,a2: \
 	        np.matrix([ [α + 2*β*cos(a2),   δ + β*cos(a2)],
-	                    [δ + β*cos(a2),     δ]],\
-						dtype = 'float128') # kg⋅m² (N⋅m⋅s²)
-	B_matrix = np.matrix([ [b11, b12],\
-	                	[b21, b22]]) # kg⋅m²/s (N⋅m⋅s)
+	                    [δ + β*cos(a2),     δ]]) # kg⋅m² (N⋅m⋅s²)
+	B = np.matrix([ [b11, b12],\
+	                [b21, b22]]) # kg⋅m²/s (N⋅m⋅s)
 	global T1,T2
 	T1,T2 = [],[]
-	Ȧ = np.swapaxes(np.array(np.concatenate((Ȧ1,Ȧ2),axis=0),ndmin=3),0,2)
-	Ä = np.swapaxes(np.array(np.concatenate((Ä1,Ä2),axis=0),ndmin=3),0,2)
-	M = np.array(list(map(M_matrix,A1.T,A2.T)))
-	C = np.array(list(map(C_matrix,A1.T,A2.T,Ȧ1.T,Ȧ2.T)))
-	MÄ = np.array(list(map(lambda m,ä: np.matrix(m)*ä,M,Ä)))
-	CȦ = np.array(list(map(lambda c,ȧ: np.matrix(np.array(c,ndmin=2,dtype='float128'))*ȧ,C,Ȧ)))
-	BȦ = np.array(list(map(lambda ȧ: B_matrix*ȧ,Ȧ)))
-	T = MÄ + CȦ + BȦ
-	# returns a (N,1,2) 3D array. Therefore we must transpose it first and select first element
-	T1,T2 = np.split(T.T[0],2,axis=0) # returns 2 (1,N) arrays
-	# for i in range(len(A1)):
-	#     Ȧ = np.matrix([[Ȧ1[i]],[Ȧ2[i]]])
-	#     Ä = np.matrix([[Ä1[i]],[Ä2[i]]])
-	#     T = M(A1[i],A2[i])*Ä + C(A1[i],A2[i],Ȧ1[i],A2[i])*Ȧ + B*Ȧ
-	#     T1.append(T[0,0])
-	#     T2.append(T[1,0])
-def calculate_potential_variability(i,j,δT1,δT2,dt=0.001,EOM = 'Uno',Group = 'flexor'):
+	for i in range(len(A1)):
+	    Ȧ = np.matrix([[Ȧ1[i]],[Ȧ2[i]]])
+	    Ä = np.matrix([[Ä1[i]],[Ä2[i]]])
+	    T = M(A1[i],A2[i])*Ä + C(A1[i],A2[i],Ȧ1[i],A2[i])*Ȧ + B*Ȧ
+	    T1.append(T[0,0])
+	    T2.append(T[1,0])
+def calculate_potential_variability(i,δT1,δT2,dt=0.001,EOM = 'Uno',Group = 'flexor'):
 	from math import cos,sin
 	import numpy as np
 	assert EOM in ["Uno","Zadravec"], "EOM can be either 'Uno' or 'Zadravec'"
@@ -442,10 +349,10 @@ def reaching_task(dt = 0.001, Xi = [0,0.25], Xf = [0.25,0.50],t_end=1):
 	import numpy as np
 	set_link_lengths()
 	create_angle_lists()
-	t = np.array(np.arange(0,1+dt,dt),dtype='float128',ndmin=2)
+	t = np.arange(0,1+dt,dt)
 	X,Ẋ,Ẍ = return_X_values(t,Xi,Xf,t_end)
 	update_angle_lists(X,Ẋ,Ẍ)
-	# calculate_torques()
+	calculate_torques()
 def plot_resulting_kinematics():
     import matplotlib.pyplot as plt
     import numpy as np
@@ -518,10 +425,9 @@ def MA_function(Parameters):
 			q = q2
 		else:
 			q = q1
-		MomentArm = (np.matrix(Coefficients,dtype='float128')\
-						*np.matrix([1,q,q**2,q**3,q**4,q**5]).T)[0,0]
+		MomentArm = (np.matrix(Coefficients)*np.matrix([1,q,q**2,q**3,q**4,q**5]).T)[0,0]
 	elif src.capitalize() == 'Est' :
-		MomentArm = np.array(Coefficients,dtype='float128')
+		MomentArm = Coefficients
 	else: #src.capitalize() == 'Ramsay'
 		q = q2
 		assert type(Coefficients) == list, "Coefficients must be a list."
@@ -529,11 +435,10 @@ def MA_function(Parameters):
 		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay (2009)."
 		if eq == 1:
 			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
-			MomentArm = (sp.Matrix(Coefficients,dtype='float128').T\
-							*sp.Matrix([1,q,q**2,q**3,q**4]))[0,0]
+			MomentArm = (sp.Matrix(Coefficients).T*sp.Matrix([1,q,q**2,q**3,q**4]))[0,0]
 		elif eq == 2:
 			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
-			MomentArm = (sp.Matrix(Coefficients,dtype='float128').T*\
+			MomentArm = (sp.Matrix(Coefficients).T*\
 							sp.Matrix([1, q, q_PS, q*q_PS, q**2, \
 										q_PS**2, (q**2)*q_PS, q*(q_PS**2), \
 										(q**2)*(q_PS**2), q**3, q_PS**3, \
@@ -542,7 +447,7 @@ def MA_function(Parameters):
 										(q**3)*(q_PS**3)]))[0, 0]
 		else: # eq == 3
 			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
-			MomentArm = (sp.Matrix(Coefficients,dtype='float128').T*\
+			MomentArm = (sp.Matrix(Coefficients).T*\
 							sp.Matrix([1, q, q_PS, q*q_PS, q**2, \
 								q_PS**2, (q**2)*q_PS, q*(q_PS**2), (q**2)*(q_PS**2), \
 								q**3, (q**3)*q_PS, (q**3)*(q_PS**2), \
@@ -611,9 +516,8 @@ def Pigeon_coeff_conversion(Coefficients):
 	assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
 	assert type(Coefficients)==list, 'Coefficients must be a 6 element list.'
 	rad_conversion = np.multiply(Coefficients,\
-			np.array([1,(180/np.pi),(180/np.pi)**2,(180/np.pi)**3,(180/np.pi)**4,(180/np.pi)**5],dtype = 'float128'))
-	new_Coefficients =\
-	 	np.multiply(rad_conversion,np.array([1,1e-1,1e-3,1e-5,1e-7,1e-9],dtype='float128'))
+			np.array([1,(180/np.pi),(180/np.pi)**2,(180/np.pi)**3,(180/np.pi)**4,(180/np.pi)**5]))
+	new_Coefficients = np.multiply(rad_conversion,[1,1e-1,1e-3,1e-5,1e-7,1e-9])
 	return(new_Coefficients)
 def global_R_matrix():
 	"""
@@ -668,7 +572,6 @@ def global_R_matrix():
 	CB SFE MA was estimated in Holzbaur (2005) as 20 mm while Bassett (1990) estimates from 7 cadavers the MA to be 36 mm.
 	"""
 	import sympy as sp
-	from sympy.utilities import lambdify
 	import numpy as np
 	from numpy import pi
 
@@ -982,26 +885,9 @@ def global_R_matrix():
 	# 					FCR_Coefficients, ECRB_Coefficients, ECRL_Coefficients, FCU_Coefficients, \
 	# 					FDS_Coefficients, ECU_Coefficients, EDM_Coefficients, EDC_Coefficients]
 
-	global RMatrix_Transpose, dRMatrix_Transpose
+	global RMatrix_Transpose
 	RMatrix_Transpose = sp.Matrix([[MA_function(AllCoefficients[muscle][dof]) for dof in ['Shoulder','Elbow']] for muscle in MuscleList])
-	dRMatrix_Transpose = sp.Matrix(np.concatenate((sp.diff(RMatrix_Transpose[:,0],q1),\
-											sp.diff(RMatrix_Transpose[:,1],q2)),axis=1))
-	RMatrix_Transpose = lambdify([q1,q2,q_PS],RMatrix_Transpose)
-	dRMatrix_Transpose = lambdify([q1,q2,q_PS],dRMatrix_Transpose)
-	# returns an (n,m) matrix when n is the number of muscles and m is the number of DOFS. We chose to return R.T because this is commonly utilized in muscle velocity calculations.
-def plot_MA_values_for_muscle_(j):
-	import matplotlib.pyplot as plt
-	import numpy as np
-	global MomentArmMatrix
-	assert j in range(MomentArmMatrix.shape[2]), "j must be the index of one of the muscles used (j ∊ {0,1,...,m-1})"
-	plt.figure()
-	ax = plt.gca()
-	plt.plot(MomentArmMatrix[:,:,j])
-	ax.set_xticks([0,MomentArmMatrix.shape[0]])
-	ax.set_xticklabels(['Start','Finish'])
-	ax.set_ylabel('Moment Arm (in mm)')
-	plt.show()
-def return_MA_matrix():
+def return_MA_matrix(A1,A2):
 	"""
 	Notes:
 
@@ -1012,17 +898,14 @@ def return_MA_matrix():
 	import numpy as np
 	from numpy import pi
 	import sympy as sp
-
-	global A1,A2,RMatrix_Transpose,dRMatrix_Transpose
-	global MomentArmMatrix,dMomentArmMatrix
-	MomentArmMatrix = np.array(list(map(lambda A1,A2: \
-						np.float128(RMatrix_Transpose(A1,A2,pi/2).T),\
-						A1.T,A2.T)))
-	dMomentArmMatrix = np.array(list(map(lambda A1,A2:\
-						np.float128(dRMatrix_Transpose(A1,A2,pi/2).T),\
-						A1.T,A2.T)))
-	# returns two matrices of size (N,2,m)
-def calculate_muscle_velocities():
+	global q1,q2,q_PS,RMatrix_Transpose
+	MomentArmMatrix = RMatrix_Transpose.subs([(q1,A1),(q2,A2),(q_PS,pi/2)]).T
+	return(MomentArmMatrix)
+def diagonal(X):
+	import sympy as sp
+	import numpy as np
+	return(sp.Matrix(np.diagflat(X)))
+def calculate_muscle_velocities(A1,A2,Ȧ1,Ȧ2):
 	"""
 	v = (-dR/dϑ)⋅(dϑ/dt)⋅ϑ + (-R)⋅(dϑ/dt)
 	(dsⱼ/dϑ₁)⋅(dϑ₁/dt) = √((dϑ₁/dt)²⋅(dr₁ⱼ/dϑ₁)² + (dϑ₁/dt)²⋅(r₁ⱼ)²)
@@ -1031,16 +914,23 @@ def calculate_muscle_velocities():
 	Need to hard code whether the rotation causes lengthening or shortening. This is determined by the sign of -r₁ⱼ⋅dϑ₁/dt for each d.o.f.
 	"""
 	import numpy as np
-	global Ȧ1,Ȧ2,AllCoefficients,MomentArmMatrix,dMomentArmMatrix
-	Ȧ = np.swapaxes(np.array(np.concatenate((Ȧ1,Ȧ2),axis=0),ndmin=3),0,2)
-	MuscleVelocity = (abs(Ȧ.T)*(((dMomentArmMatrix.T**2)+(MomentArmMatrix.T**2))**0.5)\
-						*np.sign(-Ȧ.T*MomentArmMatrix.T))\
-							.sum(axis=1)[:,np.newaxis]
-	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()],dtype='float128')[:,np.newaxis,np.newaxis]
-	NormalizedMuscleVelocity = MuscleVelocity/OptimalMuscleLength
-	# returns a (m,1,N) array where m is the number of muscles and N is the number of timesteps.
+	import sympy as sp
+	global q1,q2,q_PS,AllCoefficients,RMatrix_Transpose
+	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()])
+	R = return_MA_matrix(A1,A2)
+	# J²_{Rⱼ} --> The squared jacobian of each column of the R matrix w.r.t. {ϑ₁,...,ϑₙ}
+	SquaredJacobians = [RMatrix_Transpose[i,:].jacobian([q1,q2]).subs([(q1,A1),(q2,A2),(q_PS,np.pi/2)])**2 for i in range(np.shape(RMatrix_Transpose)[0])]
+	sign_convention = lambda j: -np.sign(np.multiply([Ȧ1,Ȧ2],R[:,j].T))
+	MuscleVelocity = [float(sign_convention(j)\
+		*np.matrix([el**0.5 for el in \
+			diagonal([Ȧ1,Ȧ2])*SquaredJacobians[j]*np.matrix([[Ȧ1],[Ȧ2]]) \
+				+ diagonal(R[:,j])*(diagonal([Ȧ1,Ȧ2])**2)*R[:,j]]).T) \
+					for j in range(np.shape(R)[1])]
+	# dR = np.concatenate([sp.diff(RMatrix_Transpose[:,0],q1).subs(q1,A1),sp.diff(RMatrix_Transpose[:,1],q2).subs([(q2,A2),(q_PS,np.pi/2)])],axis=1)
+	# MuscleVelocity = -R.T*(np.matrix([Ȧ1,Ȧ2]).T)#-dR*(np.matrix(np.multiply([A1,A2],[Ȧ1,Ȧ2])).T)
+	NormalizedMuscleVelocity = np.array([[MuscleVelocity[i]/OptimalMuscleLength[i] for i in range(len(MuscleVelocity))]])
 	return(NormalizedMuscleVelocity)
-def calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK():
+def calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK(A1,A2,NormalizedMuscleVelocity):
 	"""
 	v = (-dR/dϑ)⋅(dϑ/dt)⋅ϑ + (-R)⋅(dϑ/dt)
 	(dsⱼ/dϑ₁)⋅(dϑ₁/dt) = √((dϑ₁/dt)²⋅(dr₁ⱼ/dϑ₁)² + (dϑ₁/dt)²⋅(r₁ⱼ)²)
@@ -1049,135 +939,101 @@ def calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK():
 	Need to hard code whether the rotation causes lengthening or shortening. This is determined by the sign of -r₁ⱼ⋅dϑ₁/dt for each d.o.f.
 	"""
 	import numpy as np
-	import ipdb
-	global Ȧ1,Ȧ2,AllCoefficients,MomentArmMatrix,dMomentArmMatrix
-
+	import sympy as sp
+	global AllCoefficients
+	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()])
+	R = return_MA_matrix(A1,A2)
+	# # J²_{Rⱼ} --> The squared jacobian of each column of the R matrix w.r.t. {ϑ₁,...,ϑₙ}
+	# SquaredJacobians = [RMatrix_Transpose[i,:].jacobian([q1,q2]).subs([(q1,A1),(q2,A2),(q_PS,np.pi/2)])**2 for i in range(np.shape(RMatrix_Transpose)[0])]
+	# sign_convention = lambda j: -np.sign(np.multiply([Ȧ1,Ȧ2],R[:,j].T))
+	# MuscleVelocity = [float(sign_convention(j)\
+	# 	*np.matrix([el**0.5 for el in \
+	# 		diagonal([Ȧ1,Ȧ2])*SquaredJacobians[j]*np.matrix([[Ȧ1],[Ȧ2]]) \
+	# 			+ diagonal(R[:,j])*(diagonal([Ȧ1,Ȧ2])**2)*R[:,j]]).T) \
+	# 				for j in range(np.shape(R)[1])]
 	MuscleList = list(AllCoefficients.keys())
-	Ȧ = np.swapaxes(np.array(np.concatenate((Ȧ1,Ȧ2),axis=0),ndmin=3),0,2)
 
-	"""
-	Note: Ȧ is a 3D array of size (N,2,1). Thus, Ȧ.T has shape (1,2,N). Numpy.ndarray multiplication of arrays with IDENTICAL shapes will result in an element by element multiplication similar to np.multiply. Thus we multiply -Ȧ.T[0] by the (2,N) array that is the result of the norm of dMomentArmMatrix.T[j] and MomentArmMatrix.T[j] (each of shape (2,N)). This is equivalent to -ȧ₁*√(ṙ₁ⱼ² + r₁ⱼ²) for all t.
-	"""
+	WeightedNormalizedMuscleVelocity_shoulder = []
+	WeightedNormalizedMuscleVelocity_elbow = []
 
-	MuscleVelocity = \
-					(abs(Ȧ.T)*(((dMomentArmMatrix.T**2)+(MomentArmMatrix.T**2))**0.5)\
-						*np.sign(-Ȧ.T*MomentArmMatrix.T))\
-							.sum(axis=1)[:,np.newaxis]
+	for i in range(len(AllCoefficients)):
+		WeightedNormalizedMuscleVelocity_shoulder.append(NormalizedMuscleVelocity[i]*(abs(R.T[i,0] )/1000)*AllCoefficients[MuscleList[i]]['Corrected No'])
 
-	"""
-	Normalizing these muscle velocities can similarly be done by dividing the (m,1,N) MuscleVelocity array by the OptimalMuscleLength array of shape (m,1,1).
-	"""
+		WeightedNormalizedMuscleVelocity_elbow.append(NormalizedMuscleVelocity[i]*(abs(R.T[i,1] )/1000)*AllCoefficients[MuscleList[i]]['Corrected No'])
 
-	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()],dtype='float128')[:,np.newaxis,np.newaxis]
-	NormalizedMuscleVelocity = MuscleVelocity/OptimalMuscleLength
-
-	"""
-	Next we need to multiply each muscle velocity, AT EACH TIMESTEP, by the appropriate scaling factor, which may be a function of joint angle (i.e., movement step number).
-	"""
-
-	CorrectedAfferentNumber = np.array([AllCoefficients[key]['Corrected No'] for key in AllCoefficients.keys()],dtype='float128')[:,np.newaxis] # returns an (m,1) array
-
-	"""
-	Note: (NormalizedMuscleVelocity*MomentArmMatrix.T/1000).T returns an (N,2,m) matrix. Therefore, we must construct a (2,m) matrix of Corrected Afferented Numbers that have identical rows. This is done by concatenating CorrectedAfferentNumber with itself and then transposing the result. This total product will yield a (m,2,N) array of both shoulder and elbow weighted muscle velocities. This will then be split by np.split() to give (m,1,N) arrays that are then squeezed into (m,N) arrays for the individual joint weighted muscle velocities.
-	"""
-
-	MAWeightedMuscleVelocity = \
-		((NormalizedMuscleVelocity*MomentArmMatrix.T/1000).T\
-			*np.concatenate((CorrectedAfferentNumber,CorrectedAfferentNumber),axis=1).T).T
-	MAWeightedMuscleVelocity_Shoulder,MAWeightedMuscleVelocity_Elbow = \
-	 	np.split(MAWeightedMuscleVelocity,2,axis=1)
-	MAWeightedMuscleVelocity_Shoulder,MAWeightedMuscleVelocity_Elbow = \
-		MAWeightedMuscleVelocity_Shoulder.squeeze(),MAWeightedMuscleVelocity_Elbow.squeeze()
-	# returns two (m,N) arrays.
-	return(MAWeightedMuscleVelocity_Shoulder,MAWeightedMuscleVelocity_Elbow)
-def calculate_weighted_muscle_velocities_REACHING_TASK():
+	return(np.array([WeightedNormalizedMuscleVelocity_shoulder]),np.array([WeightedNormalizedMuscleVelocity_elbow]))
+def calculate_weighted_muscle_velocities_REACHING_TASK(A1,A2,Ȧ1,Ȧ2):
 	"""
 	v = (-dR/dϑ)⋅(dϑ/dt)⋅ϑ + (-R)⋅(dϑ/dt)
 	(dsⱼ/dϑ₁)⋅(dϑ₁/dt) = √((dϑ₁/dt)²⋅(dr₁ⱼ/dϑ₁)² + (dϑ₁/dt)²⋅(r₁ⱼ)²)
 	(dsⱼ/dt) = sum([√(el) for el in diag(dϑ/dt)(J²_{Rⱼ})(dϑ/dt) + diag(Rⱼ)(diag(dϑ/dt)²)(dϑ₁/dt)])
 
-	Need to hard code whether the rotation causes lengthening or shortening. This is determined by the sign of -r₁ⱼ⋅dϑ₁/dt for each d.o.f. CORRECTION: by removing the angular velocity from the square root, the sign of the rotation is preserved -- regaining the sign convention.
+	Need to hard code whether the rotation causes lengthening or shortening. This is determined by the sign of -r₁ⱼ⋅dϑ₁/dt for each d.o.f.
 	"""
-
 	import numpy as np
-	import ipdb
-	global Ȧ1,Ȧ2,AllCoefficients,MomentArmMatrix,dMomentArmMatrix
-
+	import sympy as sp
+	global q1,q2,q_PS,AllCoefficients,RMatrix_Transpose
+	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()])
+	R = return_MA_matrix(A1,A2)
+	# J²_{Rⱼ} --> The squared jacobian of each column of the R matrix w.r.t. {ϑ₁,...,ϑₙ}
+	SquaredJacobians = [RMatrix_Transpose[i,:].jacobian([q1,q2]).subs([(q1,A1),(q2,A2),(q_PS,np.pi/2)])**2 for i in range(np.shape(RMatrix_Transpose)[0])]
+	sign_convention = lambda j: -np.sign(np.multiply([Ȧ1,Ȧ2],R[:,j].T))
+	MuscleVelocity = [float(sign_convention(j)\
+		*np.matrix([el**0.5 for el in \
+			diagonal([Ȧ1,Ȧ2])*SquaredJacobians[j]*np.matrix([[Ȧ1],[Ȧ2]]) \
+				+ diagonal(R[:,j])*(diagonal([Ȧ1,Ȧ2])**2)*R[:,j]]).T) \
+					for j in range(np.shape(R)[1])]
+	# import numpy as np
+	# import sympy as sp
+	# import ipdb
+	# global q1,q2,q_PS,AllCoefficients
+	# R = return_MA_matrix(A1,A2)
+	# #dR = np.concatenate([sp.diff(RMatrix_Transpose[:,0],q1).subs(q1,A1),sp.diff(RMatrix_Transpose[:,1],q2).subs([(q2,A2),(q_PS,np.pi/2)])],axis=1)
+	# MuscleVelocity = -R.T*(np.matrix([Ȧ1,Ȧ2]).T)#-dR*(np.matrix(np.multiply([A1,A2],[Ȧ1,Ȧ2])).T)#
 	MuscleList = list(AllCoefficients.keys())
-	Ȧ = np.swapaxes(np.array(np.concatenate((Ȧ1,Ȧ2),axis=0),ndmin=3),0,2)
-
-	"""
-	Note: Ȧ is a 3D array of size (N,2,1). Thus, Ȧ.T has shape (1,2,N). Numpy.ndarray multiplication of arrays with IDENTICAL shapes will result in an element by element multiplication similar to np.multiply. Thus we multiply -Ȧ.T[0] by the (2,N) array that is the result of the norm of dMomentArmMatrix.T[j] and MomentArmMatrix.T[j] (each of shape (2,N)). This is equivalent to -ȧ₁*√(ṙ₁ⱼ² + r₁ⱼ²) for all t.
-
-	Normalizing these muscle velocities can similarly be done by dividing the (m,1,N) MuscleVelocity array by the OptimalMuscleLength array of shape (m,1,1).
-	"""
-
-	MuscleVelocity = \
-					(abs(Ȧ.T)*(((dMomentArmMatrix.T**2)+(MomentArmMatrix.T**2))**0.5)\
-						*np.sign(-Ȧ.T*MomentArmMatrix.T))\
-							.sum(axis=1)[:,np.newaxis]
-
-	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()],dtype='float128')[:,np.newaxis,np.newaxis]
-	NormalizedMuscleVelocity = MuscleVelocity/OptimalMuscleLength
-
-	"""
-	Next we need to multiply each muscle velocity, AT EACH TIMESTEP, by the appropriate scaling factor, which may be a function of joint angle (i.e., movement step number).
-	"""
-
-	CorrectedAfferentNumber = np.array([AllCoefficients[key]['Corrected No'] for key in AllCoefficients.keys()],dtype='float128')[:,np.newaxis]
-	WeightedMuscleVelocity = (NormalizedMuscleVelocity*abs(MomentArmMatrix).T/1000).sum(axis=1)  \
-								/((abs(MomentArmMatrix)>0).T.sum(axis=1))  \
-									*CorrectedAfferentNumber
-
-	"""
-	If you wanted to change the weighting scheme, use the above notation whereby the numpy.ndarrays have the same primary shape (i.e., length). Removing the .sum(axis=1) for the first line of the WeightedMuscleVelocity equation will return the individual weighted muscle velocity components per joint.
-	"""
-	return(WeightedMuscleVelocity)
+	# WeightedNormalizedMuscleVelocity = np.array([[float(MuscleVelocity[i,0])/AllCoefficients[list(MuscleList)[i]]['Optimal Muscle Length'] for i in range(len(MuscleVelocity))]])
+	WeightedNormalizedMuscleVelocity = []
+	for i in range(len(AllCoefficients)):
+		if MuscleList[i] not in ['BIC','TRI']:
+			WeightedNormalizedMuscleVelocity.append(MuscleVelocity[i]*abs(sum(R.T[i,:] )/1000)*AllCoefficients[MuscleList[i]]['Corrected No']/AllCoefficients[MuscleList[i]]['Optimal Muscle Length'])
+		else:
+			WeightedNormalizedMuscleVelocity.append(MuscleVelocity[i]*abs((sum(R.T[i,:] )/2)/1000)*AllCoefficients[MuscleList[i]]['Corrected No']/AllCoefficients[MuscleList[i]]['Optimal Muscle Length'])
+	return(np.array([WeightedNormalizedMuscleVelocity]))
 def eccentric_velocities(NormalizedMuscleVelocity):
-	"""
-	Returns a (m,1,N) list with m (1,N) arrays of positive muscle velocities.
-	"""
 	import numpy as np
-	def positive_entries(NormalizedMuscleVelocity):
-		return(np.multiply(np.array([[1]*np.shape(NormalizedMuscleVelocity)[1]]),\
-										NormalizedMuscleVelocity>0))
-	PositiveMuscleVelocities = list(map(lambda Vm: np.multiply(positive_entries(Vm),Vm),\
-									np.split(NormalizedMuscleVelocity,\
-									len(NormalizedMuscleVelocity),axis=0)))
+	PositiveMuscleVelocities = []
+	for i in range(np.shape(NormalizedMuscleVelocity)[1]):
+		PositiveEntries = np.multiply(np.array([[1]*np.shape(NormalizedMuscleVelocity)[0]]),\
+										NormalizedMuscleVelocity.T[i,:]>=0)
+		PositiveMuscleVelocities.append(np.multiply(NormalizedMuscleVelocity.T[i,:],\
+														PositiveEntries))
 	return(PositiveMuscleVelocities)
 def concentric_velocities(NormalizedMuscleVelocity):
-	"""
-	Returns a (m,1,N) list with m (1,N) arrays of negative muscle velocities.
-	"""
-	def negative_entries(NormalizedMuscleVelocity):
-		return(np.multiply(np.array([[1]*np.shape(NormalizedMuscleVelocity)[1]]),\
-										NormalizedMuscleVelocity<0))
-	NegativeMuscleVelocities = list(map(lambda Vm: np.multiply(negative_entries(Vm),Vm),\
-									np.split(NormalizedMuscleVelocity,\
-									len(NormalizedMuscleVelocity),axis=0)))
+	import numpy as np
+	NegativeMuscleVelocities = [NormalizedMuscleVelocity.T[i,:][NormalizedMuscleVelocity.T[i,:]<=0] for i in range(np.shape(NormalizedMuscleVelocity)[1])]
 	return(NegativeMuscleVelocities)
-def cost_function(X,costtype="avg"):
-	assert costtype in ['avg','sos','l2norm','l1norm'], "costtype must be either 'avg','sos','l2norm', or 'l1norm'"
-	if costtype == 'avg' :
+def cost_function(X,type="avg"):
+	assert type in ['avg','sos','l2norm','l1norm'], "type must be either 'avg','sos','l2norm', or 'l1norm'"
+	if type == 'avg' :
 		cost = abs(sum(X)/len(X))
-	elif costtype == 'sos' :
+	elif type == 'sos' :
 		cost = sum([el**2 for el in X])
-	elif costtype == 'l1norm' :
+	elif type == 'l1norm' :
 		cost = abs(sum(X))
-	elif costtype == 'l2norm' :
+	elif type == 'l2norm' :
 		cost = sum([el**2 for el in X])**0.5
 	return(cost)
-def eccentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,costtype ='l2norm'):
+def eccentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,type ='l2norm'):
 	import numpy as np
 	PositiveMuscleVelocities = eccentric_velocities(NormalizedMuscleVelocity)
 	TotalPositiveExcursion = [np.trapz(el,dx=t_end*dt) for el in PositiveMuscleVelocities]
-	EccentricCost = cost_function(TotalPositiveExcursion,costtype=costtype)
+	EccentricCost = cost_function(TotalPositiveExcursion,type=type)
 	return(EccentricCost)
-def concentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,costtype = 'l2norm'):
+def concentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,type = 'l2norm'):
 	import numpy as np
 	NegativeMuscleVelocities = concentric_velocities(NormalizedMuscleVelocity)
 	TotalNegativeExcursion = [np.trapz(el,dx=t_end*dt) for el in NegativeMuscleVelocities]
-	ConcentricCost = cost_function(TotalNegativeExcursion,costtype=costtype)
+	ConcentricCost = cost_function(TotalNegativeExcursion,type=type)
 	return(ConcentricCost)
 def return_initial_muscle_length(Coefficients,OptimalMuscleLength):
 	"""
@@ -1255,7 +1111,6 @@ import matplotlib.pyplot as plt
 import math
 import time
 from matplotlib.backends.backend_pdf import PdfPages
-import ipdb
 
 	# Save Output Figures?
 
@@ -1263,10 +1118,23 @@ SaveOutputFigures = False
 
 	# DescriptiveTitle should be something to identify the trial either by reaching location, (i.e., Left, Right, Center, or Sideways) or by what has changed in the most current iteration (e.g., CB_Ramsay, DELTa_Est, etc.). Spaces will be replaced by '_' symbols for the filename but kept for figure titles.
 
-ReachType = ['Sideways','Center','Left','Right'][3]
+ReachType = ['Sideways','Center','Left','Right'][1]
 DescriptiveTitle = ReachType + ' Reach'
 
-	# Define Moment Arm Matrix Functions for the model and establish flexor/extensor list
+	# Open PDF files to write plots to
+
+if SaveOutputFigures == True:
+	pdf_forward = PdfPages(DescriptiveTitle.replace(' ','_') + '_Forward.pdf')
+	pdf_reverse = PdfPages(DescriptiveTitle.replace(' ','_') + '_Reverse.pdf')
+	pdf_bar = PdfPages(DescriptiveTitle.replace(' ','_') + '_bar.pdf')
+
+	# Set reaching duration and sampling period
+
+t_end = 1
+dt = 0.001
+t = np.arange(0,1+dt,dt)*t_end
+
+	# Define the Model and establish flexor/extensor list
 
 global_R_matrix()
 n_muscles=len(AllCoefficients)
@@ -1291,92 +1159,96 @@ OrderedColorsList = flexor_colors_list + list(reversed(extensor_colors_list))
 OrderedMuscleList = FlexorOrderedMuscleList + list(reversed(ExtensorOrderedMuscleList))
 OrderNumber = [list(AllCoefficients.keys()).index(el) for el in OrderedMuscleList]
 
-	# Open PDF files to write plots to
-
-if SaveOutputFigures == True:
-	pdf_forward = PdfPages(DescriptiveTitle.replace(' ','_') + '_Forward.pdf')
-	pdf_reverse = PdfPages(DescriptiveTitle.replace(' ','_') + '_Reverse.pdf')
-	pdf_bar = PdfPages(DescriptiveTitle.replace(' ','_') + '_bar.pdf')
-
-	# Set reaching duration and sampling period
-
-t_end = 1
-dt = 0.001
-t = np.array(np.arange(0,1+dt,dt,dtype = 'float128')*t_end, ndmin = 2) # returns a (1,(1+dt)/dt) array of ndmin = 2.
-
 	# Define Initial and Final positions
 
 Xi,Xf = set_initial_and_final_positions(ReachType)
 
-###################################################################################################
-
 	# Forward Direction
 
 reaching_task(Xi=Xi, Xf=Xf,dt=dt, t_end=t_end)
-return_MA_matrix()
 
-	# Calculate resulting muscle velocities, lengths, etc.
+	# Initialize Arrays before loop
 
-NormalizedMuscleVelocity_Forward = calculate_muscle_velocities()
-WeightedPotentialTorqueVariation_shoulder_Forward,\
-WeightedPotentialTorqueVariation_elbow_Forward = \
-calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK()
-WeightedNormalizedMuscleVelocity_Forward = calculate_weighted_muscle_velocities_REACHING_TASK()
 # calculate_muscle_lengths()
 # MuscleLengths_Forward = MuscleLengths
+# WeightedNormalizedMuscleVelocity_Forward = calculate_weighted_muscle_velocities_REACHING_TASK(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
+NormalizedMuscleVelocity_Forward = calculate_muscle_velocities(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
+WeightedPotentialTorqueVariation_shoulder_Forward,\
+WeightedPotentialTorqueVariation_elbow_Forward = \
+	calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK(A1[0],A2[0],NormalizedMuscleVelocity_Forward[0])
+
+	# Iterate over the rest of the movement.
+
+# global A1_dev, A2_dev
+# A1_dev,A2_dev = [],[]
+
+StartTime = time.time()
+statusbar(0,len(A1),Title = 'Forward Vm',StartTime=StartTime)
+for i in range(1,len(A1)):
+	statusbar(i,len(A1),Title = 'Forward Vm',StartTime=StartTime)
+	# WeightedNormalizedMuscleVelocity_Forward = np.concatenate((WeightedNormalizedMuscleVelocity_Forward,calculate_weighted_muscle_velocities_REACHING_TASK(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
+	NormalizedMuscleVelocity_Forward = np.concatenate( \
+				(NormalizedMuscleVelocity_Forward,\
+					calculate_muscle_velocities(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),\
+						axis=0)
+	WeightedPotentialTorqueVariation_temp = \
+		calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK(A1[i],A2[i],\
+			NormalizedMuscleVelocity_Forward[i])
+	WeightedPotentialTorqueVariation_shoulder_Forward = \
+			np.concatenate((WeightedPotentialTorqueVariation_shoulder_Forward,\
+						WeightedPotentialTorqueVariation_temp[0]),axis=0)
+	WeightedPotentialTorqueVariation_elbow_Forward = \
+			np.concatenate((WeightedPotentialTorqueVariation_elbow_Forward,\
+						WeightedPotentialTorqueVariation_temp[1]),axis=0)
+
+print('\n')
 
 	# Adding the weighted values regains the Weighted Normalized Muscle Velocities. But it is important to average the BIARTICULATING MUSCLES as shown below when considering the average afferent response.
 
-# WeightedNormalizedMuscleVelocity_Forward = WeightedPotentialTorqueVariation_elbow_Forward + WeightedPotentialTorqueVariation_shoulder_Forward
+WeightedNormalizedMuscleVelocity_Forward = WeightedPotentialTorqueVariation_elbow_Forward + WeightedPotentialTorqueVariation_shoulder_Forward
 
-# WeightedNormalizedMuscleVelocity_Forward_2 = \
-# 		[WeightedPotentialTorqueVariation_shoulder_Forward[i]\
-# 		+WeightedPotentialTorqueVariation_elbow_Forward[i] \
-# 		for i in range(np.shape(WeightedPotentialTorqueVariation_shoulder_Forward)[0])]
-#
-# 	# Correct for BIC and TRI by averaging the contributions from the MAs.
-#
-# WeightedNormalizedMuscleVelocity_Forward_2[3] = WeightedNormalizedMuscleVelocity_Forward_2[3]/2
-# WeightedNormalizedMuscleVelocity_Forward_2[4] = WeightedNormalizedMuscleVelocity_Forward_2[4]/2
-#
-# 	# Calculate only the lengthening Torque Variation Contributions for both the shoulder and the elbow.
-#
-# EccentricTorqueVariations_Shoulder =\
-#  	eccentric_velocities(WeightedPotentialTorqueVariation_shoulder_Forward)
-# EccentricTorqueVariations_Elbow =\
-#  	eccentric_velocities(WeightedPotentialTorqueVariation_elbow_Forward)
-#
-# 	# Concatenate, Sum, and Scale the total lengthening Torque Variations for both Shoulder and Elbow.
-#
-# ScalingFactor = 2000
-# TotalEccentricTorqueVariations_Shoulder =\
-# 	ScalingFactor*np.concatenate(EccentricTorqueVariations_Shoulder,axis=0)
-# TotalEccentricTorqueVariations_Elbow =\
-# 	ScalingFactor*np.concatenate(EccentricTorqueVariations_Elbow,axis=0)
-#
-# 	# Calculate the time series of potential endpoint variation.
-# MuscleList = list(AllCoefficients.keys())
-# TotalEndpointPotentialVariation = []
-#
-# for j in range(len(MuscleList)):
-# 	TotalEndpointPotentialVariation.append( \
-# 		[calculate_potential_variability(\
-# 			i,\
-# 			TotalEccentricTorqueVariations_Shoulder[j,:],\
-# 			TotalEccentricTorqueVariations_Elbow[j,:],\
-# 			EOM='Uno',\
-# 			dt=dt,\
-# 			Group = AllCoefficients[MuscleList[j]]['Group']) \
-# 				for i in range(len(A1))])
-#
-# 	# Plot the resulting potential variation
-#
-# [plt.plot(TotalEndpointPotentialVariation[i]) for i in range(16)]
+	# Correct for BIC and TRI by averaging the contributions from the MAs.
+
+WeightedNormalizedMuscleVelocity_Forward[:,3:5] = WeightedNormalizedMuscleVelocity_Forward[:,3:5]/2
+
+	# Calculate only the lengthening Torque Variation Contributions for both the shoulder and the elbow.
+
+EccentricTorqueVariations_Shoulder =\
+ 	eccentric_velocities(WeightedPotentialTorqueVariation_shoulder_Forward)
+EccentricTorqueVariations_Elbow =\
+ 	eccentric_velocities(WeightedPotentialTorqueVariation_elbow_Forward)
+
+	# Concatenate, Sum, and Scale the total lengthening Torque Variations for both Shoulder and Elbow.
+
+ScalingFactor = 2000
+TotalEccentricTorqueVariations_Shoulder =\
+	ScalingFactor*np.concatenate(EccentricTorqueVariations_Shoulder,axis=0)
+TotalEccentricTorqueVariations_Elbow =\
+	ScalingFactor*np.concatenate(EccentricTorqueVariations_Elbow,axis=0)
+
+	# Calculate the time series of potential endpoint variation.
+MuscleList = list(AllCoefficients.keys())
+TotalEndpointPotentialVariation = []
+
+for j in range(len(MuscleList)):
+	TotalEndpointPotentialVariation.append( \
+		[calculate_potential_variability(\
+			i,\
+			TotalEccentricTorqueVariations_Shoulder[j,:],\
+			TotalEccentricTorqueVariations_Elbow[j,:],\
+			EOM='Uno',\
+			dt=dt,\
+			Group = AllCoefficients[MuscleList[j]]['Group']) \
+				for i in range(len(A1))])
+
+	# Plot the resulting potential variation
+
+[plt.plot(TotalEndpointPotentialVariation[i]) for i in range(16)]
 
 	# Plot Afferent-Weighted Muscle Velocity (Forward)
 
 fig1e = plt.figure()
-[plt.plot(t.T,WeightedNormalizedMuscleVelocity_Forward[i].T) for i in OrderNumber]
+[plt.plot(t,WeightedNormalizedMuscleVelocity_Forward[:,i]) for i in OrderNumber]
 ax1e = plt.gca()
 ax1e.set_xlim(0,t_end*(1.3))
 ax1e.set_ylim(-12,12)
@@ -1389,10 +1261,13 @@ ax1e.set_title(DescriptiveTitle+'\nAfferent-Weighted Normalized Muscle Velocity'
 [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1e.lines)]
 ax1e.legend(OrderedMuscleList)
 
+
+
+
 	# Plot Normalized Muscle Velocity (Forward)
 
 fig1a = plt.figure()
-[plt.plot(t.T,NormalizedMuscleVelocity_Forward[i].T) for i in OrderNumber]
+[plt.plot(t,NormalizedMuscleVelocity_Forward[:,i]) for i in OrderNumber]
 ax1a = plt.gca()
 ax1a.set_xlim(0,t_end*(1.3))
 ax1a.set_ylim(-1.5,1.5)
@@ -1405,11 +1280,12 @@ ax1a.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Ec
 [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1a.lines)]
 ax1a.legend(OrderedMuscleList)
 
+
 	# Plot Joint Angles (Forward)
 
 fig1b = plt.figure()
-plt.plot(t.T,A1.T,'g')
-plt.plot(t.T,A2.T,'g:')
+plt.plot(t,A1,'g')
+plt.plot(t,A2,'g:')
 ax1b = plt.gca()
 ax1b.set_xlim(0,t_end*(1.3))
 ax1b.set_title(DescriptiveTitle+'\nAngle vs. Time')
@@ -1420,19 +1296,21 @@ else:
 ax1b.set_ylabel('Joint Angles (in radians)')
 ax1b.legend(["Shoulder","Elbow"])
 
+
 	# Plot Configuration Space (Forward)
 
 fig1c = plt.figure()
-plt.plot(A1.T,A2.T,'g')
+plt.plot(A1,A2,'g')
 ax1c = plt.gca()
 ax1c.set_title(DescriptiveTitle+'\nConfiguration Space')
 ax1c.set_ylabel("Shouler Angle (in radians)")
 ax1c.set_xlabel("Elbow Angle (in radians)")
 
+
 	# Calculate Costs from Afferent-Weighted Muscle Velocities
 
-EccentricCost_Forward = eccentric_cost(WeightedNormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt,costtype='l1norm')
-ConcentricCost_Forward = concentric_cost(WeightedNormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt,costtype='l1norm')
+EccentricCost_Forward = eccentric_cost(WeightedNormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt,type='l1norm')
+ConcentricCost_Forward = concentric_cost(WeightedNormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt,type='l1norm')
 
 # # Plot Muscle Lengths (Forward)
 #
@@ -1441,7 +1319,6 @@ ConcentricCost_Forward = concentric_cost(WeightedNormalizedMuscleVelocity_Forwar
 # ax1d = plt.gca()
 # ax1d.set_xlim(0,t_end*(1.3))
 # ax1d.set_title(DescriptiveTitle+'\nMuscle Lengths')
->>>>>>> 0e6d55c9bd628ca620fc054c2768478456996fda
 # if t_end!=1:
 # 	ax1d.set_xlabel('Time (s)')
 # else:
@@ -1450,29 +1327,26 @@ ConcentricCost_Forward = concentric_cost(WeightedNormalizedMuscleVelocity_Forwar
 # [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1d.lines)]
 # ax1d.legend(OrderedMuscleList)
 
-###################################################################################################
 
 	# Reverse Direction
 
 reaching_task(Xi=Xf, Xf=Xi,dt=dt, t_end=t_end)
-return_MA_matrix()
-
-	# Calculate resulting muscle velocities, lengths, etc.
-
-NormalizedMuscleVelocity_Reverse = calculate_muscle_velocities()
-WeightedPotentialTorqueVariation_shoulder_Reverse,\
-WeightedPotentialTorqueVariation_elbow_Reverse = \
-calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK()
-WeightedNormalizedMuscleVelocity_Reverse = calculate_weighted_muscle_velocities_REACHING_TASK()
-
-	# Test to make sure that the muscle velocities are negative, time-reversed versions of each other for the forward and backwards movement.
-
-assert np.array([np.array(abs(NormalizedMuscleVelocity_Forward[j,0,:].T-np.array(list(reversed(-NormalizedMuscleVelocity_Reverse[j,0,:]))).T)<1e-12).all() for j in range(n_muscles)]).all(), "The muscle velocities are not reversed and negative versions of each other."
+# calculate_muscle_lengths()
+# MuscleLengths_Reverse = MuscleLengths
+WeightedNormalizedMuscleVelocity_Reverse = calculate_weighted_muscle_velocities_REACHING_TASK(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
+NormalizedMuscleVelocity_Reverse = calculate_muscle_velocities(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
+StartTime = time.time()
+statusbar(0,len(A1),Title = 'Reverse Vm',StartTime=StartTime)
+for i in range(1,len(A1)):
+    statusbar(i,len(A1),Title = 'Reverse Vm',StartTime=StartTime)
+    WeightedNormalizedMuscleVelocity_Reverse = np.concatenate((WeightedNormalizedMuscleVelocity_Reverse,calculate_weighted_muscle_velocities_REACHING_TASK(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
+    NormalizedMuscleVelocity_Reverse = np.concatenate((NormalizedMuscleVelocity_Reverse,calculate_muscle_velocities(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
+print('\n')
 
 	# Plot Afferent-Weighted Muscle Velocity (Reverse)
 
 fig2e = plt.figure()
-[plt.plot(t.T,WeightedNormalizedMuscleVelocity_Reverse[i].T) for i in OrderNumber]
+[plt.plot(t,WeightedNormalizedMuscleVelocity_Reverse[:,i]) for i in OrderNumber]
 ax2e = plt.gca()
 ax2e.set_xlim(0,t_end*(1.3))
 ax2e.set_ylim(-12,12)
@@ -1485,10 +1359,11 @@ ax2e.set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$
 [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2e.lines)]
 ax2e.legend(OrderedMuscleList)
 
+
 	# Plot Normalized Muscle Velocity (Reverse)
 
 fig2a = plt.figure()
-[plt.plot(t.T,NormalizedMuscleVelocity_Reverse[i].T) for i in OrderNumber]
+[plt.plot(t,NormalizedMuscleVelocity_Reverse[:,i]) for i in OrderNumber]
 ax2a = plt.gca()
 ax2a.set_xlim(0,t_end*(1.3))
 ax2a.set_ylim(-1.5,1.5)
@@ -1501,11 +1376,12 @@ ax2a.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Ec
 [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2a.lines)]
 ax2a.legend(OrderedMuscleList)
 
+
 	# Plot Joint Angles (Reverse)
 
 fig2b = plt.figure()
-plt.plot(t.T,A1.T,'b')
-plt.plot(t.T,A2.T,'b:')
+plt.plot(t,A1,'b')
+plt.plot(t,A2,'b:')
 ax2b = plt.gca()
 ax2b.set_xlim(0,t_end*(1.3))
 ax2b.set_title(DescriptiveTitle+'\nAngle vs. Time')
@@ -1516,19 +1392,21 @@ else:
 ax2b.set_ylabel('Joint Angles (in radians)')
 ax2b.legend(["Shoulder","Elbow"])
 
+
 	# Plot Configuration Space (Reverse)
 
 fig2c = plt.figure()
-plt.plot(A1.T,A2.T,'b')
+plt.plot(A1,A2,'b')
 ax2c = plt.gca()
 ax2c.set_title(DescriptiveTitle+'\nConfiguration Space')
 ax2c.set_ylabel("Shouler Angle (in radians)")
 ax2c.set_xlabel("Elbow Angle (in radians)")
 
+
 	# Calculate Costs from Afferent-Weighted Muscle Velocities
 
-EccentricCost_Reverse = eccentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,costtype='l1norm')
-ConcentricCost_Reverse = concentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,costtype='l1norm')
+EccentricCost_Reverse = eccentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,type='l1norm')
+ConcentricCost_Reverse = concentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,type='l1norm')
 
 # # Plot Muscle Lengths (Reverse)
 #
@@ -1540,15 +1418,50 @@ ConcentricCost_Reverse = concentric_cost(WeightedNormalizedMuscleVelocity_Revers
 # if t_end!=1:
 # 	ax2d.set_xlabel('Time (s)')
 # else:
-# if t_end!=1:
-# 	ax2d.set_xlabel('Time (s)')
-# else:
 # 	ax2d.set_xlabel('Normalized Time')
 # ax2d.set_ylabel('Muscle Lengths (in mm)')
 # [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2d.lines)]
 # ax2d.legend(OrderedMuscleList)
 
-###################################################################################################
+
+# plt.figure()
+# plt.plot(np.arange(0,2*math.ceil(max([EccentricCost_Forward,ConcentricCost_Forward]))+1,1), np.arange(0,2*math.ceil(max([EccentricCost_Forward,ConcentricCost_Forward]))+1,1),'0.75',linestyle='--')
+# plt.scatter([EccentricCost_Forward],[ConcentricCost_Forward],facecolor ='g', edgecolor = 'k', marker='o',s=100)
+# plt.scatter([EccentricCost_Reverse],[ConcentricCost_Reverse],facecolor ='b', edgecolor = 'k', marker='o',s=100)
+# ax3 = plt.gca()
+# ax3.set_xlim(0,2*math.ceil(max([EccentricCost_Forward,EccentricCost_Reverse])))
+# ax3.set_ylim(0,2*math.ceil(max([EccentricCost_Forward,EccentricCost_Reverse])))
+# ax3.set_aspect('equal')
+# ax3.set_title('Eccentric vs. Concentric Cost\nFor Forward and Reverse Movments')
+# ax3.set_xlabel('Eccentric Cost (in $\hat{l}_{o}$)')
+# ax3.set_ylabel('Concentric Cost (in $\hat{l}_{o}$)')
+# ax3.legend(['Equal Cost Line','Forward Direction','Reversed Direction'])
+
+
+# Using Default Reaching Directions Listed Above...
+# CostValues ={'CenterForward' : np.array([[ 1.3220062 ,  2.10011198]]),\
+# 				'CenterReverse' : np.array([[ 2.10011198,  1.3220062 ]]),\
+# 					'LeftForward' : np.array([[ 1.24643599,  1.88616011]]),\
+# 						'LeftReverse' : np.array([[ 1.88616011,  1.24643599]]),\
+# 							'RightForward' : np.array([[ 1.1047386 ,  1.92105444]]),\
+# 								'RightReverse' : np.array([[ 1.92105444,  1.1047386 ]]),\
+# 									'SideForward' : np.array([[ 0.37931692,  0.53156831]]),\
+# 										'SideReverse' : np.array([[ 0.53156831,  0.37931692]])}
+# plt.figure()
+# MaximumCost = max([max(CostValues[key][0]) for key in CostValues.keys()])
+# plt.plot(np.arange(0,2*math.ceil(MaximumCost)+1,1), np.arange(0,2*math.ceil(MaximumCost)+1,1),'0.75',linestyle='--')
+# facecolor = iter(['k','#9f9f9f','b','#9f9f9f','r','#9f9f9f','g','#9f9f9f'])
+# edgecolor = iter(['k','k','k','b','k','r','k','g'])
+# [plt.scatter(CostValues[key][0,0],CostValues[key][0,1],c=next(facecolor),edgecolor=next(edgecolor),marker='o',s=75) for key in CostValues.keys()]
+# ax4 = plt.gca()
+# ax4.set_xlim(0,math.ceil(MaximumCost))
+# ax4.set_ylim(0,math.ceil(MaximumCost))
+# ax4.set_aspect('equal')
+# ax4.set_title('Eccentric vs. Concentric Cost\nFor Forward and Reverse Movments')
+# ax4.set_xlabel('Eccentric Cost (in $\hat{l}_{o}$)')
+# ax4.set_ylabel('Concentric Cost (in $\hat{l}_{o}$)')
+# # ax4.legend(['Equal Cost Line','Center (Forward)','Center (Reverse)','Left (Forward)','Left (Reverse)','Right (Forward)','Right (Reverse)','Side-to-Side (Forward)','Side-to-Side (Reverse)'],loc='upper right')
+#
 
 	# Plot bar graph comparing the two directions
 
@@ -1563,8 +1476,8 @@ ax4.set_title(DescriptiveTitle + '\nEccentric Cost for Forward and Reverse Movem
 ax4.set_ylabel('Sum of Afferent-Weighted Muscle Lengthening')
 ax4.set_xticks([0,1])
 
-	# Need to write PDF files and close the PDF files/figures
 
+	# Need to write PDF files and close the PDF files/figures
 if SaveOutputFigures == True:
 	pdf_forward.savefig(fig1e)
 	pdf_forward.savefig(fig1a)
