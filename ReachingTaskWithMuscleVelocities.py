@@ -271,7 +271,7 @@ def update_angular_acceleration(Ẋ,Ẍ):
 					,dtype = 'float128',ndmin=2).T # returns a (1,N) array
 def update_angle_lists(X,Ẋ,Ẍ):
 	"""
-	Creates global lists for angles 1 and 2 of shape (1,N).
+	Takes in three (2,N) endpoint arrays and returns global lists for angles 1 and 2 of shape (1,N).
 	"""
 	import numpy as np
 	inverse_kinematics(X)
@@ -334,22 +334,33 @@ def calculate_torques(EOM="Uno"):
 	    α = I1 + I2 + m1*(c1**2) + m2*(L1**2 + c2**2)
 	    β = m2*L1*c2
 	    δ = I2 + m2*(c2**2)
-	C = lambda a1,a2,ȧ1,ȧ2: \
+	C_matrix = lambda a1,a2,ȧ1,ȧ2: \
 	        np.matrix([ [-β*ȧ2*sin(a2),     -β*(ȧ1 + ȧ2)*sin(a2)],
 	                    [β*ȧ1*sin(a2),      0]]) # kg⋅m² (N⋅m⋅s²)
-	M = lambda a1,a2: \
+	M_matrix = lambda a1,a2: \
 	        np.matrix([ [α + 2*β*cos(a2),   δ + β*cos(a2)],
-	                    [δ + β*cos(a2),     δ]]) # kg⋅m² (N⋅m⋅s²)
-	B = np.matrix([ [b11, b12],\
-	                [b21, b22]]) # kg⋅m²/s (N⋅m⋅s)
+	                    [δ + β*cos(a2),     δ]],\
+						dtype = 'float128') # kg⋅m² (N⋅m⋅s²)
+	B_matrix = np.matrix([ [b11, b12],\
+	                	[b21, b22]]) # kg⋅m²/s (N⋅m⋅s)
 	global T1,T2
 	T1,T2 = [],[]
-	for i in range(len(A1)):
-	    Ȧ = np.matrix([[Ȧ1[i]],[Ȧ2[i]]])
-	    Ä = np.matrix([[Ä1[i]],[Ä2[i]]])
-	    T = M(A1[i],A2[i])*Ä + C(A1[i],A2[i],Ȧ1[i],A2[i])*Ȧ + B*Ȧ
-	    T1.append(T[0,0])
-	    T2.append(T[1,0])
+	Ȧ = np.swapaxes(np.array(np.concatenate((Ȧ1,Ȧ2),axis=0),ndmin=3),0,2)
+	Ä = np.swapaxes(np.array(np.concatenate((Ä1,Ä2),axis=0),ndmin=3),0,2)
+	M = np.array(list(map(M_matrix,A1.T,A2.T)))
+	C = np.array(list(map(C_matrix,A1.T,A2.T,Ȧ1.T,Ȧ2.T)))
+	MÄ = np.array(list(map(lambda m,ä: np.matrix(m)*ä,M,Ä)))
+	CȦ = np.array(list(map(lambda c,ȧ: np.matrix(np.array(c,ndmin=2,dtype='float128'))*ȧ,C,Ȧ)))
+	BȦ = np.array(list(map(lambda ȧ: B_matrix*ȧ,Ȧ)))
+	T = MÄ + CȦ + BȦ
+	# returns a (N,1,2) 3D array. Therefore we must transpose it first and select first element
+	T1,T2 = np.split(T.T[0],2,axis=0) # returns 2 (1,N) arrays
+	# for i in range(len(A1)):
+	#     Ȧ = np.matrix([[Ȧ1[i]],[Ȧ2[i]]])
+	#     Ä = np.matrix([[Ä1[i]],[Ä2[i]]])
+	#     T = M(A1[i],A2[i])*Ä + C(A1[i],A2[i],Ȧ1[i],A2[i])*Ȧ + B*Ȧ
+	#     T1.append(T[0,0])
+	#     T2.append(T[1,0])
 def calculate_potential_variability(i,j,δT1,δT2,dt=0.001,EOM = 'Uno',Group = 'flexor'):
 	from math import cos,sin
 	import numpy as np
@@ -435,7 +446,6 @@ def reaching_task(dt = 0.001, Xi = [0,0.25], Xf = [0.25,0.50],t_end=1):
 	X,Ẋ,Ẍ = return_X_values(t,Xi,Xf,t_end)
 	update_angle_lists(X,Ẋ,Ẍ)
 	# calculate_torques()
-# reaching_task()
 def plot_resulting_kinematics():
     import matplotlib.pyplot as plt
     import numpy as np
@@ -1002,12 +1012,8 @@ def return_MA_matrix():
 	import numpy as np
 	from numpy import pi
 	import sympy as sp
-	# global q1,q2,q_PS,RMatrix_Transpose,dRMatrix_Transpose
+
 	global A1,A2,RMatrix_Transpose,dRMatrix_Transpose
-	"""
-	# MomentArmMatrix = RMatrix_Transpose.subs([(q1,A1),(q2,A2),(q_PS,pi/2)]).T
-	"""
-	# MomentArmMatrix = np.float128(RMatrix_Transpose(A1,A2,pi/2).T)
 	global MomentArmMatrix,dMomentArmMatrix
 	MomentArmMatrix = np.array(list(map(lambda A1,A2: \
 						np.float128(RMatrix_Transpose(A1,A2,pi/2).T),\
@@ -1015,12 +1021,7 @@ def return_MA_matrix():
 	dMomentArmMatrix = np.array(list(map(lambda A1,A2:\
 						np.float128(dRMatrix_Transpose(A1,A2,pi/2).T),\
 						A1.T,A2.T)))
-	# currently returns R matrix of size (m,n) for a given configuration (q1,q2). This will be changed in the future to calculate all R matrices over the movement.
-	# return(MomentArmMatrix,d)
-def diagonal(X):
-	import sympy as sp
-	import numpy as np
-	return(sp.Matrix(np.diagflat(X)))
+	# returns two matrices of size (N,2,m)
 def calculate_muscle_velocities():
 	"""
 	v = (-dR/dϑ)⋅(dϑ/dt)⋅ϑ + (-R)⋅(dϑ/dt)
@@ -1030,35 +1031,13 @@ def calculate_muscle_velocities():
 	Need to hard code whether the rotation causes lengthening or shortening. This is determined by the sign of -r₁ⱼ⋅dϑ₁/dt for each d.o.f.
 	"""
 	import numpy as np
-	global Ȧ1,Ȧ2,AllCoefficients,RMatrix_Transpose,dRMatrix_Transpose
-	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()])
-	return_MA_matrix()
-	R,dR = MomentArmMatrix,dMomentArmMatrix
-	# def muscle_velocity_for_muscle_j(ȧ1,ȧ2,r1,r2,ṙ1,ṙ2):
-	# 	import numpy as np
-	# 	result = np.sign(-r1*ȧ1)*(((-ṙ1*ȧ1)**2 + (-r1*ȧ1)**2)**(1/2)) \
-	# 				+ np.sign(-r2*ȧ2)*(((-ṙ2*ȧ2)**2 + (-r2*ȧ2)**2)**(1/2))
-	# 	return(result)
-	# MuscleVelocity = [np.array(list(map(muscle_velocity_for_muscle_j,\
-	# Ȧ1,Ȧ2,R[:,0,j],R[:,1,j],dR[:,0,j],dR[:,1,j]))) for j in range(MomentArmMatrix.shape[2])]
-
-	def muscle_velocity_for_muscle_j(ȧ1,ȧ2,r1,r2):
-		import numpy as np
-		result = - np.multiply(ȧ1[0],r1) - np.multiply(ȧ2[0],r2)
-		return(result)
-	MuscleVelocity = [np.array(list(map(muscle_velocity_for_muscle_j,\
-	Ȧ1,Ȧ2,R[:,0,j],R[:,1,j]))) for j in range(MomentArmMatrix.shape[2])]
-	# J²_{Rⱼ} --> The squared jacobian of each column of the R matrix w.r.t. {ϑ₁,...,ϑₙ}
-	# SquaredJacobians = [RMatrix_Transpose[i,:].jacobian([q1,q2]).subs([(q1,A1),(q2,A2),(q_PS,np.pi/2)])**2 for i in range(np.shape(RMatrix_Transpose)[0])]
-	# sign_convention = lambda j: -np.sign(np.multiply([Ȧ1,Ȧ2],R[:,j].T))
-	# MuscleVelocity = [float(sign_convention(j)\
-	# 	*np.matrix([el**0.5 for el in \
-	# 		diagonal([Ȧ1,Ȧ2])*SquaredJacobians[j]*np.matrix([[Ȧ1],[Ȧ2]]) \
-	# 			+ diagonal(R[:,j])*(diagonal([Ȧ1,Ȧ2])**2)*R[:,j]]).T) \
-	# 				for j in range(np.shape(R)[1])]
-	# dR = np.concatenate([sp.diff(RMatrix_Transpose[:,0],q1).subs(q1,A1),sp.diff(RMatrix_Transpose[:,1],q2).subs([(q2,A2),(q_PS,np.pi/2)])],axis=1)
-	# MuscleVelocity = -R.T*(np.matrix([Ȧ1,Ȧ2]).T)#-dR*(np.matrix(np.multiply([A1,A2],[Ȧ1,Ȧ2])).T)
-	NormalizedMuscleVelocity = np.array([[MuscleVelocity[i]/OptimalMuscleLength[i] for i in range(len(MuscleVelocity))]][0])
+	global Ȧ1,Ȧ2,AllCoefficients,MomentArmMatrix,dMomentArmMatrix
+	Ȧ = np.swapaxes(np.array(np.concatenate((Ȧ1,Ȧ2),axis=0),ndmin=3),0,2)
+	MuscleVelocity = (abs(Ȧ.T)*(((dMomentArmMatrix.T**2)+(MomentArmMatrix.T**2))**0.5)\
+						*np.sign(-Ȧ.T*MomentArmMatrix.T))\
+							.sum(axis=1)[:,np.newaxis]
+	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()],dtype='float128')[:,np.newaxis,np.newaxis]
+	NormalizedMuscleVelocity = MuscleVelocity/OptimalMuscleLength
 	# returns a (m,1,N) array where m is the number of muscles and N is the number of timesteps.
 	return(NormalizedMuscleVelocity)
 def calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK():
@@ -1069,160 +1048,113 @@ def calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK():
 
 	Need to hard code whether the rotation causes lengthening or shortening. This is determined by the sign of -r₁ⱼ⋅dϑ₁/dt for each d.o.f.
 	"""
-	# import numpy as np
-	# import sympy as sp
-	# global AllCoefficients
-	# OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()])
-	# R = return_MA_matrix(A1,A2)
-
-
-	# # J²_{Rⱼ} --> The squared jacobian of each column of the R matrix w.r.t. {ϑ₁,...,ϑₙ}
-	# SquaredJacobians = [RMatrix_Transpose[i,:].jacobian([q1,q2]).subs([(q1,A1),(q2,A2),(q_PS,np.pi/2)])**2 for i in range(np.shape(RMatrix_Transpose)[0])]
-	# sign_convention = lambda j: -np.sign(np.multiply([Ȧ1,Ȧ2],R[:,j].T))
-	# MuscleVelocity = [float(sign_convention(j)\
-	# 	*np.matrix([el**0.5 for el in \
-	# 		diagonal([Ȧ1,Ȧ2])*SquaredJacobians[j]*np.matrix([[Ȧ1],[Ȧ2]]) \
-	# 			+ diagonal(R[:,j])*(diagonal([Ȧ1,Ȧ2])**2)*R[:,j]]).T) \
-	# 				for j in range(np.shape(R)[1])]
-
-
-	# MuscleList = list(AllCoefficients.keys())
-	#
-	# WeightedNormalizedMuscleVelocity_shoulder = []
-	# WeightedNormalizedMuscleVelocity_elbow = []
-	#
-	# for i in range(len(AllCoefficients)):
-	# 	WeightedNormalizedMuscleVelocity_shoulder.append(NormalizedMuscleVelocity[i]*(abs(R.T[i,0] )/1000)*AllCoefficients[MuscleList[i]]['Corrected No'])
-	#
-	# 	WeightedNormalizedMuscleVelocity_elbow.append(NormalizedMuscleVelocity[i]*(abs(R.T[i,1] )/1000)*AllCoefficients[MuscleList[i]]['Corrected No'])
-	#
-	# return(np.array([WeightedNormalizedMuscleVelocity_shoulder]),np.array([WeightedNormalizedMuscleVelocity_elbow]))
-
 	import numpy as np
-	global Ȧ1,Ȧ2,AllCoefficients,RMatrix_Transpose,dRMatrix_Transpose
-	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()])
+	import ipdb
+	global Ȧ1,Ȧ2,AllCoefficients,MomentArmMatrix,dMomentArmMatrix
+
 	MuscleList = list(AllCoefficients.keys())
-	return_MA_matrix()
-	R,dR = MomentArmMatrix,dMomentArmMatrix
-	def MA_weighted_muscle_velocity_for_muscle_j_shoulder(ȧ1,ȧ2,r1,r2,ṙ1,ṙ2):
-		import numpy as np
-		result = (np.sign(-r1*ȧ1)*(((-ṙ1*ȧ1)**2 + (-r1*ȧ1)**2)**(1/2)) \
-					+ np.sign(-r2*ȧ2)*(((-ṙ2*ȧ2)**2 + (-r2*ȧ2)**2)**(1/2)))\
-					*abs(r1)/1000
-		return(result)
-	def MA_weighted_muscle_velocity_for_muscle_j_elbow(ȧ1,ȧ2,r1,r2,ṙ1,ṙ2):
-		import numpy as np
-		result = (np.sign(-r1*ȧ1)*(((-ṙ1*ȧ1)**2 + (-r1*ȧ1)**2)**(1/2)) \
-					+ np.sign(-r2*ȧ2)*(((-ṙ2*ȧ2)**2 + (-r2*ȧ2)**2)**(1/2)))\
-					*abs(r2)/1000
-		return(result)
-	WeightedMuscleVelocity_Shoulder = \
-				[np.array(list(map(MA_weighted_muscle_velocity_for_muscle_j_shoulder,\
-				Ȧ1,Ȧ2,R[:,0,j],R[:,1,j],dR[:,0,j],dR[:,1,j])))\
-				*AllCoefficients[MuscleList[j]]['Corrected No']\
-				/AllCoefficients[MuscleList[j]]['Optimal Muscle Length'] \
-				for j in range(MomentArmMatrix.shape[2])]
-	WeightedMuscleVelocity_Elbow = \
-				[np.array(list(map(MA_weighted_muscle_velocity_for_muscle_j_elbow,\
-				Ȧ1,Ȧ2,R[:,0,j],R[:,1,j],dR[:,0,j],dR[:,1,j])))\
-				*AllCoefficients[MuscleList[j]]['Corrected No']\
-				/AllCoefficients[MuscleList[j]]['Optimal Muscle Length'] \
-				for j in range(MomentArmMatrix.shape[2])]
-	return(WeightedMuscleVelocity_Shoulder,WeightedMuscleVelocity_Elbow)
+	Ȧ = np.swapaxes(np.array(np.concatenate((Ȧ1,Ȧ2),axis=0),ndmin=3),0,2)
+
+	"""
+	Note: Ȧ is a 3D array of size (N,2,1). Thus, Ȧ.T has shape (1,2,N). Numpy.ndarray multiplication of arrays with IDENTICAL shapes will result in an element by element multiplication similar to np.multiply. Thus we multiply -Ȧ.T[0] by the (2,N) array that is the result of the norm of dMomentArmMatrix.T[j] and MomentArmMatrix.T[j] (each of shape (2,N)). This is equivalent to -ȧ₁*√(ṙ₁ⱼ² + r₁ⱼ²) for all t.
+	"""
+
+	MuscleVelocity = \
+					(abs(Ȧ.T)*(((dMomentArmMatrix.T**2)+(MomentArmMatrix.T**2))**0.5)\
+						*np.sign(-Ȧ.T*MomentArmMatrix.T))\
+							.sum(axis=1)[:,np.newaxis]
+
+	"""
+	Normalizing these muscle velocities can similarly be done by dividing the (m,1,N) MuscleVelocity array by the OptimalMuscleLength array of shape (m,1,1).
+	"""
+
+	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()],dtype='float128')[:,np.newaxis,np.newaxis]
+	NormalizedMuscleVelocity = MuscleVelocity/OptimalMuscleLength
+
+	"""
+	Next we need to multiply each muscle velocity, AT EACH TIMESTEP, by the appropriate scaling factor, which may be a function of joint angle (i.e., movement step number).
+	"""
+
+	CorrectedAfferentNumber = np.array([AllCoefficients[key]['Corrected No'] for key in AllCoefficients.keys()],dtype='float128')[:,np.newaxis] # returns an (m,1) array
+
+	"""
+	Note: (NormalizedMuscleVelocity*MomentArmMatrix.T/1000).T returns an (N,2,m) matrix. Therefore, we must construct a (2,m) matrix of Corrected Afferented Numbers that have identical rows. This is done by concatenating CorrectedAfferentNumber with itself and then transposing the result. This total product will yield a (m,2,N) array of both shoulder and elbow weighted muscle velocities. This will then be split by np.split() to give (m,1,N) arrays that are then squeezed into (m,N) arrays for the individual joint weighted muscle velocities.
+	"""
+
+	MAWeightedMuscleVelocity = \
+		((NormalizedMuscleVelocity*MomentArmMatrix.T/1000).T\
+			*np.concatenate((CorrectedAfferentNumber,CorrectedAfferentNumber),axis=1).T).T
+	MAWeightedMuscleVelocity_Shoulder,MAWeightedMuscleVelocity_Elbow = \
+	 	np.split(MAWeightedMuscleVelocity,2,axis=1)
+	MAWeightedMuscleVelocity_Shoulder,MAWeightedMuscleVelocity_Elbow = \
+		MAWeightedMuscleVelocity_Shoulder.squeeze(),MAWeightedMuscleVelocity_Elbow.squeeze()
+	# returns two (m,N) arrays.
+	return(MAWeightedMuscleVelocity_Shoulder,MAWeightedMuscleVelocity_Elbow)
 def calculate_weighted_muscle_velocities_REACHING_TASK():
 	"""
 	v = (-dR/dϑ)⋅(dϑ/dt)⋅ϑ + (-R)⋅(dϑ/dt)
 	(dsⱼ/dϑ₁)⋅(dϑ₁/dt) = √((dϑ₁/dt)²⋅(dr₁ⱼ/dϑ₁)² + (dϑ₁/dt)²⋅(r₁ⱼ)²)
 	(dsⱼ/dt) = sum([√(el) for el in diag(dϑ/dt)(J²_{Rⱼ})(dϑ/dt) + diag(Rⱼ)(diag(dϑ/dt)²)(dϑ₁/dt)])
 
-	Need to hard code whether the rotation causes lengthening or shortening. This is determined by the sign of -r₁ⱼ⋅dϑ₁/dt for each d.o.f.
+	Need to hard code whether the rotation causes lengthening or shortening. This is determined by the sign of -r₁ⱼ⋅dϑ₁/dt for each d.o.f. CORRECTION: by removing the angular velocity from the square root, the sign of the rotation is preserved -- regaining the sign convention.
 	"""
 
 	import numpy as np
-	global Ȧ1,Ȧ2,AllCoefficients,RMatrix_Transpose,dRMatrix_Transpose
-	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()])
+	import ipdb
+	global Ȧ1,Ȧ2,AllCoefficients,MomentArmMatrix,dMomentArmMatrix
+
 	MuscleList = list(AllCoefficients.keys())
-	return_MA_matrix()
-	R,dR = MomentArmMatrix,dMomentArmMatrix
-	def MA_weighted_muscle_velocity_for_muscle_j(ȧ1,ȧ2,r1,r2,ṙ1,ṙ2):
-		import numpy as np
-		result = (np.sign(-r1*ȧ1)*(((-ṙ1*ȧ1)**2 + (-r1*ȧ1)**2)**(1/2)) \
-					+ np.sign(-r2*ȧ2)*(((-ṙ2*ȧ2)**2 + (-r2*ȧ2)**2)**(1/2)))\
-					*(abs(np.trim_zeros(np.array([r1,r2])).mean())/1000)
-		return(result)
-	WeightedMuscleVelocity = [np.array(list(map(MA_weighted_muscle_velocity_for_muscle_j,\
-								Ȧ1,Ȧ2,R[:,0,j],R[:,1,j],dR[:,0,j],dR[:,1,j])))\
-								*AllCoefficients[MuscleList[j]]['Corrected No']\
-								/AllCoefficients[MuscleList[j]]['Optimal Muscle Length'] \
-								for j in range(MomentArmMatrix.shape[2])]
+	Ȧ = np.swapaxes(np.array(np.concatenate((Ȧ1,Ȧ2),axis=0),ndmin=3),0,2)
 
-	#
-	# import numpy as np
-	# import sympy as sp
-	# global q1,q2,q_PS,AllCoefficients,RMatrix_Transpose
-	# OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()])
-	# R = return_MA_matrix(A1,A2)
-	# # J²_{Rⱼ} --> The squared jacobian of each column of the R matrix w.r.t. {ϑ₁,...,ϑₙ}
-	# SquaredJacobians = [RMatrix_Transpose[i,:].jacobian([q1,q2]).subs([(q1,A1),(q2,A2),(q_PS,np.pi/2)])**2 for i in range(np.shape(RMatrix_Transpose)[0])]
-	# sign_convention = lambda j: -np.sign(np.multiply([Ȧ1,Ȧ2],R[:,j].T))
-	# MuscleVelocity = [float(sign_convention(j)\
-	# 	*np.matrix([el**0.5 for el in \
-	# 		diagonal([Ȧ1,Ȧ2])*SquaredJacobians[j]*np.matrix([[Ȧ1],[Ȧ2]]) \
-	# 			+ diagonal(R[:,j])*(diagonal([Ȧ1,Ȧ2])**2)*R[:,j]]).T) \
-	# 				for j in range(np.shape(R)[1])]
+	"""
+	Note: Ȧ is a 3D array of size (N,2,1). Thus, Ȧ.T has shape (1,2,N). Numpy.ndarray multiplication of arrays with IDENTICAL shapes will result in an element by element multiplication similar to np.multiply. Thus we multiply -Ȧ.T[0] by the (2,N) array that is the result of the norm of dMomentArmMatrix.T[j] and MomentArmMatrix.T[j] (each of shape (2,N)). This is equivalent to -ȧ₁*√(ṙ₁ⱼ² + r₁ⱼ²) for all t.
 
+	Normalizing these muscle velocities can similarly be done by dividing the (m,1,N) MuscleVelocity array by the OptimalMuscleLength array of shape (m,1,1).
+	"""
 
-	# import numpy as np
-	# import sympy as sp
-	# import ipdb
-	# global q1,q2,q_PS,AllCoefficients
-	# R = return_MA_matrix(A1,A2)
-	# #dR = np.concatenate([sp.diff(RMatrix_Transpose[:,0],q1).subs(q1,A1),sp.diff(RMatrix_Transpose[:,1],q2).subs([(q2,A2),(q_PS,np.pi/2)])],axis=1)
-	# MuscleVelocity = -R.T*(np.matrix([Ȧ1,Ȧ2]).T)#-dR*(np.matrix(np.multiply([A1,A2],[Ȧ1,Ȧ2])).T)#
+	MuscleVelocity = \
+					(abs(Ȧ.T)*(((dMomentArmMatrix.T**2)+(MomentArmMatrix.T**2))**0.5)\
+						*np.sign(-Ȧ.T*MomentArmMatrix.T))\
+							.sum(axis=1)[:,np.newaxis]
 
+	OptimalMuscleLength = np.array([AllCoefficients[key]['Optimal Muscle Length'] for key in AllCoefficients.keys()],dtype='float128')[:,np.newaxis,np.newaxis]
+	NormalizedMuscleVelocity = MuscleVelocity/OptimalMuscleLength
 
-	# MuscleList = list(AllCoefficients.keys())
+	"""
+	Next we need to multiply each muscle velocity, AT EACH TIMESTEP, by the appropriate scaling factor, which may be a function of joint angle (i.e., movement step number).
+	"""
 
+	CorrectedAfferentNumber = np.array([AllCoefficients[key]['Corrected No'] for key in AllCoefficients.keys()],dtype='float128')[:,np.newaxis]
+	WeightedMuscleVelocity = (NormalizedMuscleVelocity*abs(MomentArmMatrix).T/1000).sum(axis=1)  \
+								/((abs(MomentArmMatrix)>0).T.sum(axis=1))  \
+									*CorrectedAfferentNumber
 
-	# WeightedNormalizedMuscleVelocity = np.array([[float(MuscleVelocity[i,0])/AllCoefficients[list(MuscleList)[i]]['Optimal Muscle Length'] for i in range(len(MuscleVelocity))]])
-
-
-	# WeightedNormalizedMuscleVelocity = []
-	# for i in range(len(AllCoefficients)):
-	# 	if MuscleList[i] not in ['BIC','TRI']:
-	# 		WeightedNormalizedMuscleVelocity.append(MuscleVelocity[i]*abs(sum(R.T[i,:] )/1000)*AllCoefficients[MuscleList[i]]['Corrected No']/AllCoefficients[MuscleList[i]]['Optimal Muscle Length'])
-	# 	else:
-	# 		WeightedNormalizedMuscleVelocity.append(MuscleVelocity[i]*abs((sum(R.T[i,:] )/2)/1000)*AllCoefficients[MuscleList[i]]['Corrected No']/AllCoefficients[MuscleList[i]]['Optimal Muscle Length'])
-	# return(np.array([WeightedNormalizedMuscleVelocity]))
+	"""
+	If you wanted to change the weighting scheme, use the above notation whereby the numpy.ndarrays have the same primary shape (i.e., length). Removing the .sum(axis=1) for the first line of the WeightedMuscleVelocity equation will return the individual weighted muscle velocity components per joint.
+	"""
 	return(WeightedMuscleVelocity)
 def eccentric_velocities(NormalizedMuscleVelocity):
 	"""
 	Returns a (m,1,N) list with m (1,N) arrays of positive muscle velocities.
 	"""
 	import numpy as np
-	# PositiveMuscleVelocities = []
 	def positive_entries(NormalizedMuscleVelocity):
 		return(np.multiply(np.array([[1]*np.shape(NormalizedMuscleVelocity)[1]]),\
 										NormalizedMuscleVelocity>0))
 	PositiveMuscleVelocities = list(map(lambda Vm: np.multiply(positive_entries(Vm),Vm),\
-									NormalizedMuscleVelocity))
-	# for j in range(np.shape(NormalizedMuscleVelocity)[0]):
-	# 	PositiveEntries = np.multiply(np.array([[1]*np.shape(NormalizedMuscleVelocity)[2]]),\
-	# 									NormalizedMuscleVelocity[j]>=0)
-	# 	PositiveMuscleVelocities.append(np.multiply(NormalizedMuscleVelocity[j],\
-	# 													PositiveEntries))
+									np.split(NormalizedMuscleVelocity,\
+									len(NormalizedMuscleVelocity),axis=0)))
 	return(PositiveMuscleVelocities)
 def concentric_velocities(NormalizedMuscleVelocity):
 	"""
 	Returns a (m,1,N) list with m (1,N) arrays of negative muscle velocities.
 	"""
-	# import numpy as np
-	# NegativeMuscleVelocities = [NormalizedMuscleVelocity.T[i,:][NormalizedMuscleVelocity.T[i,:]<=0] for i in range(np.shape(NormalizedMuscleVelocity)[1])]
 	def negative_entries(NormalizedMuscleVelocity):
 		return(np.multiply(np.array([[1]*np.shape(NormalizedMuscleVelocity)[1]]),\
 										NormalizedMuscleVelocity<0))
 	NegativeMuscleVelocities = list(map(lambda Vm: np.multiply(negative_entries(Vm),Vm),\
-									NormalizedMuscleVelocity))
+									np.split(NormalizedMuscleVelocity,\
+									len(NormalizedMuscleVelocity),axis=0)))
 	return(NegativeMuscleVelocities)
 def cost_function(X,costtype="avg"):
 	assert costtype in ['avg','sos','l2norm','l1norm'], "costtype must be either 'avg','sos','l2norm', or 'l1norm'"
@@ -1323,6 +1255,7 @@ import matplotlib.pyplot as plt
 import math
 import time
 from matplotlib.backends.backend_pdf import PdfPages
+import ipdb
 
 	# Save Output Figures?
 
@@ -1330,8 +1263,33 @@ SaveOutputFigures = False
 
 	# DescriptiveTitle should be something to identify the trial either by reaching location, (i.e., Left, Right, Center, or Sideways) or by what has changed in the most current iteration (e.g., CB_Ramsay, DELTa_Est, etc.). Spaces will be replaced by '_' symbols for the filename but kept for figure titles.
 
-ReachType = ['Sideways','Center','Left','Right'][2]
+ReachType = ['Sideways','Center','Left','Right'][3]
 DescriptiveTitle = ReachType + ' Reach'
+
+	# Define Moment Arm Matrix Functions for the model and establish flexor/extensor list
+
+global_R_matrix()
+n_muscles=len(AllCoefficients)
+n_extensors = sum([AllCoefficients[key]['Group']=='extensor' for key in AllCoefficients.keys()])
+n_flexors = sum([AllCoefficients[key]['Group']=='flexor' for key in AllCoefficients.keys()])
+flexor_cmap=plt.get_cmap('autumn')
+extensor_cmap = plt.get_cmap('YlGnBu')
+flexor_colors = iter(flexor_cmap(np.linspace(0,1,n_flexors)))
+extensor_colors = iter(list(reversed(extensor_cmap(np.linspace(0,1,n_flexors)))))
+flexor_colors_list = []
+extensor_colors_list = []
+FlexorOrderedMuscleList = []
+ExtensorOrderedMuscleList = []
+for muscle in AllCoefficients:
+   if AllCoefficients[muscle]['Group'] == 'flexor':
+        flexor_colors_list.append(next(flexor_colors))
+        FlexorOrderedMuscleList.append(muscle)
+   else:
+        extensor_colors_list.append(next(extensor_colors))
+        ExtensorOrderedMuscleList.append(muscle)
+OrderedColorsList = flexor_colors_list + list(reversed(extensor_colors_list))
+OrderedMuscleList = FlexorOrderedMuscleList + list(reversed(ExtensorOrderedMuscleList))
+OrderNumber = [list(AllCoefficients.keys()).index(el) for el in OrderedMuscleList]
 
 	# Open PDF files to write plots to
 
@@ -1350,392 +1308,278 @@ t = np.array(np.arange(0,1+dt,dt,dtype = 'float128')*t_end, ndmin = 2) # returns
 
 Xi,Xf = set_initial_and_final_positions(ReachType)
 
+###################################################################################################
+
 	# Forward Direction
 
+reaching_task(Xi=Xi, Xf=Xf,dt=dt, t_end=t_end)
+return_MA_matrix()
+
+	# Calculate resulting muscle velocities, lengths, etc.
+
+NormalizedMuscleVelocity_Forward = calculate_muscle_velocities()
+WeightedPotentialTorqueVariation_shoulder_Forward,\
+WeightedPotentialTorqueVariation_elbow_Forward = \
+calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK()
+WeightedNormalizedMuscleVelocity_Forward = calculate_weighted_muscle_velocities_REACHING_TASK()
+# calculate_muscle_lengths()
+# MuscleLengths_Forward = MuscleLengths
+
+	# Adding the weighted values regains the Weighted Normalized Muscle Velocities. But it is important to average the BIARTICULATING MUSCLES as shown below when considering the average afferent response.
+
+# WeightedNormalizedMuscleVelocity_Forward = WeightedPotentialTorqueVariation_elbow_Forward + WeightedPotentialTorqueVariation_shoulder_Forward
+
+# WeightedNormalizedMuscleVelocity_Forward_2 = \
+# 		[WeightedPotentialTorqueVariation_shoulder_Forward[i]\
+# 		+WeightedPotentialTorqueVariation_elbow_Forward[i] \
+# 		for i in range(np.shape(WeightedPotentialTorqueVariation_shoulder_Forward)[0])]
+#
+# 	# Correct for BIC and TRI by averaging the contributions from the MAs.
+#
+# WeightedNormalizedMuscleVelocity_Forward_2[3] = WeightedNormalizedMuscleVelocity_Forward_2[3]/2
+# WeightedNormalizedMuscleVelocity_Forward_2[4] = WeightedNormalizedMuscleVelocity_Forward_2[4]/2
+#
+# 	# Calculate only the lengthening Torque Variation Contributions for both the shoulder and the elbow.
+#
+# EccentricTorqueVariations_Shoulder =\
+#  	eccentric_velocities(WeightedPotentialTorqueVariation_shoulder_Forward)
+# EccentricTorqueVariations_Elbow =\
+#  	eccentric_velocities(WeightedPotentialTorqueVariation_elbow_Forward)
+#
+# 	# Concatenate, Sum, and Scale the total lengthening Torque Variations for both Shoulder and Elbow.
+#
+# ScalingFactor = 2000
+# TotalEccentricTorqueVariations_Shoulder =\
+# 	ScalingFactor*np.concatenate(EccentricTorqueVariations_Shoulder,axis=0)
+# TotalEccentricTorqueVariations_Elbow =\
+# 	ScalingFactor*np.concatenate(EccentricTorqueVariations_Elbow,axis=0)
+#
+# 	# Calculate the time series of potential endpoint variation.
+# MuscleList = list(AllCoefficients.keys())
+# TotalEndpointPotentialVariation = []
+#
+# for j in range(len(MuscleList)):
+# 	TotalEndpointPotentialVariation.append( \
+# 		[calculate_potential_variability(\
+# 			i,\
+# 			TotalEccentricTorqueVariations_Shoulder[j,:],\
+# 			TotalEccentricTorqueVariations_Elbow[j,:],\
+# 			EOM='Uno',\
+# 			dt=dt,\
+# 			Group = AllCoefficients[MuscleList[j]]['Group']) \
+# 				for i in range(len(A1))])
+#
+# 	# Plot the resulting potential variation
+#
+# [plt.plot(TotalEndpointPotentialVariation[i]) for i in range(16)]
+
+	# Plot Afferent-Weighted Muscle Velocity (Forward)
+
+fig1e = plt.figure()
+[plt.plot(t.T,WeightedNormalizedMuscleVelocity_Forward[i].T) for i in OrderNumber]
+ax1e = plt.gca()
+ax1e.set_xlim(0,t_end*(1.3))
+ax1e.set_ylim(-12,12)
+if t_end!=1:
+	ax1e.set_xlabel('Time (s)')
+else:
+	ax1e.set_xlabel('Normalized Time')
+ax1e.set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+ax1e.set_title(DescriptiveTitle+'\nAfferent-Weighted Normalized Muscle Velocity')
+[j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1e.lines)]
+ax1e.legend(OrderedMuscleList)
+
+	# Plot Normalized Muscle Velocity (Forward)
+
+fig1a = plt.figure()
+[plt.plot(t.T,NormalizedMuscleVelocity_Forward[i].T) for i in OrderNumber]
+ax1a = plt.gca()
+ax1a.set_xlim(0,t_end*(1.3))
+ax1a.set_ylim(-1.5,1.5)
+ax1a.set_title(DescriptiveTitle+'\nNormalized Muscle Velocity')
+if t_end!=1:
+	ax1a.set_xlabel('Time (s)')
+else:
+	ax1a.set_xlabel('Normalized Time')
+ax1a.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Eccentric')
+[j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1a.lines)]
+ax1a.legend(OrderedMuscleList)
+
+	# Plot Joint Angles (Forward)
+
+fig1b = plt.figure()
+plt.plot(t.T,A1.T,'g')
+plt.plot(t.T,A2.T,'g:')
+ax1b = plt.gca()
+ax1b.set_xlim(0,t_end*(1.3))
+ax1b.set_title(DescriptiveTitle+'\nAngle vs. Time')
+if t_end!=1:
+	ax1b.set_xlabel('Time (s)')
+else:
+	ax1b.set_xlabel('Normalized Time')
+ax1b.set_ylabel('Joint Angles (in radians)')
+ax1b.legend(["Shoulder","Elbow"])
+
+	# Plot Configuration Space (Forward)
+
+fig1c = plt.figure()
+plt.plot(A1.T,A2.T,'g')
+ax1c = plt.gca()
+ax1c.set_title(DescriptiveTitle+'\nConfiguration Space')
+ax1c.set_ylabel("Shouler Angle (in radians)")
+ax1c.set_xlabel("Elbow Angle (in radians)")
+
+	# Calculate Costs from Afferent-Weighted Muscle Velocities
+
+EccentricCost_Forward = eccentric_cost(WeightedNormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt,costtype='l1norm')
+ConcentricCost_Forward = concentric_cost(WeightedNormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt,costtype='l1norm')
+
+# # Plot Muscle Lengths (Forward)
+#
+# fig1d = plt.figure()
+# [plt.plot(t,MuscleLengths_Forward[i]) for i in OrderNumber]
+# ax1d = plt.gca()
+# ax1d.set_xlim(0,t_end*(1.3))
+# ax1d.set_title(DescriptiveTitle+'\nMuscle Lengths')
+# if t_end!=1:
+# 	ax1d.set_xlabel('Time (s)')
+# else:
+# 	ax1d.set_xlabel('Normalized Time')
+# ax1d.set_ylabel('Muscle Lengths (in mm)')
+# [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1d.lines)]
+# ax1d.legend(OrderedMuscleList)
+
+###################################################################################################
+
+	# Reverse Direction
+
 reaching_task(Xi=Xf, Xf=Xi,dt=dt, t_end=t_end)
-global_R_matrix()
-# a1,a2,da1,da2,dda1,dda2 = A1,A2,Ȧ1,Ȧ2,Ä1,Ä2
-# 	# Attempting to do this all in one pass!!
+return_MA_matrix()
+
+	# Calculate resulting muscle velocities, lengths, etc.
+
+NormalizedMuscleVelocity_Reverse = calculate_muscle_velocities()
+WeightedPotentialTorqueVariation_shoulder_Reverse,\
+WeightedPotentialTorqueVariation_elbow_Reverse = \
+calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK()
+WeightedNormalizedMuscleVelocity_Reverse = calculate_weighted_muscle_velocities_REACHING_TASK()
+
+	# Test to make sure that the muscle velocities are negative, time-reversed versions of each other for the forward and backwards movement.
+
+assert np.array([np.array(abs(NormalizedMuscleVelocity_Forward[j,0,:].T-np.array(list(reversed(-NormalizedMuscleVelocity_Reverse[j,0,:]))).T)<1e-12).all() for j in range(n_muscles)]).all(), "The muscle velocities are not reversed and negative versions of each other."
+
+	# Plot Afferent-Weighted Muscle Velocity (Reverse)
+
+fig2e = plt.figure()
+[plt.plot(t.T,WeightedNormalizedMuscleVelocity_Reverse[i].T) for i in OrderNumber]
+ax2e = plt.gca()
+ax2e.set_xlim(0,t_end*(1.3))
+ax2e.set_ylim(-12,12)
+ax2e.set_title(DescriptiveTitle+'\nAfferent-Weighted Normalized Muscle Velocity')
+if t_end!=1:
+	ax2e.set_xlabel('Time (s)')
+else:
+	ax2e.set_xlabel('Normalized Time')
+ax2e.set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+[j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2e.lines)]
+ax2e.legend(OrderedMuscleList)
+
+	# Plot Normalized Muscle Velocity (Reverse)
+
+fig2a = plt.figure()
+[plt.plot(t.T,NormalizedMuscleVelocity_Reverse[i].T) for i in OrderNumber]
+ax2a = plt.gca()
+ax2a.set_xlim(0,t_end*(1.3))
+ax2a.set_ylim(-1.5,1.5)
+ax2a.set_title(DescriptiveTitle+'\nNormalized Muscle Velocity')
+if t_end!=1:
+	ax2a.set_xlabel('Time (s)')
+else:
+	ax2a.set_xlabel('Normalized Time')
+ax2a.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Eccentric')
+[j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2a.lines)]
+ax2a.legend(OrderedMuscleList)
+
+	# Plot Joint Angles (Reverse)
+
+fig2b = plt.figure()
+plt.plot(t.T,A1.T,'b')
+plt.plot(t.T,A2.T,'b:')
+ax2b = plt.gca()
+ax2b.set_xlim(0,t_end*(1.3))
+ax2b.set_title(DescriptiveTitle+'\nAngle vs. Time')
+if t_end!=1:
+	ax2b.set_xlabel('Time (s)')
+else:
+	ax2b.set_xlabel('Normalized Time')
+ax2b.set_ylabel('Joint Angles (in radians)')
+ax2b.legend(["Shoulder","Elbow"])
+
+	# Plot Configuration Space (Reverse)
+
+fig2c = plt.figure()
+plt.plot(A1.T,A2.T,'b')
+ax2c = plt.gca()
+ax2c.set_title(DescriptiveTitle+'\nConfiguration Space')
+ax2c.set_ylabel("Shouler Angle (in radians)")
+ax2c.set_xlabel("Elbow Angle (in radians)")
+
+	# Calculate Costs from Afferent-Weighted Muscle Velocities
+
+EccentricCost_Reverse = eccentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,costtype='l1norm')
+ConcentricCost_Reverse = concentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,costtype='l1norm')
+
+# # Plot Muscle Lengths (Reverse)
 #
-# NormalizedMuscleVelocity_Forward = calculate_muscle_velocities()
-# # WeightedPotentialTorqueVariation_shoulder_Forward,\
-# # WeightedPotentialTorqueVariation_elbow_Forward = \
-# # calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK()
-# WeightedNormalizedMuscleVelocity_Forward = calculate_weighted_muscle_velocities_REACHING_TASK()
-#
-# 	# Initialize Arrays before loop
-#
-# # calculate_muscle_lengths()
-# # MuscleLengths_Forward = MuscleLengths
-# # WeightedNormalizedMuscleVelocity_Forward = calculate_weighted_muscle_velocities_REACHING_TASK(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
-# # NormalizedMuscleVelocity_Forward = calculate_muscle_velocities(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
-# # WeightedPotentialTorqueVariation_shoulder_Forward,\
-# # WeightedPotentialTorqueVariation_elbow_Forward = \
-# # 	calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK(A1[0],A2[0],NormalizedMuscleVelocity_Forward[0])
-#
-# 	# Define the Model and establish flexor/extensor list
-#
-# # global_R_matrix()
-# n_muscles=len(AllCoefficients)
-# n_extensors = sum([AllCoefficients[key]['Group']=='extensor' for key in AllCoefficients.keys()])
-# n_flexors = sum([AllCoefficients[key]['Group']=='flexor' for key in AllCoefficients.keys()])
-# flexor_cmap=plt.get_cmap('autumn')
-# extensor_cmap = plt.get_cmap('YlGnBu')
-# flexor_colors = iter(flexor_cmap(np.linspace(0,1,n_flexors)))
-# extensor_colors = iter(list(reversed(extensor_cmap(np.linspace(0,1,n_flexors)))))
-# flexor_colors_list = []
-# extensor_colors_list = []
-# FlexorOrderedMuscleList = []
-# ExtensorOrderedMuscleList = []
-# for muscle in AllCoefficients:
-#    if AllCoefficients[muscle]['Group'] == 'flexor':
-#         flexor_colors_list.append(next(flexor_colors))
-#         FlexorOrderedMuscleList.append(muscle)
-#    else:
-#         extensor_colors_list.append(next(extensor_colors))
-#         ExtensorOrderedMuscleList.append(muscle)
-# OrderedColorsList = flexor_colors_list + list(reversed(extensor_colors_list))
-# OrderedMuscleList = FlexorOrderedMuscleList + list(reversed(ExtensorOrderedMuscleList))
-# OrderNumber = [list(AllCoefficients.keys()).index(el) for el in OrderedMuscleList]
-#
-# 	# Iterate over the rest of the movement.
-#
-# # global A1_dev, A2_dev
-# # A1_dev,A2_dev = [],[]
-#
-# # StartTime = time.time()
-# # statusbar(0,len(A1),Title = 'Forward Vm',StartTime=StartTime)
-# # for i in range(1,len(A1)):
-# # 	statusbar(i,len(A1),Title = 'Forward Vm',StartTime=StartTime)
-# # 	# WeightedNormalizedMuscleVelocity_Forward = np.concatenate((WeightedNormalizedMuscleVelocity_Forward,calculate_weighted_muscle_velocities_REACHING_TASK(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
-# # 	NormalizedMuscleVelocity_Forward = np.concatenate( \
-# # 				(NormalizedMuscleVelocity_Forward,\
-# # 					calculate_muscle_velocities(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),\
-# # 						axis=0)
-# # 	WeightedPotentialTorqueVariation_temp = \
-# # 		calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK(A1[i],A2[i],\
-# # 			NormalizedMuscleVelocity_Forward[i])
-# # 	WeightedPotentialTorqueVariation_shoulder_Forward = \
-# # 			np.concatenate((WeightedPotentialTorqueVariation_shoulder_Forward,\
-# # 						WeightedPotentialTorqueVariation_temp[0]),axis=0)
-# # 	WeightedPotentialTorqueVariation_elbow_Forward = \
-# # 			np.concatenate((WeightedPotentialTorqueVariation_elbow_Forward,\
-# # 						WeightedPotentialTorqueVariation_temp[1]),axis=0)
-# #
-# # print('\n')
-#
-# 	# Adding the weighted values regains the Weighted Normalized Muscle Velocities. But it is important to average the BIARTICULATING MUSCLES as shown below when considering the average afferent response.
-#
-# # WeightedNormalizedMuscleVelocity_Forward = WeightedPotentialTorqueVariation_elbow_Forward + WeightedPotentialTorqueVariation_shoulder_Forward
-#
-# # WeightedNormalizedMuscleVelocity_Forward_2 = \
-# # 		[WeightedPotentialTorqueVariation_shoulder_Forward[i]\
-# # 		+WeightedPotentialTorqueVariation_elbow_Forward[i] \
-# # 		for i in range(np.shape(WeightedPotentialTorqueVariation_shoulder_Forward)[0])]
-# #
-# # 	# Correct for BIC and TRI by averaging the contributions from the MAs.
-# #
-# # WeightedNormalizedMuscleVelocity_Forward_2[3] = WeightedNormalizedMuscleVelocity_Forward_2[3]/2
-# # WeightedNormalizedMuscleVelocity_Forward_2[4] = WeightedNormalizedMuscleVelocity_Forward_2[4]/2
-# #
-# # 	# Calculate only the lengthening Torque Variation Contributions for both the shoulder and the elbow.
-# #
-# # EccentricTorqueVariations_Shoulder =\
-# #  	eccentric_velocities(WeightedPotentialTorqueVariation_shoulder_Forward)
-# # EccentricTorqueVariations_Elbow =\
-# #  	eccentric_velocities(WeightedPotentialTorqueVariation_elbow_Forward)
-# #
-# # 	# Concatenate, Sum, and Scale the total lengthening Torque Variations for both Shoulder and Elbow.
-# #
-# # ScalingFactor = 2000
-# # TotalEccentricTorqueVariations_Shoulder =\
-# # 	ScalingFactor*np.concatenate(EccentricTorqueVariations_Shoulder,axis=0)
-# # TotalEccentricTorqueVariations_Elbow =\
-# # 	ScalingFactor*np.concatenate(EccentricTorqueVariations_Elbow,axis=0)
-# #
-# # 	# Calculate the time series of potential endpoint variation.
-# # MuscleList = list(AllCoefficients.keys())
-# # TotalEndpointPotentialVariation = []
-# #
-# # for j in range(len(MuscleList)):
-# # 	TotalEndpointPotentialVariation.append( \
-# # 		[calculate_potential_variability(\
-# # 			i,\
-# # 			TotalEccentricTorqueVariations_Shoulder[j,:],\
-# # 			TotalEccentricTorqueVariations_Elbow[j,:],\
-# # 			EOM='Uno',\
-# # 			dt=dt,\
-# # 			Group = AllCoefficients[MuscleList[j]]['Group']) \
-# # 				for i in range(len(A1))])
-# #
-# # 	# Plot the resulting potential variation
-# #
-# # [plt.plot(TotalEndpointPotentialVariation[i]) for i in range(16)]
-#
-# 	# Plot Afferent-Weighted Muscle Velocity (Forward)
-#
-# fig1e = plt.figure()
-# [plt.plot(t.T,WeightedNormalizedMuscleVelocity_Forward[i].T) for i in OrderNumber]
-# ax1e = plt.gca()
-# ax1e.set_xlim(0,t_end*(1.3))
-# ax1e.set_ylim(-12,12)
+# fig2d = plt.figure()
+# [plt.plot(t,MuscleLengths_Reverse[i]) for i in OrderNumber]
+# ax2d = plt.gca()
+# ax2d.set_xlim(0,t_end*(1.3))
+# ax2d.set_title(DescriptiveTitle+'\nMuscle Lengths')
 # if t_end!=1:
-# 	ax1e.set_xlabel('Time (s)')
+# 	ax2d.set_xlabel('Time (s)')
 # else:
-# 	ax1e.set_xlabel('Normalized Time')
-# ax1e.set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
-# ax1e.set_title(DescriptiveTitle+'\nAfferent-Weighted Normalized Muscle Velocity')
-# [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1e.lines)]
-# ax1e.legend(OrderedMuscleList)
-# #
-# # plt.show()
-#
-#
-# 	# Plot Normalized Muscle Velocity (Forward)
-#
-# fig1a = plt.figure()
-# [plt.plot(t.T,NormalizedMuscleVelocity_Forward[i].T) for i in OrderNumber]
-# ax1a = plt.gca()
-# ax1a.set_xlim(0,t_end*(1.3))
-# ax1a.set_ylim(-1.5,1.5)
-# ax1a.set_title(DescriptiveTitle+'\nNormalized Muscle Velocity')
-# if t_end!=1:
-# 	ax1a.set_xlabel('Time (s)')
-# else:
-# 	ax1a.set_xlabel('Normalized Time')
-# ax1a.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Eccentric')
-# [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1a.lines)]
-# ax1a.legend(OrderedMuscleList)
-#
-#
-# 	# Plot Joint Angles (Forward)
-#
-# fig1b = plt.figure()
-# plt.plot(t.T,A1.T,'g')
-# plt.plot(t.T,A2.T,'g:')
-# ax1b = plt.gca()
-# ax1b.set_xlim(0,t_end*(1.3))
-# ax1b.set_title(DescriptiveTitle+'\nAngle vs. Time')
-# if t_end!=1:
-# 	ax1b.set_xlabel('Time (s)')
-# else:
-# 	ax1b.set_xlabel('Normalized Time')
-# ax1b.set_ylabel('Joint Angles (in radians)')
-# ax1b.legend(["Shoulder","Elbow"])
-#
-#
-# 	# Plot Configuration Space (Forward)
-#
-# fig1c = plt.figure()
-# plt.plot(A1.T,A2.T,'g')
-# ax1c = plt.gca()
-# ax1c.set_title(DescriptiveTitle+'\nConfiguration Space')
-# ax1c.set_ylabel("Shouler Angle (in radians)")
-# ax1c.set_xlabel("Elbow Angle (in radians)")
-#
-#
-# 	# Calculate Costs from Afferent-Weighted Muscle Velocities
-#
-# EccentricCost_Forward = eccentric_cost(WeightedNormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt,costtype='l1norm')
-# ConcentricCost_Forward = concentric_cost(WeightedNormalizedMuscleVelocity_Forward,t_end=t_end,dt = dt,costtype='l1norm')
-#
-# # # Plot Muscle Lengths (Forward)
-# #
-# # fig1d = plt.figure()
-# # [plt.plot(t,MuscleLengths_Forward[i]) for i in OrderNumber]
-# # ax1d = plt.gca()
-# # ax1d.set_xlim(0,t_end*(1.3))
-# # ax1d.set_title(DescriptiveTitle+'\nMuscle Lengths')
-# # if t_end!=1:
-# # 	ax1d.set_xlabel('Time (s)')
-# # else:
-# # 	ax1d.set_xlabel('Normalized Time')
-# # ax1d.set_ylabel('Muscle Lengths (in mm)')
-# # [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1d.lines)]
-# # ax1d.legend(OrderedMuscleList)
-#
-#
-# 	# Reverse Direction
-#
-# reaching_task(Xi=Xf, Xf=Xi,dt=dt, t_end=t_end)
-# global_R_matrix()
-# b1,b2,db1,db2,ddb1,ddb2 = A1,A2,Ȧ1,Ȧ2,Ä1,Ä2
-# 	# Attempting to do this all in one pass!!
-#
-# NormalizedMuscleVelocity_Reverse = calculate_muscle_velocities()
-# # WeightedPotentialTorqueVariation_shoulder_Reverse,\
-# # WeightedPotentialTorqueVariation_elbow_Reverse = \
-# # calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK()
-# WeightedNormalizedMuscleVelocity_Reverse = calculate_weighted_muscle_velocities_REACHING_TASK()
-#
-#
-#
-# # calculate_muscle_lengths()
-# # MuscleLengths_Reverse = MuscleLengths
-# # WeightedNormalizedMuscleVelocity_Reverse = calculate_weighted_muscle_velocities_REACHING_TASK(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
-# # NormalizedMuscleVelocity_Reverse = calculate_muscle_velocities(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
-# # StartTime = time.time()
-# # statusbar(0,len(A1),Title = 'Reverse Vm',StartTime=StartTime)
-# # for i in range(1,len(A1)):
-# #     statusbar(i,len(A1),Title = 'Reverse Vm',StartTime=StartTime)
-# #     WeightedNormalizedMuscleVelocity_Reverse = np.concatenate((WeightedNormalizedMuscleVelocity_Reverse,calculate_weighted_muscle_velocities_REACHING_TASK(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
-# #     NormalizedMuscleVelocity_Reverse = np.concatenate((NormalizedMuscleVelocity_Reverse,calculate_muscle_velocities(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
-# # print('\n')
-#
-# 	# Plot Afferent-Weighted Muscle Velocity (Reverse)
-#
-# fig2e = plt.figure()
-# [plt.plot(t.T,WeightedNormalizedMuscleVelocity_Reverse[i].T) for i in OrderNumber]
-# ax2e = plt.gca()
-# ax2e.set_xlim(0,t_end*(1.3))
-# ax2e.set_ylim(-12,12)
-# ax2e.set_title(DescriptiveTitle+'\nAfferent-Weighted Normalized Muscle Velocity')
-# if t_end!=1:
-# 	ax2e.set_xlabel('Time (s)')
-# else:
-# 	ax2e.set_xlabel('Normalized Time')
-# ax2e.set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
-# [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2e.lines)]
-# ax2e.legend(OrderedMuscleList)
-#
-#
-# 	# Plot Normalized Muscle Velocity (Reverse)
-#
-# fig2a = plt.figure()
-# [plt.plot(t.T,NormalizedMuscleVelocity_Reverse[i].T) for i in OrderNumber]
-# ax2a = plt.gca()
-# ax2a.set_xlim(0,t_end*(1.3))
-# ax2a.set_ylim(-1.5,1.5)
-# ax2a.set_title(DescriptiveTitle+'\nNormalized Muscle Velocity')
-# if t_end!=1:
-# 	ax2a.set_xlabel('Time (s)')
-# else:
-# 	ax2a.set_xlabel('Normalized Time')
-# ax2a.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Eccentric')
-# [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2a.lines)]
-# ax2a.legend(OrderedMuscleList)
-#
-#
-# 	# Plot Joint Angles (Reverse)
-#
-# fig2b = plt.figure()
-# plt.plot(t.T,A1.T,'b')
-# plt.plot(t.T,A2.T,'b:')
-# ax2b = plt.gca()
-# ax2b.set_xlim(0,t_end*(1.3))
-# ax2b.set_title(DescriptiveTitle+'\nAngle vs. Time')
-# if t_end!=1:
-# 	ax2b.set_xlabel('Time (s)')
-# else:
-# 	ax2b.set_xlabel('Normalized Time')
-# ax2b.set_ylabel('Joint Angles (in radians)')
-# ax2b.legend(["Shoulder","Elbow"])
-#
-#
-# 	# Plot Configuration Space (Reverse)
-#
-# fig2c = plt.figure()
-# plt.plot(A1.T,A2.T,'b')
-# ax2c = plt.gca()
-# ax2c.set_title(DescriptiveTitle+'\nConfiguration Space')
-# ax2c.set_ylabel("Shouler Angle (in radians)")
-# ax2c.set_xlabel("Elbow Angle (in radians)")
-#
-#
-# 	# Calculate Costs from Afferent-Weighted Muscle Velocities
-#
-# EccentricCost_Reverse = eccentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,costtype='l1norm')
-# ConcentricCost_Reverse = concentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,costtype='l1norm')
-#
-# # # Plot Muscle Lengths (Reverse)
-# #
-# # fig2d = plt.figure()
-# # [plt.plot(t,MuscleLengths_Reverse[i]) for i in OrderNumber]
-# # ax2d = plt.gca()
-# # ax2d.set_xlim(0,t_end*(1.3))
-# # ax2d.set_title(DescriptiveTitle+'\nMuscle Lengths')
-# # if t_end!=1:
-# # 	ax2d.set_xlabel('Time (s)')
-# # else:
-# # 	ax2d.set_xlabel('Normalized Time')
-# # ax2d.set_ylabel('Muscle Lengths (in mm)')
-# # [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2d.lines)]
-# # ax2d.legend(OrderedMuscleList)
-#
-#
-# # plt.figure()
-# # plt.plot(np.arange(0,2*math.ceil(max([EccentricCost_Forward,ConcentricCost_Forward]))+1,1), np.arange(0,2*math.ceil(max([EccentricCost_Forward,ConcentricCost_Forward]))+1,1),'0.75',linestyle='--')
-# # plt.scatter([EccentricCost_Forward],[ConcentricCost_Forward],facecolor ='g', edgecolor = 'k', marker='o',s=100)
-# # plt.scatter([EccentricCost_Reverse],[ConcentricCost_Reverse],facecolor ='b', edgecolor = 'k', marker='o',s=100)
-# # ax3 = plt.gca()
-# # ax3.set_xlim(0,2*math.ceil(max([EccentricCost_Forward,EccentricCost_Reverse])))
-# # ax3.set_ylim(0,2*math.ceil(max([EccentricCost_Forward,EccentricCost_Reverse])))
-# # ax3.set_aspect('equal')
-# # ax3.set_title('Eccentric vs. Concentric Cost\nFor Forward and Reverse Movments')
-# # ax3.set_xlabel('Eccentric Cost (in $\hat{l}_{o}$)')
-# # ax3.set_ylabel('Concentric Cost (in $\hat{l}_{o}$)')
-# # ax3.legend(['Equal Cost Line','Forward Direction','Reversed Direction'])
-#
-#
-# # Using Default Reaching Directions Listed Above...
-# # CostValues ={'CenterForward' : np.array([[ 1.3220062 ,  2.10011198]]),\
-# # 				'CenterReverse' : np.array([[ 2.10011198,  1.3220062 ]]),\
-# # 					'LeftForward' : np.array([[ 1.24643599,  1.88616011]]),\
-# # 						'LeftReverse' : np.array([[ 1.88616011,  1.24643599]]),\
-# # 							'RightForward' : np.array([[ 1.1047386 ,  1.92105444]]),\
-# # 								'RightReverse' : np.array([[ 1.92105444,  1.1047386 ]]),\
-# # 									'SideForward' : np.array([[ 0.37931692,  0.53156831]]),\
-# # 										'SideReverse' : np.array([[ 0.53156831,  0.37931692]])}
-# # plt.figure()
-# # MaximumCost = max([max(CostValues[key][0]) for key in CostValues.keys()])
-# # plt.plot(np.arange(0,2*math.ceil(MaximumCost)+1,1), np.arange(0,2*math.ceil(MaximumCost)+1,1),'0.75',linestyle='--')
-# # facecolor = iter(['k','#9f9f9f','b','#9f9f9f','r','#9f9f9f','g','#9f9f9f'])
-# # edgecolor = iter(['k','k','k','b','k','r','k','g'])
-# # [plt.scatter(CostValues[key][0,0],CostValues[key][0,1],c=next(facecolor),edgecolor=next(edgecolor),marker='o',s=75) for key in CostValues.keys()]
-# # ax4 = plt.gca()
-# # ax4.set_xlim(0,math.ceil(MaximumCost))
-# # ax4.set_ylim(0,math.ceil(MaximumCost))
-# # ax4.set_aspect('equal')
-# # ax4.set_title('Eccentric vs. Concentric Cost\nFor Forward and Reverse Movments')
-# # ax4.set_xlabel('Eccentric Cost (in $\hat{l}_{o}$)')
-# # ax4.set_ylabel('Concentric Cost (in $\hat{l}_{o}$)')
-# # # ax4.legend(['Equal Cost Line','Center (Forward)','Center (Reverse)','Left (Forward)','Left (Reverse)','Right (Forward)','Right (Reverse)','Side-to-Side (Forward)','Side-to-Side (Reverse)'],loc='upper right')
-# #
-#
-# 	# Plot bar graph comparing the two directions
-#
-# fig2 = plt.figure()
-# plt.bar(np.arange(2),[EccentricCost_Reverse,EccentricCost_Forward])
-# ax4 = plt.gca()
-# ax4.set_xticklabels(('Reverse','Forward'))
-# ax4.set_ylim(0,18)
-# ax4.set_yticks([0,9,18])
-# ax4.set_yticklabels(['0','','18'])
-# ax4.set_title(DescriptiveTitle + '\nEccentric Cost for Forward and Reverse Movements')
-# ax4.set_ylabel('Sum of Afferent-Weighted Muscle Lengthening')
-# ax4.set_xticks([0,1])
-#
-#
-# 	# Need to write PDF files and close the PDF files/figures
-# if SaveOutputFigures == True:
-# 	pdf_forward.savefig(fig1e)
-# 	pdf_forward.savefig(fig1a)
-# 	pdf_forward.savefig(fig1b)
-# 	pdf_forward.savefig(fig1c)
-# 	# pdf_forward.savefig(fig1d)
-# 	pdf_reverse.savefig(fig2e)
-# 	pdf_reverse.savefig(fig2a)
-# 	pdf_reverse.savefig(fig2b)
-# 	pdf_reverse.savefig(fig2c)
-# 	# pdf_reverse.savefig(fig2d)
-# 	pdf_bar.savefig(fig2)
-#
-# 	pdf_forward.close()
-# 	pdf_reverse.close()
-# 	pdf_bar.close()
-#
-# 		# Close any open plots
-#
-# 	plt.close('all')
-#
-# plt.show()
+# 	ax2d.set_xlabel('Normalized Time')
+# ax2d.set_ylabel('Muscle Lengths (in mm)')
+# [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax2d.lines)]
+# ax2d.legend(OrderedMuscleList)
+
+###################################################################################################
+
+	# Plot bar graph comparing the two directions
+
+fig2 = plt.figure()
+plt.bar(np.arange(2),[EccentricCost_Reverse,EccentricCost_Forward])
+ax4 = plt.gca()
+ax4.set_xticklabels(('Reverse','Forward'))
+ax4.set_ylim(0,18)
+ax4.set_yticks([0,9,18])
+ax4.set_yticklabels(['0','','18'])
+ax4.set_title(DescriptiveTitle + '\nEccentric Cost for Forward and Reverse Movements')
+ax4.set_ylabel('Sum of Afferent-Weighted Muscle Lengthening')
+ax4.set_xticks([0,1])
+
+	# Need to write PDF files and close the PDF files/figures
+
+if SaveOutputFigures == True:
+	pdf_forward.savefig(fig1e)
+	pdf_forward.savefig(fig1a)
+	pdf_forward.savefig(fig1b)
+	pdf_forward.savefig(fig1c)
+	# pdf_forward.savefig(fig1d)
+	pdf_reverse.savefig(fig2e)
+	pdf_reverse.savefig(fig2a)
+	pdf_reverse.savefig(fig2b)
+	pdf_reverse.savefig(fig2c)
+	# pdf_reverse.savefig(fig2d)
+	pdf_bar.savefig(fig2)
+
+	pdf_forward.close()
+	pdf_reverse.close()
+	pdf_bar.close()
+
+		# Close any open plots
+
+	plt.close('all')
+
+plt.show()

@@ -660,7 +660,7 @@ SaveOutputFigures = False
 
 	# DescriptiveTitle should be something to identify the trial either by degree of freedom, (i.e., Elbow or Shoulder) or by what has changed in the most current iteration (e.g., CB_Ramsay, DELTa_Est, etc.). Spaces will be replaced by '_' symbolbs for the filename but kept for figure titles.
 
-DescriptiveTitle = 'Isolated Shoulder'
+
 
 if SaveOutputFigures == True:
 
@@ -673,6 +673,7 @@ if SaveOutputFigures == True:
 	# Specify isolated DOF and define reaching locations
 
 dof = 'Shoulder'
+DescriptiveTitle = 'Isolated ' + dof
 
 if dof == 'Elbow':
 	# Elbow Rotation
