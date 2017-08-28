@@ -319,21 +319,21 @@ def calculate_torques(EOM="Uno"):
 	import numpy as np
 	assert EOM in ["Uno","Zadravec"], "EOM can be either 'Uno' or 'Zadravec'"
 	if EOM == "Uno": # Uno et al. Biological Cybernetics (1989)
-	    m1,m2 = 1.02,1.16 # kg
-	    c1,c2 = 0.104,0.165 # m
-	    I1,I2 = 0.0167,0.0474 # kg⋅m²
-	    b11,b12,b21,b22 = 0.8,0,0,0.8
-	    α = I1 + I2 + m2*(L1**2)
-	    β = m2*L1*c2
-	    δ = I2
+		m1,m2 = 1.02,1.16 # kg
+		c1,c2 = 0.104,0.165 # m
+		I1,I2 = 0.0167,0.0474 # kg⋅m²
+		b11,b12,b21,b22 = 0.8,0,0,0.8
+		α = I1 + I2 + m2*(L1**2)
+		β = m2*L1*c2
+		δ = I2
 	else: # Zadravec, Biocybernetics and Biomedical Engineering (2013)
-	    m1,m2 = 2.089,1.912 # kg
-	    c1,c2 = 0.152,0.181 # m
-	    I1,I2 = 0.0159,0.0257 # kg⋅m²
-	    b11,b12,b21,b22 = 0.74,0.10,0.10,0.82
-	    α = I1 + I2 + m1*(c1**2) + m2*(L1**2 + c2**2)
-	    β = m2*L1*c2
-	    δ = I2 + m2*(c2**2)
+		m1,m2 = 2.089,1.912 # kg
+		c1,c2 = 0.152,0.181 # m
+		I1,I2 = 0.0159,0.0257 # kg⋅m²
+		b11,b12,b21,b22 = 0.74,0.10,0.10,0.82
+		α = I1 + I2 + m1*(c1**2) + m2*(L1**2 + c2**2)
+		β = m2*L1*c2
+		δ = I2 + m2*(c2**2)
 	C_matrix = lambda a1,a2,ȧ1,ȧ2: \
 	        np.matrix([ [-β*ȧ2*sin(a2),     -β*(ȧ1 + ȧ2)*sin(a2)],
 	                    [β*ȧ1*sin(a2),      0]]) # kg⋅m² (N⋅m⋅s²)
@@ -355,27 +355,22 @@ def calculate_torques(EOM="Uno"):
 	T = MÄ + CȦ + BȦ
 	# returns a (N,1,2) 3D array. Therefore we must transpose it first and select first element
 	T1,T2 = np.split(T.T[0],2,axis=0) # returns 2 (1,N) arrays
-	# for i in range(len(A1)):
-	#     Ȧ = np.matrix([[Ȧ1[i]],[Ȧ2[i]]])
-	#     Ä = np.matrix([[Ä1[i]],[Ä2[i]]])
-	#     T = M(A1[i],A2[i])*Ä + C(A1[i],A2[i],Ȧ1[i],A2[i])*Ȧ + B*Ȧ
-	#     T1.append(T[0,0])
-	#     T2.append(T[1,0])
-def calculate_potential_variability(i,j,δT1,δT2,dt=0.001,EOM = 'Uno',Group = 'flexor'):
+def calculate_potential_variability(X,δT1,δT2,dt=0.001,EOM = 'Uno',scheme = "Total"):
 	from math import cos,sin
 	import numpy as np
-	assert EOM in ["Uno","Zadravec"], "EOM can be either 'Uno' or 'Zadravec'"
+	assert EOM.capitalize() in ["Uno","Zadravec"], "EOM can be either 'Uno' or 'Zadravec'"
+	assert scheme.capitalize() in ["Total","Individual"], "scheme must be either 'Total' or 'Individual'"
 
-	global A1,A2,Ȧ1,Ȧ2,T1,T2
+	global A1,A2,Ȧ1,Ȧ2,T1,T2,MomentArmMatrix
 
 	if EOM == "Uno": # Uno et al. Biological Cybernetics (1989)
-	    m1,m2 = 1.02,1.16 # kg
-	    c1,c2 = 0.104,0.165 # m
-	    I1,I2 = 0.0167,0.0474 # kg⋅m²
-	    b11,b12,b21,b22 = 0.8,0,0,0.8
-	    α = I1 + I2 + m2*(L1**2)
-	    β = m2*L1*c2
-	    δ = I2
+		m1,m2 = 1.02,1.16 # kg
+		c1,c2 = 0.104,0.165 # m
+		I1,I2 = 0.0167,0.0474 # kg⋅m²
+		b11,b12,b21,b22 = 0.8,0,0,0.8
+		α = I1 + I2 + m2*(L1**2)
+		β = m2*L1*c2
+		δ = I2
 	else: # Zadravec, Biocybernetics and Biomedical Engineering (2013)
 	    m1,m2 = 2.089,1.912 # kg
 	    c1,c2 = 0.152,0.181 # m
@@ -385,59 +380,123 @@ def calculate_potential_variability(i,j,δT1,δT2,dt=0.001,EOM = 'Uno',Group = '
 	    β = m2*L1*c2
 	    δ = I2 + m2*(c2**2)
 
-	if Group == 'flexor':
-		δT1== δT1
-		δT2== δT2
-	elif Group == 'extensor':
-		δT1== -δT1
-		δT2== -δT2
+	M_inv_matrix = lambda a1,a2: (1/(δ*(α-δ)-((β*cos(a2))**2)))* \
+	        np.matrix([ [δ,   -(δ + β*cos(a2))],
+	                    [-(δ + β*cos(a2)),     α + 2*β*cos(a2)]],\
+						dtype = 'float128') # kg⋅m² (N⋅m⋅s²)
+	C_matrix = lambda a1,a2,ȧ1,ȧ2: \
+			np.matrix([ [-β*ȧ2*sin(a2),     -β*(ȧ1 + ȧ2)*sin(a2)],
+						[β*ȧ1*sin(a2),      0]]) # kg⋅m² (N⋅m⋅s²)
+	B_matrix = np.matrix([ [b11, b12],\
+						[b21, b22]]) # kg⋅m²/s (N⋅m⋅s)
+	A = np.swapaxes(np.array(np.concatenate((A1,A2),axis=0),ndmin=3),0,2)
+	Ȧ = np.swapaxes(np.array(np.concatenate((Ȧ1,Ȧ2),axis=0),ndmin=3),0,2)
+	Ä = np.swapaxes(np.array(np.concatenate((Ä1,Ä2),axis=0),ndmin=3),0,2)
+	M_inv = np.array(list(map(M_inv_matrix,A1.T,A2.T)))
+	C = np.array(list(map(C_matrix,A1.T,A2.T,Ȧ1.T,Ȧ2.T)))
+	CȦ = np.array(list(map(lambda c,ȧ: np.matrix(np.array(c,ndmin=2,dtype='float128'))*ȧ,C,Ȧ)))
+	BȦ = np.array(list(map(lambda ȧ: B_matrix*ȧ,Ȧ)))
+	T = np.swapaxes(np.array(np.concatenate((T1,T2),axis=0),ndmin=3),0,2)
 
-	# if Group[0] == 'flexor':
-	# 	δτ1== δτ1
-	# elif Group[0] == 'extensor':
-	# 	δτ1== -δτ1
+	# Test to make sure that the forward mapping to torque and the inverse mapping to angular acceleration are consistent.
+
+	assert (abs(np.array([np.matrix(M_inv[i])*(T[i]-CȦ[i]-BȦ[i]) for i in range(1001)]).T -Ä.T)<1e-12).all(), "There is an issue with the mapping from Torques to Angular Accelerations."
+	np.array([np.matrix(M_inv[i])*(T[i]-CȦ[i]-BȦ[i]) for i in range(1001)])
+
+	# The sign of the MA for each muscle at each joint will sufficiently determine the sign of of the torque as these muscles are already eccentrically contracting (i.e., -r₁ⱼ⋅dϑ₁/dt > 0, therefore if dϑ₁/dt > 0, then r₁ⱼ < 0 and the torque will be negative and vice versa).
+
+	δT = np.concatenate((δT1,δT2),axis=1)*np.sign(MomentArmMatrix.T)
+
+	from itertools import chain, combinations
+	def all_subsets(ss):
+		return chain(*map(lambda x: combinations(ss, x), range(0, len(ss)+1)))
+	LengtheningMuscleFilter = list(\
+								filter(lambda i: not ((δT1[i]<=0).all() and (δT2[i]<=0).all()),\
+									range(16))\
+										)
+	AllSubsets = []
+	for subset in all_subsets(LengtheningMuscleFilter):
+		AllSubsets.append(list(subset))
+
+	if scheme.capitalize() == 'Individual':
+		next_Ä = np.concatenate(\
+					[np.array([np.matrix(M_inv[i])*(T[i]+δT[j,:,i][:,np.newaxis]-CȦ[i]-BȦ[i]) \
+						for i in range(δT.shape[2])]).T for j in range(δT.shape[0])])
+	elif scheme.capitalize() == 'Total':
+		next_Ä = np.array([np.matrix(M_inv[i])*(T[i]+δT.sum(axis=0)[np.newaxis,:].T[i]\
+							-CȦ[i]-BȦ[i]) \
+								for i in range(δT.shape[2])]).T
+
+	resulting_A = np.concatenate([(A+(Ȧ+next_Ä[j].T[:,np.newaxis].swapaxes(1,2)*dt/2)*dt).T \
+									for j in range(next_Ä.shape[0])])
+	resulting_A1,resulting_A2 = np.split(resulting_A,resulting_A.shape[1],axis=1)
+
+	resulting_x = np.concatenate([np.array(list(map(lambda a1,a2: L1*cos(a1) + L2*cos(a1+a2),\
+										resulting_A1[j].T,resulting_A2[j].T)),\
+	 										dtype='float128',ndmin=2) \
+												for j in range(resulting_A.shape[0])])
+	resulting_y = np.concatenate([np.array(list(map(lambda a1,a2: L1*sin(a1) + L2*sin(a1+a2),\
+										resulting_A1[j].T,resulting_A2[j].T)),\
+	 										dtype='float128',ndmin=2) \
+												for j in range(resulting_A.shape[0])])
+	"""
+	If scheme is "Total", then the output will be a (1,N) array of total resulting potential variability vs. time. If scheme is "Individual", then the output will be a (m,N) array of the individual muscle potential variability contribution versus time.
+	"""
+	potential_variability = ((X[0]-resulting_x)**2 + (X[1]-resulting_y)**2)**0.5
+
+	# if Group == 'flexor':
+	# 	δT1== δT1
+	# 	δT2== δT2
+	# elif Group == 'extensor':
+	# 	δT1== -δT1
+	# 	δT2== -δT2
 	#
-	# if Group[1] == 'flexor':
-	# 	δτ2== δτ2
-	# elif Group[1] == 'extensor':
-	# 	δτ2== -δτ2
-
-	ä1 = lambda a1,a2,ȧ1,ȧ2,τ1,τ2,δτ1,δτ2: \
-				(-(β**2)*(ȧ1**2)*sin(a2)*cos(a2)	- ȧ1*(b11*δ - b21*(δ + β*cos(a2))) \
-				+ δ*β*(ȧ1 + ȧ2)**2*sin(a2) - ȧ2*(b12*δ - b22*(δ + β*cos(a2))) \
-				+ (τ1 + δτ1)*δ - (τ2 + δτ2)*(δ + β*cos(a2))) / \
-				(α*δ - δ**2 -β**2*cos(a2)**2)
-	ä2 = lambda a1,a2,ȧ1,ȧ2,τ1,τ2,δτ1,δτ2: \
-				-((β**2)*(2*ȧ1**2 + 2*ȧ1*ȧ2 + ȧ2**2)*sin(a2)*cos(a2) \
-				- ȧ1*(b11*(δ + β*cos(a2))  - b21*(α + 2*β*cos(a2))) \
-				+ δ*β*(ȧ1 + ȧ2)**2*sin(a2) + β*ȧ1**2*(α-δ)*sin(a2) \
-				- ȧ2*(b12*(δ + β*cos(a2)) - b22*(α + 2*β*cos(a2))) \
-				+ (τ1 + δτ1)*(δ + β*cos(a2)) - (τ2 + δτ2)*(α + 2*β*cos(a2))) / \
-				(α*δ - δ**2 -β**2*cos(a2)**2)
-	def next_angle_from_forward_euler(i,δT1,δT2,dt):
-		import numpy as np
-		global A1,A2,Ȧ1,Ȧ2,T1,T2
-		next_ȧ1	= Ȧ1[i] + ä1(A1[i],A2[i],Ȧ1[i],Ȧ2[i],T1[i],T2[i],δT1[i],δT2[i])*dt
-		next_a1 = A1[i] + next_ȧ1*dt
-		next_ȧ2	= Ȧ2[i] + ä2(A1[i],A2[i],Ȧ1[i],Ȧ2[i],T1[i],T2[i],δT1[i],δT2[i])*dt
-		next_a2 = A2[i] + next_ȧ2*dt
-		return(next_a1,next_a2)
-
-	# testA1,testA2 = [],[]
-	# for i in range(len(A1)):
-	# 	next_a1,next_a2 = next_angle_from_forward_euler(A1[i],A2[i],Ȧ1[i],Ȧ2[i],T1[i],T2[i],0,0,0.001)
-	# 	testA1.append(next_a1)
-	# 	testA2.append(next_a2)
-	next_a1,next_a2 = next_angle_from_forward_euler(i,δT1,δT2,dt)
-	X = np.array([	[L1*cos(A1[i]) + L2*cos(A1[i] + A2[i])],\
-					[L1*sin(A1[i]) + L2*sin(A1[i] + A2[i])] ])
-	new_X = np.array([	[L1*cos(next_a1) + L2*cos(next_a1 + next_a2)],\
-						[L1*sin(next_a1) + L2*sin(next_a1 + next_a2)] ])
-	# global A1_dev,A2_dev
-	# A1_dev.append(A1[i]-next_a1)
-	# A2_dev.append(A2[i]-next_a2)
-	variation = float((sum((X-new_X)**2)**0.5))
-	return(variation)
+	# # if Group[0] == 'flexor':
+	# # 	δτ1== δτ1
+	# # elif Group[0] == 'extensor':
+	# # 	δτ1== -δτ1
+	# #
+	# # if Group[1] == 'flexor':
+	# # 	δτ2== δτ2
+	# # elif Group[1] == 'extensor':
+	# # 	δτ2== -δτ2
+	#
+	# ä1 = lambda a1,a2,ȧ1,ȧ2,τ1,τ2,δτ1,δτ2: \
+	# 			(-(β**2)*(ȧ1**2)*sin(a2)*cos(a2)	- ȧ1*(b11*δ - b21*(δ + β*cos(a2))) \
+	# 			+ δ*β*(ȧ1 + ȧ2)**2*sin(a2) - ȧ2*(b12*δ - b22*(δ + β*cos(a2))) \
+	# 			+ (τ1 + δτ1)*δ - (τ2 + δτ2)*(δ + β*cos(a2))) / \
+	# 			(α*δ - δ**2 -β**2*cos(a2)**2)
+	# ä2 = lambda a1,a2,ȧ1,ȧ2,τ1,τ2,δτ1,δτ2: \
+	# 			-((β**2)*(2*ȧ1**2 + 2*ȧ1*ȧ2 + ȧ2**2)*sin(a2)*cos(a2) \
+	# 			- ȧ1*(b11*(δ + β*cos(a2))  - b21*(α + 2*β*cos(a2))) \
+	# 			+ δ*β*(ȧ1 + ȧ2)**2*sin(a2) + β*ȧ1**2*(α-δ)*sin(a2) \
+	# 			- ȧ2*(b12*(δ + β*cos(a2)) - b22*(α + 2*β*cos(a2))) \
+	# 			+ (τ1 + δτ1)*(δ + β*cos(a2)) - (τ2 + δτ2)*(α + 2*β*cos(a2))) / \
+	# 			(α*δ - δ**2 -β**2*cos(a2)**2)
+	# def next_angle_from_forward_euler(i,δT1,δT2,dt):
+	# 	import numpy as np
+	# 	global A1,A2,Ȧ1,Ȧ2,T1,T2
+	# 	next_ȧ1	= Ȧ1[i] + ä1(A1[i],A2[i],Ȧ1[i],Ȧ2[i],T1[i],T2[i],δT1[i],δT2[i])*dt
+	# 	next_a1 = A1[i] + next_ȧ1*dt
+	# 	next_ȧ2	= Ȧ2[i] + ä2(A1[i],A2[i],Ȧ1[i],Ȧ2[i],T1[i],T2[i],δT1[i],δT2[i])*dt
+	# 	next_a2 = A2[i] + next_ȧ2*dt
+	# 	return(next_a1,next_a2)
+	#
+	# # testA1,testA2 = [],[]
+	# # for i in range(len(A1)):
+	# # 	next_a1,next_a2 = next_angle_from_forward_euler(A1[i],A2[i],Ȧ1[i],Ȧ2[i],T1[i],T2[i],0,0,0.001)
+	# # 	testA1.append(next_a1)
+	# # 	testA2.append(next_a2)
+	# next_a1,next_a2 = next_angle_from_forward_euler(i,δT1,δT2,dt)
+	# X = np.array([	[L1*cos(A1[i]) + L2*cos(A1[i] + A2[i])],\
+	# 				[L1*sin(A1[i]) + L2*sin(A1[i] + A2[i])] ])
+	# new_X = np.array([	[L1*cos(next_a1) + L2*cos(next_a1 + next_a2)],\
+	# 					[L1*sin(next_a1) + L2*sin(next_a1 + next_a2)] ])
+	# # global A1_dev,A2_dev
+	# # A1_dev.append(A1[i]-next_a1)
+	# # A2_dev.append(A2[i]-next_a2)
+	# variation = float((sum((X-new_X)**2)**0.5))
+	return(potential_variability)
 def reaching_task(dt = 0.001, Xi = [0,0.25], Xf = [0.25,0.50],t_end=1):
 	import numpy as np
 	set_link_lengths()
@@ -445,7 +504,8 @@ def reaching_task(dt = 0.001, Xi = [0,0.25], Xf = [0.25,0.50],t_end=1):
 	t = np.array(np.arange(0,1+dt,dt),dtype='float128',ndmin=2)
 	X,Ẋ,Ẍ = return_X_values(t,Xi,Xf,t_end)
 	update_angle_lists(X,Ẋ,Ẍ)
-	# calculate_torques()
+	calculate_torques()
+	return(X)
 def plot_resulting_kinematics():
     import matplotlib.pyplot as plt
     import numpy as np
@@ -1079,10 +1139,12 @@ def calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK():
 
 	"""
 	Note: (NormalizedMuscleVelocity*MomentArmMatrix.T/1000).T returns an (N,2,m) matrix. Therefore, we must construct a (2,m) matrix of Corrected Afferented Numbers that have identical rows. This is done by concatenating CorrectedAfferentNumber with itself and then transposing the result. This total product will yield a (m,2,N) array of both shoulder and elbow weighted muscle velocities. This will then be split by np.split() to give (m,1,N) arrays that are then squeezed into (m,N) arrays for the individual joint weighted muscle velocities.
+
+	MomentArmMatrix must be rectified so that the contraction direction is maintained.
 	"""
 
 	MAWeightedMuscleVelocity = \
-		((NormalizedMuscleVelocity*MomentArmMatrix.T/1000).T\
+		((NormalizedMuscleVelocity*abs(MomentArmMatrix).T/1000).T\
 			*np.concatenate((CorrectedAfferentNumber,CorrectedAfferentNumber),axis=1).T).T
 	MAWeightedMuscleVelocity_Shoulder,MAWeightedMuscleVelocity_Elbow = \
 	 	np.split(MAWeightedMuscleVelocity,2,axis=1)
@@ -1135,48 +1197,53 @@ def calculate_weighted_muscle_velocities_REACHING_TASK():
 	return(WeightedMuscleVelocity)
 def eccentric_velocities(NormalizedMuscleVelocity):
 	"""
-	Returns a (m,1,N) list with m (1,N) arrays of positive muscle velocities.
+	Returns a (m,1,N) array of positive muscle velocities.
 	"""
 	import numpy as np
 	def positive_entries(NormalizedMuscleVelocity):
 		return(np.multiply(np.array([[1]*np.shape(NormalizedMuscleVelocity)[1]]),\
 										NormalizedMuscleVelocity>0))
-	PositiveMuscleVelocities = list(map(lambda Vm: np.multiply(positive_entries(Vm),Vm),\
+	PositiveMuscleVelocities = np.array(list(map(lambda Vm: np.multiply(positive_entries(Vm),Vm),\
 									np.split(NormalizedMuscleVelocity,\
-									len(NormalizedMuscleVelocity),axis=0)))
+									len(NormalizedMuscleVelocity),axis=0))))
 	return(PositiveMuscleVelocities)
 def concentric_velocities(NormalizedMuscleVelocity):
 	"""
-	Returns a (m,1,N) list with m (1,N) arrays of negative muscle velocities.
+	Returns a (m,1,N) array of negative muscle velocities.
 	"""
 	def negative_entries(NormalizedMuscleVelocity):
 		return(np.multiply(np.array([[1]*np.shape(NormalizedMuscleVelocity)[1]]),\
 										NormalizedMuscleVelocity<0))
-	NegativeMuscleVelocities = list(map(lambda Vm: np.multiply(negative_entries(Vm),Vm),\
+	NegativeMuscleVelocities = np.array(list(map(lambda Vm: np.multiply(negative_entries(Vm),Vm),\
 									np.split(NormalizedMuscleVelocity,\
-									len(NormalizedMuscleVelocity),axis=0)))
+									len(NormalizedMuscleVelocity),axis=0))))
 	return(NegativeMuscleVelocities)
 def cost_function(X,costtype="avg"):
+	"""
+	X must be an numpy.ndarray or size (m,). Returns a scalar.
+	"""
 	assert costtype in ['avg','sos','l2norm','l1norm'], "costtype must be either 'avg','sos','l2norm', or 'l1norm'"
 	if costtype == 'avg' :
-		cost = abs(sum(X)/len(X))
+		cost = abs(X.mean())
 	elif costtype == 'sos' :
-		cost = sum([el**2 for el in X])
+		cost = (X**2).sum()
 	elif costtype == 'l1norm' :
-		cost = abs(sum(X))
+		cost = abs(X.sum())
 	elif costtype == 'l2norm' :
-		cost = sum([el**2 for el in X])**0.5
+		cost = (X**2).sum()**0.5
 	return(cost)
 def eccentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,costtype ='l2norm'):
 	import numpy as np
 	PositiveMuscleVelocities = eccentric_velocities(NormalizedMuscleVelocity)
-	TotalPositiveExcursion = [np.trapz(el,dx=t_end*dt) for el in PositiveMuscleVelocities]
+	TotalPositiveExcursion = np.trapz(PositiveMuscleVelocities,dx=t_end*dt)
+	# TotalPositiveExcursion = [np.trapz(el,dx=t_end*dt) for el in PositiveMuscleVelocities]
 	EccentricCost = cost_function(TotalPositiveExcursion,costtype=costtype)
 	return(EccentricCost)
 def concentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,costtype = 'l2norm'):
 	import numpy as np
 	NegativeMuscleVelocities = concentric_velocities(NormalizedMuscleVelocity)
-	TotalNegativeExcursion = [np.trapz(el,dx=t_end*dt) for el in NegativeMuscleVelocities]
+	TotalNegativeExcursion = np.trapz(NegativeMuscleVelocities,dx=t_end*dt)
+	# TotalNegativeExcursion = [np.trapz(el,dx=t_end*dt) for el in NegativeMuscleVelocities]
 	ConcentricCost = cost_function(TotalNegativeExcursion,costtype=costtype)
 	return(ConcentricCost)
 def return_initial_muscle_length(Coefficients,OptimalMuscleLength):
@@ -1256,6 +1323,7 @@ import math
 import time
 from matplotlib.backends.backend_pdf import PdfPages
 import ipdb
+import sys
 
 	# Save Output Figures?
 
@@ -1263,7 +1331,7 @@ SaveOutputFigures = False
 
 	# DescriptiveTitle should be something to identify the trial either by reaching location, (i.e., Left, Right, Center, or Sideways) or by what has changed in the most current iteration (e.g., CB_Ramsay, DELTa_Est, etc.). Spaces will be replaced by '_' symbols for the filename but kept for figure titles.
 
-ReachType = ['Sideways','Center','Left','Right'][3]
+ReachType = ['Sideways','Center','Left','Right'][0]
 DescriptiveTitle = ReachType + ' Reach'
 
 	# Define Moment Arm Matrix Functions for the model and establish flexor/extensor list
@@ -1296,7 +1364,7 @@ OrderNumber = [list(AllCoefficients.keys()).index(el) for el in OrderedMuscleLis
 if SaveOutputFigures == True:
 	pdf_forward = PdfPages(DescriptiveTitle.replace(' ','_') + '_Forward.pdf')
 	pdf_reverse = PdfPages(DescriptiveTitle.replace(' ','_') + '_Reverse.pdf')
-	pdf_bar = PdfPages(DescriptiveTitle.replace(' ','_') + '_bar.pdf')
+	pdf_compare = PdfPages(DescriptiveTitle.replace(' ','_') + '_Compare.pdf')
 
 	# Set reaching duration and sampling period
 
@@ -1312,7 +1380,7 @@ Xi,Xf = set_initial_and_final_positions(ReachType)
 
 	# Forward Direction
 
-reaching_task(Xi=Xi, Xf=Xf,dt=dt, t_end=t_end)
+X_Forward = reaching_task(Xi=Xi, Xf=Xf,dt=dt, t_end=t_end)
 return_MA_matrix()
 
 	# Calculate resulting muscle velocities, lengths, etc.
@@ -1325,53 +1393,19 @@ WeightedNormalizedMuscleVelocity_Forward = calculate_weighted_muscle_velocities_
 # calculate_muscle_lengths()
 # MuscleLengths_Forward = MuscleLengths
 
-	# Adding the weighted values regains the Weighted Normalized Muscle Velocities. But it is important to average the BIARTICULATING MUSCLES as shown below when considering the average afferent response.
+	# Calculate only the lengthening Torque Variation Contributions for both the shoulder and the elbow.
 
-# WeightedNormalizedMuscleVelocity_Forward = WeightedPotentialTorqueVariation_elbow_Forward + WeightedPotentialTorqueVariation_shoulder_Forward
+ScalingFactor = 200
+# ScalingFactor is in units of N⋅s in order for its product to result in N⋅m⋅s⋅(Af#⋅lô/s) (Note: Af# and lô are unitless measures of corrected afferented number and normalized muscle length, respectively.
 
-# WeightedNormalizedMuscleVelocity_Forward_2 = \
-# 		[WeightedPotentialTorqueVariation_shoulder_Forward[i]\
-# 		+WeightedPotentialTorqueVariation_elbow_Forward[i] \
-# 		for i in range(np.shape(WeightedPotentialTorqueVariation_shoulder_Forward)[0])]
-#
-# 	# Correct for BIC and TRI by averaging the contributions from the MAs.
-#
-# WeightedNormalizedMuscleVelocity_Forward_2[3] = WeightedNormalizedMuscleVelocity_Forward_2[3]/2
-# WeightedNormalizedMuscleVelocity_Forward_2[4] = WeightedNormalizedMuscleVelocity_Forward_2[4]/2
-#
-# 	# Calculate only the lengthening Torque Variation Contributions for both the shoulder and the elbow.
-#
-# EccentricTorqueVariations_Shoulder =\
-#  	eccentric_velocities(WeightedPotentialTorqueVariation_shoulder_Forward)
-# EccentricTorqueVariations_Elbow =\
-#  	eccentric_velocities(WeightedPotentialTorqueVariation_elbow_Forward)
-#
-# 	# Concatenate, Sum, and Scale the total lengthening Torque Variations for both Shoulder and Elbow.
-#
-# ScalingFactor = 2000
-# TotalEccentricTorqueVariations_Shoulder =\
-# 	ScalingFactor*np.concatenate(EccentricTorqueVariations_Shoulder,axis=0)
-# TotalEccentricTorqueVariations_Elbow =\
-# 	ScalingFactor*np.concatenate(EccentricTorqueVariations_Elbow,axis=0)
-#
-# 	# Calculate the time series of potential endpoint variation.
-# MuscleList = list(AllCoefficients.keys())
-# TotalEndpointPotentialVariation = []
-#
-# for j in range(len(MuscleList)):
-# 	TotalEndpointPotentialVariation.append( \
-# 		[calculate_potential_variability(\
-# 			i,\
-# 			TotalEccentricTorqueVariations_Shoulder[j,:],\
-# 			TotalEccentricTorqueVariations_Elbow[j,:],\
-# 			EOM='Uno',\
-# 			dt=dt,\
-# 			Group = AllCoefficients[MuscleList[j]]['Group']) \
-# 				for i in range(len(A1))])
-#
-# 	# Plot the resulting potential variation
-#
-# [plt.plot(TotalEndpointPotentialVariation[i]) for i in range(16)]
+EccentricTorqueVariations_Shoulder = \
+	ScalingFactor*eccentric_velocities(WeightedPotentialTorqueVariation_shoulder_Forward)
+EccentricTorqueVariations_Elbow =\
+ 	ScalingFactor*eccentric_velocities(WeightedPotentialTorqueVariation_elbow_Forward)
+PotentialVariability_Forward = calculate_potential_variability(X_Forward,\
+									EccentricTorqueVariations_Shoulder,\
+										EccentricTorqueVariations_Elbow,\
+											dt=dt,EOM = 'Uno',scheme = "Total")
 
 	# Plot Afferent-Weighted Muscle Velocity (Forward)
 
@@ -1453,7 +1487,7 @@ ConcentricCost_Forward = concentric_cost(WeightedNormalizedMuscleVelocity_Forwar
 
 	# Reverse Direction
 
-reaching_task(Xi=Xf, Xf=Xi,dt=dt, t_end=t_end)
+X_Reverse = reaching_task(Xi=Xf, Xf=Xi,dt=dt, t_end=t_end)
 return_MA_matrix()
 
 	# Calculate resulting muscle velocities, lengths, etc.
@@ -1463,6 +1497,18 @@ WeightedPotentialTorqueVariation_shoulder_Reverse,\
 WeightedPotentialTorqueVariation_elbow_Reverse = \
 calculate_weighted_unscaled_potential_torque_variations_REACHING_TASK()
 WeightedNormalizedMuscleVelocity_Reverse = calculate_weighted_muscle_velocities_REACHING_TASK()
+
+	# Calculate only the lengthening Torque Variation Contributions for both the shoulder and the elbow.
+
+EccentricTorqueVariations_Shoulder = \
+	ScalingFactor*eccentric_velocities(WeightedPotentialTorqueVariation_shoulder_Reverse)
+EccentricTorqueVariations_Elbow =\
+ 	ScalingFactor*eccentric_velocities(WeightedPotentialTorqueVariation_elbow_Reverse)
+PotentialVariability_Reverse = calculate_potential_variability(X_Reverse,\
+									EccentricTorqueVariations_Shoulder,\
+										EccentricTorqueVariations_Elbow,\
+											dt=dt,EOM = 'Uno',scheme = "Total")
+
 
 	# Test to make sure that the muscle velocities are negative, time-reversed versions of each other for the forward and backwards movement.
 
@@ -1552,12 +1598,30 @@ fig2 = plt.figure()
 plt.bar(np.arange(2),[EccentricCost_Reverse,EccentricCost_Forward])
 ax4 = plt.gca()
 ax4.set_xticklabels(('Reverse','Forward'))
-ax4.set_ylim(0,18)
-ax4.set_yticks([0,9,18])
-ax4.set_yticklabels(['0','','18'])
+ax4.set_ylim(0,20)
+ax4.set_yticks([0,10,20])
+ax4.set_yticklabels(['0','','20'])
 ax4.set_title(DescriptiveTitle + '\nEccentric Cost for Forward and Reverse Movements')
 ax4.set_ylabel('Sum of Afferent-Weighted Muscle Lengthening')
 ax4.set_xticks([0,1])
+
+###################################################################################################
+
+	# Plot potential variability comparing the two directions
+
+double_t = np.array(np.arange(0,2+2*dt,dt,dtype = 'float128')*t_end, ndmin = 2) # returns a (1,2⋅(1+dt)/dt) array of ndmin = 2.
+fig3 = plt.figure()
+plt.plot(double_t.T,np.concatenate((PotentialVariability_Forward,PotentialVariability_Reverse),\
+						axis=1).T,'k',lw=2)
+plt.plot([1,1],[0,np.concatenate((PotentialVariability_Forward,PotentialVariability_Reverse),\
+						axis=1).max()],color ='0.75',linestyle='--')
+ax5 = plt.gca()
+ax5.set_xticks([0.5,1.5])
+ax5.set_xticklabels(('Forward','Reverse'))
+ax5.set_yticks([0,1.05*(np.concatenate((PotentialVariability_Forward,PotentialVariability_Reverse),\
+						axis=1).max())])
+ax5.set_title(DescriptiveTitle + '\nPotential For Endpoint Variability')
+ax5.set_ylabel('Potential Endpoint Variability\nat Each Timestep')
 
 	# Need to write PDF files and close the PDF files/figures
 
@@ -1572,11 +1636,12 @@ if SaveOutputFigures == True:
 	pdf_reverse.savefig(fig2b)
 	pdf_reverse.savefig(fig2c)
 	# pdf_reverse.savefig(fig2d)
-	pdf_bar.savefig(fig2)
+	pdf_compare.savefig(fig2)
+	pdf_compare.savefig(fig3)
 
 	pdf_forward.close()
 	pdf_reverse.close()
-	pdf_bar.close()
+	pdf_compare.close()
 
 		# Close any open plots
 
