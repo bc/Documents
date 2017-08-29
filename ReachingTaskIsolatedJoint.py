@@ -166,8 +166,6 @@ def plot_resulting_kinematics():
     ax3.set_title("Trajectory y-Component")
     ax3.set_xlabel('Normalized Time')
     ax3.set_ylabel('y (m)')
-
-    # plt.show()
 def MA_function(Parameters):
 	"""
 	Note:
@@ -863,14 +861,12 @@ def eccentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,costtype ='l2n
 	import numpy as np
 	PositiveMuscleVelocities = eccentric_velocities(NormalizedMuscleVelocity)
 	TotalPositiveExcursion = np.trapz(PositiveMuscleVelocities,dx=t_end*dt)
-	# TotalPositiveExcursion = [np.trapz(el,dx=t_end*dt) for el in PositiveMuscleVelocities]
 	EccentricCost = cost_function(TotalPositiveExcursion,costtype=costtype)
 	return(EccentricCost)
 def concentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,costtype = 'l2norm'):
 	import numpy as np
 	NegativeMuscleVelocities = concentric_velocities(NormalizedMuscleVelocity)
 	TotalNegativeExcursion = np.trapz(NegativeMuscleVelocities,dx=t_end*dt)
-	# TotalNegativeExcursion = [np.trapz(el,dx=t_end*dt) for el in NegativeMuscleVelocities]
 	ConcentricCost = cost_function(TotalNegativeExcursion,costtype=costtype)
 	return(ConcentricCost)
 def calculate_potential_variability(X,δT1,δT2,dt=0.001,EOM = 'Uno',scheme = "Total"):
@@ -961,59 +957,6 @@ def calculate_potential_variability(X,δT1,δT2,dt=0.001,EOM = 'Uno',scheme = "T
 	If scheme is "Total", then the output will be a (1,N) array of total resulting potential variability vs. time. If scheme is "Individual", then the output will be a (m,N) array of the individual muscle potential variability contribution versus time.
 	"""
 	potential_variability = ((X[0]-resulting_x)**2 + (X[1]-resulting_y)**2)**0.5
-
-	# if Group == 'flexor':
-	# 	δT1== δT1
-	# 	δT2== δT2
-	# elif Group == 'extensor':
-	# 	δT1== -δT1
-	# 	δT2== -δT2
-	#
-	# # if Group[0] == 'flexor':
-	# # 	δτ1== δτ1
-	# # elif Group[0] == 'extensor':
-	# # 	δτ1== -δτ1
-	# #
-	# # if Group[1] == 'flexor':
-	# # 	δτ2== δτ2
-	# # elif Group[1] == 'extensor':
-	# # 	δτ2== -δτ2
-	#
-	# ä1 = lambda a1,a2,ȧ1,ȧ2,τ1,τ2,δτ1,δτ2: \
-	# 			(-(β**2)*(ȧ1**2)*sin(a2)*cos(a2)	- ȧ1*(b11*δ - b21*(δ + β*cos(a2))) \
-	# 			+ δ*β*(ȧ1 + ȧ2)**2*sin(a2) - ȧ2*(b12*δ - b22*(δ + β*cos(a2))) \
-	# 			+ (τ1 + δτ1)*δ - (τ2 + δτ2)*(δ + β*cos(a2))) / \
-	# 			(α*δ - δ**2 -β**2*cos(a2)**2)
-	# ä2 = lambda a1,a2,ȧ1,ȧ2,τ1,τ2,δτ1,δτ2: \
-	# 			-((β**2)*(2*ȧ1**2 + 2*ȧ1*ȧ2 + ȧ2**2)*sin(a2)*cos(a2) \
-	# 			- ȧ1*(b11*(δ + β*cos(a2))  - b21*(α + 2*β*cos(a2))) \
-	# 			+ δ*β*(ȧ1 + ȧ2)**2*sin(a2) + β*ȧ1**2*(α-δ)*sin(a2) \
-	# 			- ȧ2*(b12*(δ + β*cos(a2)) - b22*(α + 2*β*cos(a2))) \
-	# 			+ (τ1 + δτ1)*(δ + β*cos(a2)) - (τ2 + δτ2)*(α + 2*β*cos(a2))) / \
-	# 			(α*δ - δ**2 -β**2*cos(a2)**2)
-	# def next_angle_from_forward_euler(i,δT1,δT2,dt):
-	# 	import numpy as np
-	# 	global A1,A2,Ȧ1,Ȧ2,T1,T2
-	# 	next_ȧ1	= Ȧ1[i] + ä1(A1[i],A2[i],Ȧ1[i],Ȧ2[i],T1[i],T2[i],δT1[i],δT2[i])*dt
-	# 	next_a1 = A1[i] + next_ȧ1*dt
-	# 	next_ȧ2	= Ȧ2[i] + ä2(A1[i],A2[i],Ȧ1[i],Ȧ2[i],T1[i],T2[i],δT1[i],δT2[i])*dt
-	# 	next_a2 = A2[i] + next_ȧ2*dt
-	# 	return(next_a1,next_a2)
-	#
-	# # testA1,testA2 = [],[]
-	# # for i in range(len(A1)):
-	# # 	next_a1,next_a2 = next_angle_from_forward_euler(A1[i],A2[i],Ȧ1[i],Ȧ2[i],T1[i],T2[i],0,0,0.001)
-	# # 	testA1.append(next_a1)
-	# # 	testA2.append(next_a2)
-	# next_a1,next_a2 = next_angle_from_forward_euler(i,δT1,δT2,dt)
-	# X = np.array([	[L1*cos(A1[i]) + L2*cos(A1[i] + A2[i])],\
-	# 				[L1*sin(A1[i]) + L2*sin(A1[i] + A2[i])] ])
-	# new_X = np.array([	[L1*cos(next_a1) + L2*cos(next_a1 + next_a2)],\
-	# 					[L1*sin(next_a1) + L2*sin(next_a1 + next_a2)] ])
-	# # global A1_dev,A2_dev
-	# # A1_dev.append(A1[i]-next_a1)
-	# # A2_dev.append(A2[i]-next_a2)
-	# variation = float((sum((X-new_X)**2)**0.5))
 	return(potential_variability)
 
 import numpy as np
@@ -1101,14 +1044,6 @@ WeightedPotentialTorqueVariation_shoulder_Forward,\
 WeightedPotentialTorqueVariation_elbow_Forward = \
 calculate_weighted_unscaled_potential_torque_variations_ISOLATED_ROTATION()
 
-# StartTime = time.time()
-# statusbar(0,len(A1),Title = 'Forward Vm',StartTime=StartTime)
-# for i in range(1,len(A1)):
-#     statusbar(i,len(A1),Title = 'Forward Vm',StartTime=StartTime)
-#     WeightedNormalizedMuscleVelocity_Forward = np.concatenate((WeightedNormalizedMuscleVelocity_Forward,calculate_weighted_muscle_velocities_ISOLATED_ROTATION(A1[i],A2[i],Ȧ1[i],Ȧ2[i],dof=dof)),axis=0)
-#     NormalizedMuscleVelocity_Forward = np.concatenate((NormalizedMuscleVelocity_Forward,calculate_muscle_velocities(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
-# print('\n')
-
 	# Calculate only the lengthening Torque Variation Contributions for both the shoulder and the elbow.
 
 ScalingFactor = 200
@@ -1130,6 +1065,7 @@ PotentialVariability_Forward = calculate_potential_variability(X_Forward,\
 											dt=dt,EOM = 'Uno',scheme = "Total")
 
 	# Plot Afferent-Weighted Muscle Velocity (Forward)
+
 fig1a = plt.figure()
 [plt.plot(t.T,WeightedNormalizedMuscleVelocity_Forward[i].T) for i in OrderNumber]
 ax1a = plt.gca()
@@ -1159,7 +1095,6 @@ else:
 ax1b.set_ylabel('Normalized Muscle Velocity\nConcentric $\longleftrightarrow$ Eccentric')
 [j.set_color(OrderedColorsList[i]) for i,j in enumerate(ax1b.lines)]
 ax1b.legend(OrderedMuscleList)
-
 
 	# Calculate Costs from Afferent-Weighted Muscle Velocities (Forward)
 
@@ -1202,17 +1137,6 @@ PotentialVariability_Reverse = calculate_potential_variability(X_Reverse,\
 										EccentricTorqueVariations_Elbow,\
 											dt=dt,EOM = 'Uno',scheme = "Total")
 
-# reaching_task_ISOLATED_JOINT_TASK(dt = dt, Ai=Af, Af=Ai, t_end=t_end)
-# WeightedNormalizedMuscleVelocity_Reverse = calculate_weighted_muscle_velocities_ISOLATED_ROTATION(A1[0],A2[0],Ȧ1[0],Ȧ2[0],dof=dof)
-# NormalizedMuscleVelocity_Reverse = calculate_muscle_velocities(A1[0],A2[0],Ȧ1[0],Ȧ2[0])
-# StartTime = time.time()
-# statusbar(0,len(A1),Title = 'Reverse Vm',StartTime=StartTime)
-# for i in range(1,len(A1)):
-#     statusbar(i,len(A1),Title = 'Reverse Vm',StartTime=StartTime)
-#     WeightedNormalizedMuscleVelocity_Reverse = np.concatenate((WeightedNormalizedMuscleVelocity_Reverse,calculate_weighted_muscle_velocities_ISOLATED_ROTATION(A1[i],A2[i],Ȧ1[i],Ȧ2[i],dof=dof)),axis=0)
-#     NormalizedMuscleVelocity_Reverse = np.concatenate((NormalizedMuscleVelocity_Reverse,calculate_muscle_velocities(A1[i],A2[i],Ȧ1[i],Ȧ2[i])),axis=0)
-# print('\n')
-
 	# Plot Afferent-Weighted Muscle Velocity (Reverse)
 
 fig2a = plt.figure()
@@ -1249,23 +1173,6 @@ ax2b.legend(OrderedMuscleList)
 
 EccentricCost_Reverse = eccentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,costtype = 'l1norm')
 ConcentricCost_Reverse = concentric_cost(WeightedNormalizedMuscleVelocity_Reverse,t_end=t_end,dt = dt,costtype = 'l1norm')
-
-###################################################################################################
-
-	# Compare Costs
-
-# plt.figure()
-# plt.plot(np.arange(0,2*math.ceil(max([EccentricCost_Forward,ConcentricCost_Forward]))+1,1), np.arange(0,2*math.ceil(max([EccentricCost_Forward,ConcentricCost_Forward]))+1,1),'0.75',linestyle='--')
-# plt.scatter([EccentricCost_Forward],[ConcentricCost_Forward],facecolor ='g', edgecolor = 'k', marker='o',s=100)
-# plt.scatter([EccentricCost_Reverse],[ConcentricCost_Reverse],facecolor ='b', edgecolor = 'k', marker='o',s=100)
-# ax3 = plt.gca()
-# ax3.set_xlim(0,2*math.ceil(max([EccentricCost_Forward,EccentricCost_Reverse])))
-# ax3.set_ylim(0,2*math.ceil(max([EccentricCost_Forward,EccentricCost_Reverse])))
-# ax3.set_aspect('equal')
-# ax3.set_title('Eccentric vs. Concentric Cost\nFor Forward and Reverse Movments')
-# ax3.set_xlabel('Eccentric Cost (in $\hat{l}_{o}\cdot m$)')
-# ax3.set_ylabel('Concentric Cost (in $\hat{l}_{o}\cdot m$)')
-# ax3.legend(['Equal Cost Line','Forward Direction','Reversed Direction'])
 
 ###################################################################################################
 
