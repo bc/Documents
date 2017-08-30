@@ -872,6 +872,8 @@ def concentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,costtype = 'l
 def calculate_potential_variability(X,δT1,δT2,dt=0.001,EOM = 'Uno',scheme = "Total"):
 	from math import cos,sin
 	import numpy as np
+	import ipdb
+
 	assert EOM.capitalize() in ["Uno","Zadravec"], "EOM can be either 'Uno' or 'Zadravec'"
 	assert scheme.capitalize() in ["Total","Individual"], "scheme must be either 'Total' or 'Individual'"
 
@@ -915,11 +917,11 @@ def calculate_potential_variability(X,δT1,δT2,dt=0.001,EOM = 'Uno',scheme = "T
 	# Test to make sure that the forward mapping to torque and the inverse mapping to angular acceleration are consistent.
 
 	assert (abs(np.array([np.matrix(M_inv[i])*(T[i]-CȦ[i]-BȦ[i]) for i in range(1001)]).T -Ä.T)<1e-12).all(), "There is an issue with the mapping from Torques to Angular Accelerations."
-	np.array([np.matrix(M_inv[i])*(T[i]-CȦ[i]-BȦ[i]) for i in range(1001)])
 
 	# The sign of the MA for each muscle at each joint will sufficiently determine the sign of of the torque as these muscles are already eccentrically contracting (i.e., -r₁ⱼ⋅dϑ₁/dt > 0, therefore if dϑ₁/dt > 0, then r₁ⱼ < 0 and the torque will be negative and vice versa).
 
-	δT = np.concatenate((δT1,δT2),axis=1)*np.sign(MomentArmMatrix.T)
+	δT = (np.concatenate((δT1,δT2),axis=1)*np.sign(MomentArmMatrix.T)).T
+	# returns an (N,2,m) array.
 
 	from itertools import chain, combinations
 	def all_subsets(ss):
@@ -934,17 +936,22 @@ def calculate_potential_variability(X,δT1,δT2,dt=0.001,EOM = 'Uno',scheme = "T
 
 	if scheme.capitalize() == 'Individual':
 		next_Ä = np.concatenate(\
-					[np.array([np.matrix(M_inv[i])*(T[i]+δT[j,:,i][:,np.newaxis]-CȦ[i]-BȦ[i]) \
-						for i in range(δT.shape[2])]).T for j in range(δT.shape[0])])
+					[np.array([np.matrix(M_inv[i])*(T[i]+δT[i,:,j][:,np.newaxis]-CȦ[i]-BȦ[i]) \
+						for i in range(δT.shape[0])]).T for j in range(δT.shape[2])]) # returns (m,2,1001) array
 	elif scheme.capitalize() == 'Total':
-		next_Ä = np.array([np.matrix(M_inv[i])*(T[i]+δT.sum(axis=0)[np.newaxis,:].T[i]\
+		next_Ä = np.array([np.matrix(M_inv[i])*(T[i]+δT.sum(axis=2)[:,np.newaxis].swapaxes(1,2)[i]\
 							-CȦ[i]-BȦ[i]) \
-								for i in range(δT.shape[2])]).T
+								for i in range(δT.shape[0])]).T # returns (1,2,N) array
 
-	resulting_A = np.concatenate([(A+(Ȧ+next_Ä[j].T[:,np.newaxis].swapaxes(1,2)*dt/2)*dt).T \
+
+	"""
+	A,Ȧ,Ä have shape (N,2,1), but next_Ä has shape (x,2,N), where x is determined by the torque combinations. We have chosen to allow for variable torque contributes in case we wish to observe the effects of individual muscle, muscle groups, etc. Therefore we use next_Ä[j].T[:,np.newaxis].swapaxes(1,2) (where j is in range(x)) to take (N,2) arrays, add a new axis in the middle, and then swap 2nd and 3rd axis to regain (N,2,1) arrays for each j in range(x). Taking the transpose at the end returns an easy to split (1,2,N) array.
+	"""
+	resulting_A = np.concatenate([(A+(Ȧ+((Ä + next_Ä[j].T[:,np.newaxis].swapaxes(1,2))/2)*dt/2)*dt).T \
 									for j in range(next_Ä.shape[0])])
+		# returns (x,1,N) arrays for the resulting A1 and A2.
 	resulting_A1,resulting_A2 = np.split(resulting_A,resulting_A.shape[1],axis=1)
-
+		# returns (x,N) arrays for the resulting deviation at step n+1.
 	resulting_x = np.concatenate([np.array(list(map(lambda a1,a2: L1*cos(a1) + L2*cos(a1+a2),\
 										resulting_A1[j].T,resulting_A2[j].T)),\
 	 										dtype='float128',ndmin=2) \
@@ -956,7 +963,13 @@ def calculate_potential_variability(X,δT1,δT2,dt=0.001,EOM = 'Uno',scheme = "T
 	"""
 	If scheme is "Total", then the output will be a (1,N) array of total resulting potential variability vs. time. If scheme is "Individual", then the output will be a (m,N) array of the individual muscle potential variability contribution versus time.
 	"""
-	potential_variability = ((X[0]-resulting_x)**2 + (X[1]-resulting_y)**2)**0.5
+	potential_variability = ((X[0][1:]-resulting_x[:,:-1])**2 +\
+	 								(X[1][1:]-resulting_y[:,:-1])**2)**0.5 # returns (x,N-1) array because we do not have any variability at the first timestep.
+	potential_variability = \
+			np.concatenate((np.array([0]*potential_variability.shape[0],ndmin=2).T,\
+								potential_variability),\
+									axis=1) # returns an (x,N) array that adds zero values infront of index 0.
+	# ipdb.set_trace()
 	return(potential_variability)
 
 import numpy as np
@@ -1140,7 +1153,7 @@ PotentialVariability_Reverse = calculate_potential_variability(X_Reverse,\
 	# Plot Afferent-Weighted Muscle Velocity (Reverse)
 
 fig2a = plt.figure()
-[plt.plot(t.T,WeightedNormalizedMuscleVelocity_Forward[i].T) for i in OrderNumber]
+[plt.plot(t.T,WeightedNormalizedMuscleVelocity_Reverse[i].T) for i in OrderNumber]
 ax2a = plt.gca()
 ax2a.set_xlim(0,t_end*(1.3))
 ax2a.set_ylim(-12,12)
@@ -1156,7 +1169,7 @@ ax2a.legend(OrderedMuscleList)
 	# Plot Normalized Muscle Velocity (Reverse)
 
 fig2b = plt.figure()
-[plt.plot(t.T,NormalizedMuscleVelocity_Forward[i].T) for i in OrderNumber]
+[plt.plot(t.T,NormalizedMuscleVelocity_Reverse[i].T) for i in OrderNumber]
 ax2b = plt.gca()
 ax2b.set_xlim(0,t_end*(1.3))
 ax2b.set_ylim(-1.5,1.5)
@@ -1201,7 +1214,8 @@ plt.plot([1,1],[-0.005,0.025],color ='0.75',linestyle='--')
 ax5 = plt.gca()
 ax5.set_xticks([0.5,1.5])
 ax5.set_xticklabels((Direction[0],Direction[1]))
-ax5.set_yticks([0,0.02])
+ax5.set_yticks([0,0.01])
+ax5.set_ylim([0,0.01])
 ax5.set_title(DescriptiveTitle + '\nPotential For Endpoint Variability')
 ax5.set_ylabel('Potential Endpoint Variability\nat Each Timestep')
 
