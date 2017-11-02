@@ -348,7 +348,7 @@ def global_R_matrix():
 
 	DELTp SFE MA is listed as -78.74 mm in Pigeon and estimated as -8 mm. Using Pigeon Coefficients convention, Kuechle (1997) has the DELTp MA for [-140,90] as Pigeon_coeff_conversion([ 2.28547177,  0.39721238, -0.33900829, -0.36146546,  0.,  0.]). This will yield a piecewise function that creates jumps with the new velocity formulation. Instead, we are going to try Pigeon_coeff_conversion([-2.38165173, -0.4486164 ,  0.58655808,  0.65003255, -0.82736695,0.20812998]) so that the function is within range and continuous during the ROM. Threshold (pi/2) has been removed for this new MA function.
 
-	PC (Clavicle attachment of Pectoralis) SFE MA is listed as 50.80 mm in Pigeon.
+	PC (Clavicle attachment of Pectoralis) SFE MA is listed as 50.80 mm in Pigeon. APPROX OPTIMAL MUSCLE LENGTH! NEED TO FIND ACTUAL NUMBER. We used the Banks numbers for mass, afferent number, corrected number and relative abundance as the stretch will likely affect the whole muscle.
 
 	CB SFE MA was estimated in Holzbaur (2005) as 20 mm while Bassett (1990) estimates from 7 cadavers the MA to be 36 mm.
 	"""
@@ -362,6 +362,7 @@ def global_R_matrix():
 
 	# Coefficients from observation, Ramsay, Pigeon, FVC, Holtzbaur, or Banks.
 	# Moment arms are in mm. Mass is in grams. threshold is in radians.
+
 	PC_Coefficients = {\
 		'Shoulder' : {\
 			'MA' : [50.80,0,0,0,0,0],\
@@ -371,11 +372,11 @@ def global_R_matrix():
 			'MA' : 0,\
 			'src' : 'Est', 'eq' : None, 'threshold' : None, \
 			'dof' : 'Elbow'}, \
-		'Mass' : None, \
-		'Actual No' : None, \
-		'Corrected No' : None, \
-		'Relative Abundance' : None,\
-		'Optimal Muscle Length' : None,\
+		'Mass' :  295.6, \
+		'Actual No' : 450, \
+		'Corrected No' : 389.7, \
+		'Relative Abundance' : 1.2,\
+		'Optimal Muscle Length' : 150, \
 	    'Group' : 'flexor'}
 	DELTa_Coefficients = {\
 		'Shoulder' : {\
@@ -653,7 +654,8 @@ def global_R_matrix():
 	# 					TRI_Coefficients, BRA_Coefficients, BRD_Coefficients, PRO_Coefficients, \
 	# 					FCR_Coefficients, ECRB_Coefficients, ECRL_Coefficients, FCU_Coefficients, \
 	# 					FDS_Coefficients, PL_Coefficients, ECU_Coefficients, EDM_Coefficients, EDC_Coefficients]
-	AllCoefficients = {'DELTa' : DELTa_Coefficients, 'CB' : CB_Coefficients, \
+	AllCoefficients = {'PC': PC_Coefficients,\
+						'DELTa' : DELTa_Coefficients, 'CB' : CB_Coefficients, \
 						'DELTp' : DELTp_Coefficients, 'BIC' : BIC_Coefficients, \
 						'TRI' : TRI_Coefficients, 'BRA' : BRA_Coefficients, \
 						'BRD' : BRD_Coefficients, 'PRO' : PRO_Coefficients, \
@@ -986,7 +988,7 @@ SaveOutputFigures = False
 
 	# Specify isolated DOF and define reaching locations
 
-dof = 'Elbow'
+dof = 'Shoulder'
 DescriptiveTitle = 'Isolated ' + dof
 
 if dof == 'Elbow':
@@ -996,8 +998,8 @@ if dof == 'Elbow':
 	Direction = ['Extension','Flexion']
 elif dof == 'Shoulder':
 	# Shoulder Rotation (Rotation from θ₁ = 112.5° to ϑ₁ = 67.5° -- i.e., ABDuction [Horiz. Ext.])
-	Ai = [np.pi/2+np.pi/8,0]
-	Af = [np.pi/2-np.pi/8,0]
+	Ai = [90*np.pi/180+np.pi/8,0]
+	Af = [90*np.pi/180-np.pi/8,0]
 	Direction = ['Abduction (i.e., Horiz. Ext.)', 'Adduction (i.e., Horiz. Flex.)']
 
 	# DescriptiveTitle should be something to identify the trial either by degree of freedom, (i.e., Elbow or Shoulder) or by what has changed in the most current iteration (e.g., CB_Ramsay, DELTa_Est, etc.). Spaces will be replaced by '_' symbolbs for the filename but kept for figure titles.
@@ -1190,15 +1192,19 @@ ConcentricCost_Reverse = concentric_cost(WeightedNormalizedMuscleVelocity_Revers
 ###################################################################################################
 
 	# Plot bar graph comparing the two directions
-
+EccentricCost_Forward = PotentialVariability_Forward.mean()
+EccentricCost_Reverse = PotentialVariability_Reverse.mean()
 fig4 = plt.figure()
 plt.bar(np.arange(2),[EccentricCost_Forward,EccentricCost_Reverse])
 ax4 = plt.gca()
 ax4.set_xticks([0,1])
 ax4.set_xticklabels((Direction[0],Direction[1]))
-ax4.set_ylim(0,10)
-ax4.set_yticks([0,5,10])
-ax4.set_yticklabels(['0','','10'])
+# ax4.set_ylim(0,10)
+# ax4.set_yticks([0,5,10])
+# ax4.set_yticklabels(['0','','10'])
+ax4.set_ylim(0,0.002)
+ax4.set_yticks([0,0.001,0.002])
+ax4.set_yticklabels(['0','','0.002'])
 ax4.set_title('Eccentric Cost\nFor Forward and Reverse Movements')
 ax4.set_ylabel('Sum of Afferent-Weighted Muscle Lengthening')
 
