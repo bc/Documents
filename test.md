@@ -1,3 +1,0 @@
-- [ ] This is a test.
-- **Bold test**
-- _Italic test_
