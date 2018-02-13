@@ -393,12 +393,14 @@ fix_ending_point = True
 boundary_sigma = 0.25
 allowable_error_rad = 30*(np.pi/180) #degrees
 allowable_error_y = 5 # cm
+NumberOfTrials =  50
 
-plt.figure()
-ax2 = plt.gca()
+
+fig1 = plt.figure()
+ax1 = plt.gca()
+ax1.set_title(str(NumberOfTrials) + " Random Trajectories")
 plt.axes().set_aspect('equal', 'datalim')
 
-NumberOfTrials =  50
 i = 0
 StartTime = time.time()
 
@@ -447,9 +449,9 @@ while i < NumberOfTrials:
 			t = np.arange(0,1,0.001)
 			x = x_initial + (x_final-x_initial)*(10*t**3 - 15*t**4 + 6*t**5) # Returns an (1,N) array
 			y = spline_structure.pp_func(x)
-			line, = ax2.plot(x,y)
+			line, = ax1.plot(x,y)
 			c = line.get_color()
-			ax2.scatter([x[0],x[-1]],[y[0],y[-1]],color=c,marker='o')
+			ax1.scatter([x[0],x[-1]],[y[0],y[-1]],color=c,marker='o')
 	elif i == 1:
 		if spline_structure.is_within_bounds(x_initial,x_final, ymin, ymax):
 			Splines = np.concatenate(([Splines], [spline_structure]), axis = 0)
@@ -458,9 +460,9 @@ while i < NumberOfTrials:
 			t = np.arange(0,1,0.001)
 			x = x_initial + (x_final-x_initial)*(10*t**3 - 15*t**4 + 6*t**5) # Returns an (1,N) array
 			y = spline_structure.pp_func(x)
-			line, = ax2.plot(x,y)
+			line, = ax1.plot(x,y)
 			c = line.get_color()
-			ax2.scatter([x[0],x[-1]],[y[0],y[-1]],color=c,marker='o')
+			ax1.scatter([x[0],x[-1]],[y[0],y[-1]],color=c,marker='o')
 	else:
 		if spline_structure.is_within_bounds(x_initial,x_final, ymin, ymax):
 			Splines = np.concatenate((Splines, [spline_structure]), axis = 0)
@@ -468,9 +470,9 @@ while i < NumberOfTrials:
 			t = np.arange(0,1,0.001)
 			x = x_initial + (x_final-x_initial)*(10*t**3 - 15*t**4 + 6*t**5) # Returns an (1,N) array
 			y = spline_structure.pp_func(x)
-			line, = ax2.plot(x,y)
+			line, = ax1.plot(x,y)
 			c = line.get_color()
-			ax2.scatter([x[0],x[-1]],[y[0],y[-1]],color=c,marker='o')
+			ax1.scatter([x[0],x[-1]],[y[0],y[-1]],color=c,marker='o')
 			if i<NumberOfTrials:
 				statusbar(i,NumberOfTrials,Title="Reaching Task",StartTime=StartTime)
 
@@ -571,17 +573,17 @@ def dx_dt(t,x):
 xs=[x_initial]
 for i in range(len(t)-1):
 	xs.append(fourth_order_runge_kutta(dx_dt,t[i],xs[i],dt))
+ys = np.array(list(map(lambda x: spline_structure.pp_func(x),xs)))
 
 # t = np.linspace(0,1,10000)
 # xs = sp.integrate.odeint(dx_dt,x_initial,t).flatten()
-plt.figure()
-ys = np.array(list(map(lambda x: spline_structure.pp_func(x),xs)))
-plt.plot(xs,ys,'r',lw = 5)
-plt.plot(np.linspace(x_initial,x_final,1001),spline_structure.pp_func(np.linspace(x_initial,x_final,1001)),'g')
 
+fig2, (ax2, ax3) = plt.subplots(nrows=2, figsize=(7, 9.6))
+ax2.set_title("RK4 - spline_structure piecewise function v1")
+ax2.plot(xs,ys,'r',lw = 5)
+ax2.plot(np.linspace(x_initial,x_final,1001),spline_structure.pp_func(np.linspace(x_initial,x_final,1001)),)
 
-plt.figure()
-
+ax3.set_title("RK4 - spline_structure piecewise function v1\nRecovered xy-plot")
 r_calculated = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),xs,ys)))
 dr_calculated = np.gradient(r_calculated)/dt
 
@@ -590,25 +592,32 @@ r_final = np.sqrt(x_final**2+y_final**2)
 r_desired = np.array(list(map(lambda t: r_initial + (r_final-r_initial)*(10*t**3 - 15*t**4 + 6*t**5),t)))
 dr_desired = np.array(list(map(lambda t: (r_final-r_initial)*(30*t**2 - 60*t**3 + 30*t**4),t)))
 
-plt.plot(t,dr_calculated,'r',lw=5)
-plt.plot(t,dr_desired)
+ax3.plot(t,dr_calculated,'r',lw=5)
+ax3.plot(t,dr_desired)
 r_break = np.sqrt(x_rand**2+y_rand**2)
 t_break = t[sum(r_break>r_desired)]
-plt.plot([t_break,t_break],[0,15*(r_final-r_initial)/8],'k--')
+ax3.plot([t_break,t_break],[0,15*(r_final-r_initial)/8],'k--')
 
 
 # To show that the RK4 algorithm works...
 
-test_ode = lambda t,x: (2*(30*t**2-60*t**3+30*t**4))\
+test_ode_1 = lambda t,x: (2*(30*t**2-60*t**3+30*t**4))\
                     	*np.sqrt(x**2-4*x+5)/(2*x**2-6*x+5);
 testx=[0]
 for i in range(len(t)-1):
-	testx.append(fourth_order_runge_kutta(test_ode,t[i],testx[i],dt))
+	testx.append(fourth_order_runge_kutta(test_ode_1,t[i],testx[i],dt))
 testy = np.array(list(map(lambda x:-x**2+2*x,testx)))
 testr = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx,testy)))
-plt.figure()
-plt.plot(t,np.gradient(testr)/dt,'r',lw=5)
-plt.plot(t,np.array(list(map(lambda t: 2*(30*t**2-60*t**3+30*t**4),t))))
+testr_desired = np.array(list(map(lambda t: (2)*(10*t**3 - 15*t**4 + 6*t**5),t)))
+
+fig3, (ax4, ax5) = plt.subplots(nrows=2, figsize=(7, 9.6))
+ax4.set_title('RK4 Test with $f(x) = -x^{2}+2x$')
+ax4.plot(t,np.gradient(testr)/dt,'r',lw=5)
+ax4.plot(t,np.array(list(map(lambda t: 2*(30*t**2-60*t**3+30*t**4),t))))
+
+ax5.set_title("RK4 Test with $f(x) = -x^{2}+2x$\nRecovered xy-plot")
+ax5.plot(testx,testy,'r',lw=5)
+ax5.plot(np.linspace(0,2,101),np.array(list(map(lambda x: -x**2 + 2*x,np.linspace(0,2,101)))))
 
 # def test_ode_2(t,x):
 # 	def dr_dt(t):
@@ -634,10 +643,10 @@ def test_ode_2(t,x):
 		return((r_final-r_initial)*(30*t**2-60*t**3+30*t**4))
 	def f(x):
 		a,b,c,d = spline_structure.a[0],spline_structure.b[0,0,0],spline_structure.c[0,0],spline_structure.d[0,0,0]
-		return(a + b*x + c*x**2 + d*x**3)
+		return(a + b*(x-spline_structure.x_initial) + c*(x-spline_structure.x_initial)**2 + d*(x-spline_structure.x_initial)**3)
 	def df(x):
 		a,b,c,d = spline_structure.a[0],spline_structure.b[0,0,0],spline_structure.c[0,0],spline_structure.d[0,0,0]
-		return(b+ 2*c*x + 3*d*x**2)
+		return(b+ 2*c*(x-spline_structure.x_initial) + 3*d*(x-spline_structure.x_initial)**2)
 	return(dr_dt(t)*np.sqrt(x**2 + f(x)**2)/(x+df(x)))
 
 testx=[x_initial]
@@ -645,10 +654,18 @@ for i in range(len(t)-1):
 	testx.append(fourth_order_runge_kutta(test_ode_2,t[i],testx[i],dt))
 testy = spline_structure.pp_func(np.array(testx))
 testr = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx,testy)))
-plt.figure()
-plt.plot(t,np.gradient(testr)/dt,'r',lw=5)
-plt.plot(t,np.array(list(map(lambda t: (r_final-r_initial)*(30*t**2-60*t**3+30*t**4),t))))
-plt.plot([t_break,t_break],[0,15*(r_final-r_initial)/8],'k--')
+
+fig4, (ax6, ax7) = plt.subplots(nrows=2, figsize=(7, 9.6))
+
+ax6.set_title("RK4 - spline_structure piecewise function v2")
+ax6.plot(t,np.gradient(testr)/dt,'r',lw=5)
+ax6.plot(t,np.array(list(map(lambda t: (r_final-r_initial)*(30*t**2-60*t**3+30*t**4),t))))
+ax6.plot([t_break,t_break],[0,15*(r_final-r_initial)/8],'k--')
+
+ax7.set_title("RK4 - spline_structure piecewise function v2\nRecovered xy-plot")
+ax7.plot(testx,testy,'r',lw = 5)
+ax7.plot(np.linspace(x_initial,x_final,1001),spline_structure.pp_func(np.linspace(x_initial,x_final,1001)),)
+
 
 def test_ode_3(t,x):
 	def dr_dt(t):
@@ -665,32 +682,70 @@ for i in range(len(t)-1):
 	testx.append(fourth_order_runge_kutta(test_ode_3,t[i],testx[i],dt))
 testy = np.array(list(map(lambda x:(x-1)**3+1,testx)))
 testr = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx,testy)))
-plt.figure()
-plt.plot(t,np.gradient(testr)/dt,'r',lw=5)
-plt.plot(t,np.array(list(map(lambda t: 2*np.sqrt(2)*(30*t**2-60*t**3+30*t**4),t))))
 
-plt.figure()
-plt.plot(testx,testy)
+fig5, (ax8, ax9) = plt.subplots(nrows=2, figsize=(7, 9.6))
+ax8.set_title('RK4 Test with $f(x) = (x-1)^{3}+1$')
 
-def test_ode_4(t,x):
-	a,b,c,d = spline_structure.a[0],spline_structure.b[0,0,0],spline_structure.c[0,0],spline_structure.d[0,0,0]
-	def dr_dt(t):
-		return((r_final-r_initial)*(30*t**2-60*t**3+30*t**4))
-	return(dr_dt(t)*2*np.sqrt(x**2 + spline_structure.pp_func(x))/(2*x + spline_structure.pp_deriv(x)))
+ax8.plot(t,np.gradient(testr)/dt,'r',lw=5)
+ax8.plot(t,np.array(list(map(lambda t: 2*np.sqrt(2)*(30*t**2-60*t**3+30*t**4),t))))
 
-testx=[x_initial]
-
-for i in range(len(t)-1):
-	testx.append(fourth_order_runge_kutta(test_ode_4,t[i],testx[i],dt))
-testy = np.array(list(map(lambda x:(x-1)**3+1,testx)))
-testr = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx,testy)))
-plt.figure()
-plt.plot(t,np.gradient(testr)/dt,'r',lw=5)
-plt.plot(t,np.array(list(map(lambda t: (r_final-r_initial)*(30*t**2-60*t**3+30*t**4),t))))
-plt.plot([t_break,t_break],[0,15*(r_final-r_initial)/8],'k--')
+ax9.set_title("RK4 Test with $f(x) = (x-1)^{3}+1$\nRecovered xy-plot")
+ax9.plot(testx,testy,'r',lw=5)
+ax9.plot(np.linspace(0,2,101),np.array(list(map(lambda x: (x-1)**3 + 1,np.linspace(0,2,101)))))
 
 # plt.figure()
 # plt.plot(testx,testy)
+
+# def test_ode_4(t,x):
+# 	a,b,c,d = spline_structure.a[0],spline_structure.b[0,0,0],spline_structure.c[0,0],spline_structure.d[0,0,0]
+# 	def dr_dt(t):
+# 		return((r_final-r_initial)*(30*t**2-60*t**3+30*t**4))
+# 	return(dr_dt(t)*2*np.sqrt(x**2 + spline_structure.pp_func(x))/(2*x + spline_structure.pp_deriv(x)))
+#
+# testx=[x_initial]
+#
+# for i in range(len(t)-1):
+# 	testx.append(fourth_order_runge_kutta(test_ode_4,t[i],testx[i],dt))
+# testy = np.array(list(map(lambda x:(x-1)**3+1,testx)))
+# testr = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx,testy)))
+# plt.figure()
+# plt.plot(t,np.gradient(testr)/dt,'r',lw=5)
+# plt.plot(t,np.array(list(map(lambda t: (r_final-r_initial)*(30*t**2-60*t**3+30*t**4),t))))
+# plt.plot([t_break,t_break],[0,15*(r_final-r_initial)/8],'k--')
+
+# plt.figure()
+# plt.plot(testx,testy)
+
+def test_ode_5(t,x):
+	def dr_dt(t):
+		return((2*np.sqrt(2))*(30*t**2-60*t**3+30*t**4))
+	def g(x):
+		if x <= 1:
+			return(x**2 + (-x**2 + 2*x)**2)
+		else:
+			return(x**2 + (x**2 - 2*x + 2)**2)
+	def dg(x):
+		if x <= 1:
+			return(2*x + 2*(-x**2 + 2*x)*(-2*x + 2))
+		else:
+			return(2*x + 2*(x**2 - 2*x + 2)*(2*x - 2))
+	return(dr_dt(t)*2*np.sqrt(g(x))/dg(x))
+
+testx=[0.0000001]
+
+for i in range(len(t)-1):
+	testx.append(fourth_order_runge_kutta(test_ode_5,t[i],testx[i],dt))
+testy = np.array(list(map(lambda x:np.piecewise(x,[x<1,x>=1],[lambda x: -x**2 + 2*x, lambda x: x**2 - 2*x + 2]),testx)))
+testr = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx,testy)))
+
+fig6, (ax10, ax11) = plt.subplots(nrows=2, figsize=(7, 9.6))
+ax10.plot(t,np.gradient(testr)/dt,'r',lw=5)
+ax10.plot(t,np.array(list(map(lambda t: 2*np.sqrt(2)*(30*t**2-60*t**3+30*t**4),t))))
+ax10.set_title('RK4 Test with piecewise function\n$f(x) = -x^{2} + 2$ or $x^{2}-2x+2$;  $(x_{b} = 1)$')
+
+ax11.plot(testx,testy,'r',lw=5)
+ax11.plot(np.linspace(0,2,1001),np.array(list(map(lambda x:np.piecewise(x,[x<1,x>=1],[lambda x: -x**2 + 2*x, lambda x: x**2 - 2*x + 2]),np.linspace(0,2,1001)))))
+ax11.set_title("RK4 Test with piecewise function\nRecovered xy-plot")
 
 plt.show()
 
