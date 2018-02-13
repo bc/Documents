@@ -218,13 +218,14 @@ class Spline:
 	fall between y_min and y_max. This makes use of self.find_max_and_min()
 
 	"""
-	def __init__(self,a,b,c,d,x_initial,x_break):
+	def __init__(self,a,b,c,d,x_initial,x_break,x_final):
 		self.a = a
 		self.b = b
 		self.c = c
 		self.d = d
 		self.x_initial = x_initial
 		self.x_break = x_break
+		self.xlim = [x_initial,x_final]
 		#self.all_values = {'A': a, 'B' : b, 'C' : c, 'D' : d, 'init' : x_initial, 'break' : x_break}
 	def pp_func(self,X):
 		result = np.piecewise(X,[X <= self.x_break, X > self.x_break], \
@@ -331,7 +332,7 @@ def clamped_cubic_spline(x_initial,x_final,y_initial,y_final,initial_slope,final
 		assert test_b_coefficients(x_initial,x_rand,x_final,y_initial,y_rand,y_final,C,D,initial_slope), "Initial slope does not match the expected value"
 		assert test_endpoint_slope(B[1],C[1],D[1],x_rand,x_final,final_slope),"Problem with Endpoint Slope"
 		assert test_for_discontinuity(A[0],B[0],C[0],D[0],x_initial,x_rand,A[1]), "Jump Discontinuity at t = %f!" %x_rand
-		spline_structure = Spline(A,B,C,D,x_initial,x_rand)
+		spline_structure = Spline(A,B,C,D,x_initial,x_rand,x_final)
 		if options.get("angle") == "Shoulder":
 			options_slope_condition = spline_structure.is_initial_slope_positive(X,2501)
 			dof = "Shoulder: " + " "*(10-len("Shoulder: "))
@@ -383,8 +384,8 @@ import matplotlib.pyplot as plt
 import time
 import scipy as sp
 
-x_initial_desired = 0 # cm
-x_final_desired = 30 # cm
+x_initial_desired = 10 # cm
+x_final_desired = 40 # cm
 y_initial_desired = 0 # cm
 y_final_desired = 0 # cm
 fix_starting_point = True
@@ -436,7 +437,7 @@ while i < NumberOfTrials:
 	assert test_b_coefficients(x_initial,x_rand,x_final,y_initial,y_rand,y_final,C,D,initialerror), "Initial slope does not match the expected value"
 	assert test_endpoint_slope(B[1],C[1],D[1],x_rand,x_final,finalerror),"Problem with Endpoint Slope"
 	assert test_for_discontinuity(A[0],B[0],C[0],D[0],x_initial,x_rand,A[1]), "Jump Discontinuity at t = %f!" %x_rand
-	spline_structure = Spline(A,B,C,D,x_initial,x_rand)
+	spline_structure = Spline(A,B,C,D,x_initial,x_rand,x_final)
 	statusbar(i,NumberOfTrials,Title="Reaching Task",StartTime=StartTime)
 	if i == 0:
 		if spline_structure.is_within_bounds(x_initial,x_final, ymin, ymax):
@@ -504,7 +505,7 @@ if fix_ending_point == False:
 	plt.plot(x_circ_2,y_circ_2_top,'k--',LineWidth=2)
 	plt.plot(x_circ_2,y_circ_2_bottom,'k--',LineWidth=2)
 
-plt.figure()
+# plt.figure()
 
 # def dx_dt(x,t):
 # 	r_initial = np.sqrt(x_initial**2+y_initial**2)
@@ -573,32 +574,123 @@ for i in range(len(t)-1):
 
 # t = np.linspace(0,1,10000)
 # xs = sp.integrate.odeint(dx_dt,x_initial,t).flatten()
+plt.figure()
 ys = np.array(list(map(lambda x: spline_structure.pp_func(x),xs)))
 plt.plot(xs,ys,'r',lw = 5)
-plt.plot(np.linspace(x_initial,x_final,1000),spline_structure.pp_func(np.linspace(x_initial,x_final,1000)),'g')
+plt.plot(np.linspace(x_initial,x_final,1001),spline_structure.pp_func(np.linspace(x_initial,x_final,1001)),'g')
+
 
 plt.figure()
-r = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),xs,ys)))
-plt.figure()
-plt.plot(t,np.gradient(r)/dt,'r',lw=5)
+
+r_calculated = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),xs,ys)))
+dr_calculated = np.gradient(r_calculated)/dt
+
 r_initial = np.sqrt(x_initial**2+y_initial**2)
 r_final = np.sqrt(x_final**2+y_final**2)
-plt.plot(t,np.array(list(map(lambda t: (r_final-r_initial)*(30*t**2-60*t**3+30*t**4),t))))
+r_desired = np.array(list(map(lambda t: r_initial + (r_final-r_initial)*(10*t**3 - 15*t**4 + 6*t**5),t)))
+dr_desired = np.array(list(map(lambda t: (r_final-r_initial)*(30*t**2 - 60*t**3 + 30*t**4),t)))
+
+plt.plot(t,dr_calculated,'r',lw=5)
+plt.plot(t,dr_desired)
+r_break = np.sqrt(x_rand**2+y_rand**2)
+t_break = t[sum(r_break>r_desired)]
+plt.plot([t_break,t_break],[0,15*(r_final-r_initial)/8],'k--')
 
 
 # To show that the RK4 algorithm works...
 
-# test_ode = lambda t,x: (2*(30*t**2-60*t**3+30*t**4))\
-#                     	*np.sqrt(x**2-4*x+5)/(2*x**2-6*x+5);
-# testx=[0]
-# for i in range(len(t)-1):
-# 	testx.append(fourth_order_runge_kutta(test_ode,t[i],testx[i],dt))
-# testy = np.array(list(map(lambda x:-x**2+2*x,testx)))
-# testr = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx,testy)))
-# plt.figure()
-# plt.plot(t,np.gradient(testr)/dt,'r',lw=5)
-# plt.plot(t,np.array(list(map(lambda t: 2*(30*t**2-60*t**3+30*t**4),t))))
+test_ode = lambda t,x: (2*(30*t**2-60*t**3+30*t**4))\
+                    	*np.sqrt(x**2-4*x+5)/(2*x**2-6*x+5);
+testx=[0]
+for i in range(len(t)-1):
+	testx.append(fourth_order_runge_kutta(test_ode,t[i],testx[i],dt))
+testy = np.array(list(map(lambda x:-x**2+2*x,testx)))
+testr = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx,testy)))
+plt.figure()
+plt.plot(t,np.gradient(testr)/dt,'r',lw=5)
+plt.plot(t,np.array(list(map(lambda t: 2*(30*t**2-60*t**3+30*t**4),t))))
 
+# def test_ode_2(t,x):
+# 	def dr_dt(t):
+# 		return((r_final-r_initial)*(30*t**2-60*t**3+30*t**4))
+# 	def f(x):
+# 		if x<=spline_structure.x_break:
+# 			a,b,c,d = spline_structure.a[0],spline_structure.b[0,0,0],spline_structure.c[0,0],spline_structure.d[0,0,0]
+# 			return(a + b*x + c*x**2 + d*x**3)
+# 		else:
+# 			a,b,c,d = spline_structure.a[1],spline_structure.b[1,0,0],spline_structure.c[1,0],spline_structure.d[1,0,0]
+# 			return(a + b*(x-spline_structure.x_break) + c*(x-spline_structure.x_break)**2 + d*(x-spline_structure.x_break)**3)
+# 	def df(x):
+# 		if x<=spline_structure.x_break:
+# 			a,b,c,d = spline_structure.a[0],spline_structure.b[0,0,0],spline_structure.c[0,0],spline_structure.d[0,0,0]
+# 			return(b+ 2*c*x + 3*d*x**2)
+# 		else:
+# 			a,b,c,d = spline_structure.a[1],spline_structure.b[1,0,0],spline_structure.c[1,0],spline_structure.d[1,0,0]
+# 			return(b+ 2*c*(x-spline_structure.x_break) + 3*d*(x-spline_structure.x_break)**2)
+# 	return(dr_dt(t)*np.sqrt(x**2 + f(x)**2)/(x+df(x)))
+
+def test_ode_2(t,x):
+	def dr_dt(t):
+		return((r_final-r_initial)*(30*t**2-60*t**3+30*t**4))
+	def f(x):
+		a,b,c,d = spline_structure.a[0],spline_structure.b[0,0,0],spline_structure.c[0,0],spline_structure.d[0,0,0]
+		return(a + b*x + c*x**2 + d*x**3)
+	def df(x):
+		a,b,c,d = spline_structure.a[0],spline_structure.b[0,0,0],spline_structure.c[0,0],spline_structure.d[0,0,0]
+		return(b+ 2*c*x + 3*d*x**2)
+	return(dr_dt(t)*np.sqrt(x**2 + f(x)**2)/(x+df(x)))
+
+testx=[x_initial]
+for i in range(len(t)-1):
+	testx.append(fourth_order_runge_kutta(test_ode_2,t[i],testx[i],dt))
+testy = spline_structure.pp_func(np.array(testx))
+testr = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx,testy)))
+plt.figure()
+plt.plot(t,np.gradient(testr)/dt,'r',lw=5)
+plt.plot(t,np.array(list(map(lambda t: (r_final-r_initial)*(30*t**2-60*t**3+30*t**4),t))))
+plt.plot([t_break,t_break],[0,15*(r_final-r_initial)/8],'k--')
+
+def test_ode_3(t,x):
+	def dr_dt(t):
+		return((2*np.sqrt(2))*(30*t**2-60*t**3+30*t**4))
+	def g(x):
+		return(x**2 + ((x-1)**3+1)**2)
+	def dg(x):
+		return(2*x + 2*((x-1)**3+1)*(3*(x-1)**2))
+	return(dr_dt(t)*2*np.sqrt(g(x))/dg(x))
+
+testx=[0.0000001]
+
+for i in range(len(t)-1):
+	testx.append(fourth_order_runge_kutta(test_ode_3,t[i],testx[i],dt))
+testy = np.array(list(map(lambda x:(x-1)**3+1,testx)))
+testr = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx,testy)))
+plt.figure()
+plt.plot(t,np.gradient(testr)/dt,'r',lw=5)
+plt.plot(t,np.array(list(map(lambda t: 2*np.sqrt(2)*(30*t**2-60*t**3+30*t**4),t))))
+
+plt.figure()
+plt.plot(testx,testy)
+
+def test_ode_4(t,x):
+	a,b,c,d = spline_structure.a[0],spline_structure.b[0,0,0],spline_structure.c[0,0],spline_structure.d[0,0,0]
+	def dr_dt(t):
+		return((r_final-r_initial)*(30*t**2-60*t**3+30*t**4))
+	return(dr_dt(t)*2*np.sqrt(x**2 + spline_structure.pp_func(x))/(2*x + spline_structure.pp_deriv(x)))
+
+testx=[x_initial]
+
+for i in range(len(t)-1):
+	testx.append(fourth_order_runge_kutta(test_ode_4,t[i],testx[i],dt))
+testy = np.array(list(map(lambda x:(x-1)**3+1,testx)))
+testr = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx,testy)))
+plt.figure()
+plt.plot(t,np.gradient(testr)/dt,'r',lw=5)
+plt.plot(t,np.array(list(map(lambda t: (r_final-r_initial)*(30*t**2-60*t**3+30*t**4),t))))
+plt.plot([t_break,t_break],[0,15*(r_final-r_initial)/8],'k--')
+
+# plt.figure()
+# plt.plot(testx,testy)
 
 plt.show()
 
@@ -629,7 +721,7 @@ plt.show()
 # 	assert test_endpoint_slope(B[1],C[1],D[1],x_rand,x_final,finalerror),"Problem with Endpoint Slope"
 # 	assert test_for_discontinuity(A[0],B[0],C[0],D[0],x_initial,x_rand,A[1]), "Jump Discontinuity at t = %f!" %x_rand
 #
-# 	spline_structure = Spline(A,B,C,D,x_initial,x_rand)
+# 	spline_structure = Spline(A,B,C,D,x_initial,x_rand,x_final)
 #
 # 	if i == 0:
 # 		Splines = spline_structure
