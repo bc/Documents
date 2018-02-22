@@ -68,8 +68,8 @@ def set_link_lengths(New_L1=None,New_L2=None,EOM = "Zadravec"):
 			L1 = 0.256
 			L2 = 0.315
 		elif EOM == "Zadravec":
-		    L1 = 0.298
-		    L2 = 0.419
+			L1 = 0.298
+			L2 = 0.419
 		else:
 			L1 = Height*0.186
 			L2 = Height*(0.146+0.108)
@@ -112,98 +112,6 @@ def inverse_kinematics(X):
 	global A1,A2
 	A2 = np.array(list(map(a2,x.T,y.T)), dtype='float64', ndmin=2) # Returns a (1,N) array
 	A1 = np.array(list(map(a1,x.T,y.T,A2.T)), dtype='float64', ndmin=2) # Returns a (1,N) array
-def set_initial_and_final_positions(ReachType):
-	"""
-	This takes in a string -- either 'Center','Right','Left', or 'Sideways' -- and returns the necessary initial and final positions for the movement, based on Flash/Hogan (1985).
-
-	Parameters:
-	# 0.80*(L1+L2) = 0.4586
-	# 0.35/(L1+L2) = 0.5295
-	# Sternum at -0.177 = -L1*(0.129/0.186) <-- Anthropomorphic Ratio
-	"""
-	global L1,L2
-	MedianPlane = L1*(0.129/0.186)
-
-	assert ReachType.capitalize() in ['Center','Right','Left','Sideways'], \
-		"ReachType must be either 'Center','Right','Left', or 'Sideways'."
-
-	# PathLength = 0.4*(L1+L2)
-	PathLength = 0.35
-
-	# Side to Side, Path Length = 0.5295⋅(L1+L2) = 0.35
-	if ReachType.capitalize() == 'Sideways':
-		Xi = [-MedianPlane-PathLength/2,0.1+PathLength/2]
-		Xf = [-MedianPlane+PathLength/2,0.1+PathLength/2]
-
-	# Center Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
-	elif ReachType.capitalize() == 'Center':
-		Xi = [-MedianPlane,0.20]
-		Xf = [-MedianPlane,0.20 + PathLength]
-
-	# # Left Diagonal Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
-	elif ReachType.capitalize() == 'Left':
-		Xi = [-MedianPlane,0.20]
-		Xf = [-MedianPlane-PathLength/(2**0.5),0.20 + PathLength/(2**0.5)]
-
-	# # Right Diagonal Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
-	elif ReachType.capitalize() == 'Right':
-		Xi = [-MedianPlane,0.20]
-		Xf = [-MedianPlane+PathLength/(2**0.5),0.20 + PathLength/(2**0.5)]
-
-	return(Xi,Xf)
-def generate_default_path(PathLength = 0.35,RandomXi=False,RandomXf=False):
-
-	x_initial_desired = 0.05 # m DISPLACEMENT TO BE TRANSLATED BACK LATER
-	x_final_desired = PathLength # m
-	y_initial_desired = 0 # m
-	y_final_desired = 0 # m
-	boundary_sigma = 0.0025
-	allowable_error_rad = 30*(np.pi/180) #degrees
-	allowable_error_y = 0.05 # m
-
-	if RandomXi == False:
-		x_initial = x_initial_desired + np.random.normal(0,boundary_sigma) # cm
-		y_initial = y_initial_desired + np.random.normal(0,boundary_sigma) # cm
-	else:
-		x_initial = x_initial_desired # cm
-		y_initial = y_initial_desired # cm
-
-	if RandomXf == False:
-		x_final = x_final_desired + np.random.normal(0,boundary_sigma) # cm
-		y_final = y_final_desired + np.random.normal(0,boundary_sigma) # cm
-	else:
-		x_final = x_final_desired # cm
-		y_final = y_final_desired # cm
-
-	initialerror = np.random.uniform(-np.tan(allowable_error_rad),np.tan(allowable_error_rad))
-	finalerror = -np.sign(initialerror)*\
-			abs(np.random.uniform(-np.tan(allowable_error_rad),np.tan(allowable_error_rad)))
-
-	if initialerror>0:
-		ymax = max([y_initial,y_final])+allowable_error_y
-		ymin = 0
-	else:
-		ymax = 0
-		ymin = min([y_initial,y_final])-allowable_error_y
-
-	xmax = x_final
-	xmin = x_initial
-	x_rand = np.random.normal((x_initial+x_final)/2,abs(x_initial+x_final)/4)
-	y_rand = np.random.normal((ymax+ymin)/2,abs(ymax+ymin)/4)
-
-	A,B,C,D = spline_coefficients(x_initial,x_rand,x_final,y_initial,y_rand,y_final,initialerror,finalerror)
-	assert test_b_coefficients(x_initial,x_rand,x_final,y_initial,y_rand,y_final,C,D,initialerror), "Initial slope does not match the expected value"
-	assert test_endpoint_slope(B[1],C[1],D[1],x_rand,x_final,finalerror),"Problem with Endpoint Slope"
-	assert test_for_discontinuity(A[0],B[0],C[0],D[0],x_initial,x_rand,A[1]), "Jump Discontinuity at t = %f!" %x_rand
-	path = Spline(A,B,C,D,x_initial,x_rand,x_final)
-	return(path)
-def return_X_values(ReachType,t_end,RandomXi=False,RandomXf=False,PathLength=0.35):
-	default_path = generate_default_path(PathLength=PathLength,RandomXi=RandomXi,RandomXf=RandomXf)
-	
-	X = find_X_values(t,Xi,Xf)
-	Ẋ = find_Ẋ_values(t,Xi,Xf,t_end=t_end)
-	Ẍ = find_Ẍ_values(t,Xi,Xf,t_end=t_end)
-	return(X,Ẋ,Ẍ)
 def c_matrix(x1,x2,x3):
 	"""
 	Takes in the values of x1, x2, and x3 to create the C matrix needed to find the coefficients of a clamped
@@ -478,28 +386,53 @@ class Spline:
 		func_2 = Lambda(x,self.a[1] + self.b[1,0,0]*(x-self.x_break) + self.c[1,0]*(x-self.x_break)**2 + self.d[1,0,0]*(x-self.x_break)**3)
 		print('Function 2:\n')
 		pprint(func_2)
-	def return_parameterized_X(self):
-		dt = 1/10000
+	# def test_new_ode(self):
+	# 	dt = 1/1000
+	# 	t = np.linspace(0,1,int(1/dt) + 1)
+	# 	def ode_func(x,t):
+	# 		return(self.dr_dt(t)/np.sqrt(1 + self.pp_deriv(x)**2))
+	# 	X = sp.integrate.odeint(ode_func,self.xlim[0],t).flatten()
+	# 	Y = np.array(list(map(lambda x: spline_structure.pp_func(x),X)))
+	# 	R = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),X,Y)))
+	# 	dR = np.array(list(map(lambda dx,dy: np.sqrt(dx**2+dy**2),\
+	# 							np.gradient(X)/dt,np.gradient(Y)/dt)))
+	# 	assert sum(abs(self.dr_dt(t)-dR))/len(R)<1e-4, "Error in parameterizing path to dr/dt. Check ODE func."
+	# 	return(X,Y)
+	def test_new_ode(self):
+		dt = 1/1000
 		t = np.linspace(0,1,int(1/dt) + 1)
 		def ode_func(x,t):
-			return(self.dr_dt(t)*np.sqrt(x**2 + self.pp_func(x)**2)\
-					/(x+self.pp_deriv(x)*self.pp_func(x)))
-		X = sp.integrate.odeint(ode_func,x_initial,t).flatten()
+			return(self.dS_dt(t)/np.sqrt(1 + self.pp_deriv(x)**2))
+		X = sp.integrate.odeint(ode_func,self.xlim[0],t).flatten()
 		Y = np.array(list(map(lambda x: spline_structure.pp_func(x),X)))
 		R = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),X,Y)))
-		assert sum(abs(self.dr_dt(t)-np.gradient(R)/dt))/len(R)<1e-4, "Error in parameterizing path to dr/dt. Check ODE func."
+		dS = np.array(list(map(lambda dx,dy: np.sqrt(dx**2+dy**2),\
+								np.gradient(X)/dt,np.gradient(Y)/dt)))
+		assert sum(abs(self.dS_dt(t)-dS))/len(dS)<1e-4, "Error in parameterizing path to dr/dt. Check ODE func."
+		return(X,Y)
+	def return_parameterized_X(self):
+		dt = 1/1000
+		t = np.linspace(0,1,int(1/dt) + 1)
+		def ode_func(x,t):
+			return(self.dr_dt(t)*np.sqrt(x**2+self.pp_func(x)**2)\
+					/(x+self.pp_deriv(x)*self.pp_func(x)))
+		X = sp.integrate.odeint(ode_func,self.xlim[0],t).flatten()
+		Y = np.array(list(map(lambda x: spline_structure.pp_func(x),X)))
+		R = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),X,Y)))
+		assert sum(abs(self.dr_dt(t)-np.gradient(R)/dt))/len(R)<1e-2, "Error in parameterizing path to dr/dt. Check ODE func."
 		return(X,Y)
 	def return_parameterized_dX(self,x):
-		dt = 1/10000
+		dt = 1/1000
 		t = np.linspace(0,1,int(1/dt) + 1)
 		dr_dt = self.dr_dt(t)
 		f = self.pp_func(x)
 		df_dx = self.pp_deriv(x)
-		dx_dt = np.array(list(map(lambda dr_dt,f,df_dx,x: dr_dt*np.sqrt(x**2 + f**2)/(x + f*df_dx),dr_dt,f,df_dx,x)))
+		dx_dt = np.array(list(map(lambda dr_dt,f,df_dx,x: dr_dt*np.sqrt(x**2 + f**2)\
+									/(x + f*df_dx),dr_dt,f,df_dx,x)))
 		dy_dt = df_dx*dx_dt
 		return(dx_dt,dy_dt)
 	def return_parameterized_d2X(self,x,dx_dt):
-		dt = 1/10000
+		dt = 1/1000
 		t = np.linspace(0,1,int(1/dt) + 1)
 
 		dr_dt = self.dr_dt(t)
@@ -537,6 +470,14 @@ class Spline:
 		r_initial = np.sqrt(self.xlim[0]**2 + self.pp_func(self.xlim[0])**2)
 		r_final = np.sqrt(self.xlim[1]**2 + self.pp_func(self.xlim[1])**2)
 		return((r_final-r_initial)*(60*t - 180*t**2 + 120*t**3))
+	def find_path_length(self):
+		import scipy.integrate as integrate
+		return(integrate.quad(lambda x: \
+				np.sqrt(1 + self.pp_deriv(x)**2),self.xlim[0],self.xlim[1])[0])
+	def dS_dt(self,t):
+		S_initial = 0
+		S_final = self.find_path_length()
+		return((S_final-S_initial)*(30*t**2 - 60*t**3 + 30*t**4))
 def clamped_cubic_spline(x_initial,x_final,y_initial,y_final,initial_slope,final_slope,ymin,ymax,X,**options):
 	"""
 	This will take in the initial and final values for both x and y, as well as the desired initial and final
@@ -544,7 +485,7 @@ def clamped_cubic_spline(x_initial,x_final,y_initial,y_final,initial_slope,final
 	Returns a list of arrays, each of len(X). Options allows for slope limitations on shoulder rotations such
 	that the derivative of the spline is always positive to match observations (slope = "Shoulder").
 	"""
-	NumberOfTrials =  10000
+	NumberOfTrials =  1000
 	i = 0
 	StartTime = time.time()
 	while i < NumberOfTrials:
@@ -583,6 +524,277 @@ def clamped_cubic_spline(x_initial,x_final,y_initial,y_final,initial_slope,final
 				print(dof + statusbar + '{0:1.1f}'.format(i/NumberOfTrials*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) + 'sec        \r', end='')
 	print('\n')
 	return(Splines)
+def generate_default_path(PathLength = 0.35,RandomXi=False,RandomXf=False):
+	ValidPath = False
+	while ValidPath==False:
+		x_initial_desired = 0.05 # m DISPLACEMENT TO BE TRANSLATED BACK LATER
+		x_final_desired = PathLength + 0.05 # m
+		y_initial_desired = 0 # m
+		y_final_desired = 0 # m
+		boundary_sigma = 0.0025
+		allowable_error_rad = 30*(np.pi/180) #degrees
+		allowable_error_y = 0.05 # m
+
+		if RandomXi == False:
+			x_initial = x_initial_desired + np.random.normal(0,boundary_sigma) # cm
+			y_initial = y_initial_desired + np.random.normal(0,boundary_sigma) # cm
+		else:
+			x_initial = x_initial_desired # cm
+			y_initial = y_initial_desired # cm
+
+		if RandomXf == False:
+			x_final = x_final_desired + np.random.normal(0,boundary_sigma) # cm
+			y_final = y_final_desired + np.random.normal(0,boundary_sigma) # cm
+		else:
+			x_final = x_final_desired # cm
+			y_final = y_final_desired # cm
+
+		initialerror = np.random.uniform(-np.tan(allowable_error_rad),np.tan(allowable_error_rad))
+		finalerror = -np.sign(initialerror)*\
+				abs(np.random.uniform(-np.tan(allowable_error_rad),np.tan(allowable_error_rad)))
+
+		if initialerror>0:
+			ymax = max([y_initial,y_final])+allowable_error_y
+			ymin = 0
+		else:
+			ymax = 0
+			ymin = min([y_initial,y_final])-allowable_error_y
+
+		xmax = x_final
+		xmin = x_initial
+		x_rand = np.random.normal((x_initial+x_final)/2,abs(x_initial+x_final)/4)
+		y_rand = np.random.normal((ymax+ymin)/2,abs(ymax+ymin)/4)
+
+		A,B,C,D = spline_coefficients(x_initial,x_rand,x_final,y_initial,y_rand,y_final,initialerror,finalerror)
+		assert test_b_coefficients(x_initial,x_rand,x_final,y_initial,y_rand,y_final,C,D,initialerror), "Initial slope does not match the expected value"
+		assert test_endpoint_slope(B[1],C[1],D[1],x_rand,x_final,finalerror),"Problem with Endpoint Slope"
+		assert test_for_discontinuity(A[0],B[0],C[0],D[0],x_initial,x_rand,A[1]), "Jump Discontinuity at t = %f!" %x_rand
+		path = Spline(A,B,C,D,x_initial,x_rand,x_final)
+		if path.is_within_bounds(x_initial,x_final, ymin, ymax):
+			ValidPath = True
+		else:
+			ValidPath = False
+	return(path)
+def rotate_xy(x,y,angle):
+	XY = np.concatenate([x[np.newaxis,:],y[np.newaxis,:]],axis=0)
+	rotation_matrix = np.matrix([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
+	rotated_XY = rotation_matrix*XY
+	rotated_x = np.array(rotated_XY[0,:])[0]
+	rotated_y = np.array(rotated_XY[1,:])[0]
+	return(rotated_x,rotated_y)
+def translate_xy(x,y,px=0,py=0):
+	translated_x = x + px
+	translated_y = y + py
+	return(translated_x,translated_y)
+def return_trajectory(x,y,ReachType,IsPositionFunction):
+	"""
+	This takes in a string -- either 'Center','Right','Left', or 'Sideways' -- and returns the necessary initial and final positions for the movement, based on Flash/Hogan (1985).
+
+	Parameters:
+	# 0.80*(L1+L2) = 0.4586
+	# 0.35/(L1+L2) = 0.5295
+	# Sternum at -0.177 = -L1*(0.129/0.186) <-- Anthropomorphic Ratio
+	"""
+	global L1,L2
+	MedianPlane = -L1*(0.129/0.186) # Sternum at -L1*(0.129/0.186) <-- Anthropomorphic Ratio
+	DefaultDisplacement_x = 0.05
+	assert ReachType.capitalize() in ['Center','Right','Left','Sideways'], \
+		"ReachType must be either 'Center','Right','Left', or 'Sideways'."
+	assert type(IsPositionFunction)==bool, "IsPositionFunction is either True or False."
+
+	if IsPositionFunction==True:
+		# Side to Side, Path Length = 0.5295⋅(L1+L2) = 0.35
+		if ReachType.capitalize() == 'Sideways':
+			x_Trajectory,y_Trajectory = translate_xy(x,y,px=-DefaultDisplacement_x)
+			# x_Trajectory, y_Trajectory = rotate_xy(x_Trajectory,y_Trajectory,0)
+			x_Trajectory, y_Trajectory = translate_xy(x_Trajectory,y_Trajectory,\
+												px = -MedianPlane-PathLength/2,\
+													py=0.10+PathLength/2)
+			# Xi = [-MedianPlane-PathLength/2,0.1+PathLength/2]
+			# Xf = [-MedianPlane+PathLength/2,0.1+PathLength/2]
+
+		# Center Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
+		elif ReachType.capitalize() == 'Center':
+			x_Trajectory,y_Trajectory = translate_xy(x,y,px=-DefaultDisplacement_x)
+			x_Trajectory, y_Trajectory = rotate_xy(x_Trajectory,y_Trajectory,np.pi/2)
+			x_Trajectory, y_Trajectory = translate_xy(x_Trajectory,y_Trajectory,\
+												px = -MedianPlane,\
+													py=0.20)
+			# Xi = [-MedianPlane,0.20]
+			# Xf = [-MedianPlane,0.20 + PathLength]
+
+		# # Left Diagonal Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
+		elif ReachType.capitalize() == 'Left':
+			x_Trajectory,y_Trajectory = translate_xy(x,y,px=-DefaultDisplacement_x)
+			x_Trajectory, y_Trajectory = rotate_xy(x_Trajectory,y_Trajectory,3*np.pi/4)
+			x_Trajectory, y_Trajectory = translate_xy(x_Trajectory,y_Trajectory,\
+												px = -MedianPlane,\
+													py=0.20)
+			# Xi = [-MedianPlane,0.20]
+			# Xf = [-MedianPlane-PathLength/(2**0.5),0.20 + PathLength/(2**0.5)]
+
+		# # Right Diagonal Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
+		elif ReachType.capitalize() == 'Right':
+			x_Trajectory,y_Trajectory = translate_xy(x,y,px=-DefaultDisplacement_x)
+			x_Trajectory, y_Trajectory = rotate_xy(x_Trajectory,y_Trajectory,np.pi/4)
+			x_Trajectory, y_Trajectory = translate_xy(x_Trajectory,y_Trajectory,\
+												px = -MedianPlane,\
+													py=0.20)
+			# Xi = [-MedianPlane,0.20]
+			# Xf = [-MedianPlane+PathLength/(2**0.5),0.20 + PathLength/(2**0.5)]
+	else:
+		# Side to Side, Path Length = 0.5295⋅(L1+L2) = 0.35
+		if ReachType.capitalize() == 'Sideways':
+			x_Trajectory,y_Trajectory = x,y
+
+		# Center Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
+		elif ReachType.capitalize() == 'Center':
+			x_Trajectory, y_Trajectory = rotate_xy(x,y,np.pi/2)
+
+		# # Left Diagonal Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
+		elif ReachType.capitalize() == 'Left':
+			x_Trajectory, y_Trajectory = rotate_xy(x,y,3*np.pi/4)
+
+		# # Right Diagonal Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
+		elif ReachType.capitalize() == 'Right':
+			x_Trajectory, y_Trajectory = rotate_xy(x,y,np.pi/4)
+	return(x_Trajectory,y_Trajectory)
+def return_X_values(DefaultPath,ReachType,RandomXi=False,RandomXf=False,PathLength=0.35):
+	# import ipdb; ipdb.set_trace()
+	Default_x,Default_y = DefaultPath.return_parameterized_X()
+	Default_ẋ,Default_ẏ = DefaultPath.return_parameterized_dX(Default_x)
+	Default_ẍ,Default_ÿ = DefaultPath.return_parameterized_d2X(Default_x,Default_ẋ)
+
+	x,y = return_trajectory(Default_x,Default_y,ReachType,IsPositionFunction=True)
+	ẋ,ẏ = return_trajectory(Default_ẋ,Default_ẏ,ReachType,IsPositionFunction=False)
+	ẍ,ÿ = return_trajectory(Default_ẍ,Default_ÿ,ReachType,IsPositionFunction=False)
+
+	X = np.concatenate([x[np.newaxis,:],y[np.newaxis,:]],axis=0)
+	Ẋ = np.concatenate([ẋ[np.newaxis,:],ẏ[np.newaxis,:]],axis=0)
+	Ẍ = np.concatenate([ẍ[np.newaxis,:],ÿ[np.newaxis,:]],axis=0)
+	return(X,Ẋ,Ẍ)
+def jacobian(a1,a2):
+	import numpy as np
+	from math import cos, sin
+	J = np.matrix([[-L1*sin(a1)-L2*sin(a1+a2),-L2*sin(a1+a2)],\
+								[L1*cos(a1)+L2*cos(a1+a2),L2*cos(a1+a2)]], dtype = 'float64')
+	return(J)
+def inverse_jacobian(a1,a2):
+	import numpy as np
+	from math import cos, sin
+	det_J = L1*L2*cos(a1 + a2)*sin(a1) - L1*L2*sin(a1 + a2)*cos(a1)
+	J_inv = (1/det_J)*np.matrix([[- L2*cos(a1 + a2), 						- L2*sin(a1 + a2)],\
+								[L1*cos(a1)+L2*cos(a1 + a2),	L2*sin(a1 + a2) + L1*sin(a1)]], \
+								dtype = 'float64')
+	return(J_inv)
+def update_angular_velocity(Ẋ):
+	import numpy as np
+	global A1,A2 # both are (1,N) arrays
+	"""
+	Note: numpy.float64 does not support inverse matrix operators. Luckily, this is an always invertible 2x2 matrix (J is nonsingular within the ROM because a₂ ∊ (0,π/2)), so the inverse Jacobian function has been mapped instead.
+	"""
+	# J = list(map(jacobian,A1.T,A2.T)) # Returns a list of shape (N,2,2)
+	J_inv = list(map(inverse_jacobian,A1.T,A2.T)) # Returns a list of shape (N,2,2)
+	"""
+	In order to map properly, X (shape (2,N)) must be be first split into N (2,1) arrays (length-1). Therefore, the third argument to map() does not need to be transposed. Similar logic follows for why J_inv is not transposed, as it is has N (2,2) matrix arrays. Changing the output to an array aids in creating arrays Ȧ1 and Ȧ2.
+	"""
+	Ȧ = list(map(lambda j_inv,ẋ: np.array(j_inv*ẋ), \
+						J_inv, np.split(Ẋ,np.shape(Ẋ)[1],axis=1)))
+	global Ȧ1,Ȧ2
+	Ȧ1,Ȧ2 = np.split(np.concatenate(Ȧ, axis=1), 2, axis=0) # both are (1,N) arrays
+def update_angular_acceleration(Ẋ,Ẍ):
+	from math import cos,sin
+	import numpy as np
+
+	assert np.shape(Ẋ)[0]==2, "Ẋ must be a (2,len(Ẋ)) list/array"
+	assert np.shape(Ẍ)[0]==2, "Ẍ must be a (2,len(Ẍ)) list/array"
+	ẍ,ÿ = np.split(Ẍ,2,axis=0)
+	global A1,A2,Ȧ1,Ȧ2
+	"""
+		dȦ1/dt = (δȦ1/δA1)*(dA1/dt)
+					+ (δȦ1/δA2)*(dA2/dt)
+						+ (δȦ1/δẊ[0])*(dẊ[0]/dt)
+							+ (δȦ1/δẊ[1])*(dẊ[1]/dt)
+
+		dȦ2/dt = (δȦ2/δA1)*(dA1/dt)
+					+ (δȦ2/δA2)*(dA2/dt)
+						+ (δȦ2/δẊ[0])*(dẊ[0]/dt)
+							+ (δȦ2/δẊ[1])*(dẊ[1]/dt)
+	"""
+	ä1 = lambda a1,a2,ȧ1,ȧ2,ẋ,ẏ,ẍ,ÿ: \
+		((-sin(a1+a2)*ẋ+cos(a1+a2)*ẏ)/(L1*sin(a2)))*ȧ1 \
+		+ (((-sin(a1+a2)*ẋ+cos(a1+a2)*ẏ)*L1*sin(a2) - \
+		(cos(a1+a2)*ẋ+sin(a1+a2)*ẏ)*L1*cos(a2))/((L1**2)*(sin(a2)**2)))*ȧ2 \
+		+ (cos(a1+a2)/(L1*sin(a2)))*ẍ \
+		+ (sin(a1+a2)/(L1*sin(a2)))*ÿ
+	ä2 = lambda a1,a2,ȧ1,ȧ2,ẋ,ẏ,ẍ,ÿ: \
+		(((L1*sin(a1)+L2*sin(a1+a2))*ẋ + (-L1*cos(a1)-L2*cos(a1+a2))*ẏ)/(L1*L2*sin(a2)))*ȧ1 \
+		+ (((L2*sin(a1+a2)*ẋ + (-L2*cos(a1+a2))*ẏ)*(L1*L2*sin(a2)) \
+		- ((-L1*cos(a1)-L2*cos(a1+a2))*ẋ + (-L1*sin(a1)-L2*sin(a1+a2))*ẏ)*(L1*L2*cos(a2)))\
+		/((L1*L2*sin(a2))**2))*ȧ2 \
+		+ ((-L1*cos(a1)-L2*cos(a1+a2))/(L1*L2*sin(a2)))*ẍ + \
+		((-L1*sin(a1)-L2*sin(a1+a2))/(L1*L2*sin(a2)))*ÿ
+
+	global Ä1,Ä2
+	Ä1 = np.array(list(map(ä1,A1.T,A2.T,Ȧ1.T,Ȧ2.T,Ẋ[0].T,Ẋ[1].T,Ẍ[0].T,Ẍ[1].T))\
+					,dtype = 'float64',ndmin=2).T # returns a (1,N) array
+	Ä2 = np.array(list(map(ä2,A1.T,A2.T,Ȧ1.T,Ȧ2.T,Ẋ[0].T,Ẋ[1].T,Ẍ[0].T,Ẍ[1].T))\
+					,dtype = 'float64',ndmin=2).T # returns a (1,N) array
+def update_angle_lists(X,Ẋ,Ẍ):
+	"""
+	Takes in three (2,N) endpoint arrays and returns global lists for angles 1 and 2 of shape (1,N).
+	"""
+	import numpy as np
+	inverse_kinematics(X)
+	update_angular_velocity(Ẋ)
+	update_angular_acceleration(Ẋ,Ẍ)
+def reaching_task(ReachType='Center',RandomXi=False, RandomXf=False, \
+					PathLength=0.35,EOM='Zadravec'):
+	import numpy as np
+	assert ReachType.capitalize() in ['Center','Right','Left','Sideways'], \
+		"ReachType must be either 'Center','Right','Left', or 'Sideways'."
+	set_link_lengths()
+	create_angle_lists()
+	# t = np.array(np.arange(0,1+dt,dt),dtype='float64',ndmin=2)
+	DefaultPath = generate_default_path(PathLength=PathLength,RandomXi=RandomXi,RandomXf=RandomXf)
+	X,Ẋ,Ẍ = return_X_values(DefaultPath,ReachType,RandomXi=RandomXi,\
+								RandomXf=RandomXf,PathLength=PathLength)
+	update_angle_lists(X,Ẋ,Ẍ)
+	# calculate_torques(EOM=EOM)
+	return(X,Ẋ,Ẍ)
+def plot_resulting_kinematics():
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from math import cos,sin
+
+    dt = 1/(len(A1)-1)
+    t = np.arange(0,1+dt,dt)
+    x = np.array([L1*cos(A1[i])+L2*cos(A1[i]+A2[i]) for i in range(len(A1))])
+    y = np.array([L1*sin(A1[i])+L2*sin(A1[i]+A2[i]) for i in range(len(A1))])
+
+    plt.figure()
+    plt.plot(x,y)
+    ax1 = plt.gca()
+    ax1.set_aspect('equal')
+    ax1.set_title("Total Trajectory")
+    ax1.set_xlabel('x (m)')
+    ax1.set_ylabel('y (m)')
+    ax1.set_ylim(ymin=min(y)-abs(0.05*(max(y)-min(y))),ymax=max(y)+abs(0.05*(max(y)-min(y))))
+    ax1.set_xlim(xmin=min(x)-abs(0.05*(max(x)-min(x))),xmax=max(x)+abs(0.05*(max(x)-min(x))))
+
+    plt.figure()
+    plt.plot(t,x)
+    ax2 = plt.gca()
+    ax2.set_title("Trajectory x-Component")
+    ax2.set_xlabel('Normalized Time')
+    ax2.set_ylabel('x (m)')
+
+    plt.figure()
+    plt.plot(t,y)
+    ax3 = plt.gca()
+    ax3.set_title("Trajectory y-Component")
+    ax3.set_xlabel('Normalized Time')
+    ax3.set_ylabel('y (m)')
 def run_N_loops(NumberOfLoops):
 	for LoopNumber in range(NumberOfLoops):
 		XSplines = clamped_cubic_spline(0,EndTime,XInitial,XFinal,ẊInitial, \
@@ -598,17 +810,6 @@ def run_N_loops(NumberOfLoops):
 		else:
 			print('-'*36 + 'End of Loop ' + str(LoopNumber+1) + '-'*37)
 		pickle.dump([Angle1Splines, Angle2Splines, Angle3Splines], open('LoopNumber' + str(LoopNumber+1) + '.pkl','wb'),pickle.HIGHEST_PROTOCOL)
-def rotate_xy(x,y,angle):
-	XY = np.concatenate([x[np.newaxis,:],y[np.newaxis,:]],axis=0)
-	rotation_matrix = np.matrix([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
-	rotated_XY = rotation_matrix*XY
-	rotated_x = np.array(rotated_XY[0,:])[0]
-	rotated_y = np.array(rotated_XY[1,:])[0]
-	return(rotated_x,rotated_y)
-def translate_xy(x,y,px=0,py=0):
-	translated_x = x + px
-	translated_y = y + py
-	return(translated_x,translated_y)
 
 # run_N_loops(10)
 import numpy as np
@@ -616,16 +817,16 @@ import matplotlib.pyplot as plt
 import time
 import scipy as sp
 
-x_initial_desired = 1 # cm
-x_final_desired = 41 # cm
+x_initial_desired = 0.01 # cm
+x_final_desired = 0.41 # cm
 y_initial_desired = 0 # cm
 y_final_desired = 0 # cm
 fix_starting_point = False
 fix_ending_point = False
-boundary_sigma = 0.25
+boundary_sigma = 0.0025
 allowable_error_rad = 30*(np.pi/180) #degrees
-allowable_error_y = 5 # cm
-NumberOfTrials =  50
+allowable_error_y = 0.05 # cm
+NumberOfTrials =  1
 
 fig1 = plt.figure()
 ax_rand = plt.gca()
@@ -671,12 +872,12 @@ while i < NumberOfTrials:
 	assert test_endpoint_slope(B[1],C[1],D[1],x_rand,x_final,finalerror),"Problem with Endpoint Slope"
 	assert test_for_discontinuity(A[0],B[0],C[0],D[0],x_initial,x_rand,A[1]), "Jump Discontinuity at t = %f!" %x_rand
 	spline_structure = Spline(A,B,C,D,x_initial,x_rand,x_final)
-	statusbar(i,NumberOfTrials,Title="Reaching Task",StartTime=StartTime)
+	# statusbar(i,NumberOfTrials,Title="Reaching Task",StartTime=StartTime)
 	if i == 0:
 		if spline_structure.is_within_bounds(x_initial,x_final, ymin, ymax):
 			Splines = spline_structure
 			i+=1
-			statusbar(i,NumberOfTrials,Title="Reaching Task",StartTime=StartTime)
+			# statusbar(i,NumberOfTrials,Title="Reaching Task",StartTime=StartTime)
 			# t = np.arange(0,1,0.001)
 			# x = x_initial + (x_final-x_initial)*(10*t**3 - 15*t**4 + 6*t**5) # Returns an (1,N) array
 			x = np.linspace(x_initial,x_final,1001)
@@ -688,7 +889,7 @@ while i < NumberOfTrials:
 		if spline_structure.is_within_bounds(x_initial,x_final, ymin, ymax):
 			Splines = np.concatenate(([Splines], [spline_structure]), axis = 0)
 			i+=1
-			statusbar(i,NumberOfTrials,Title="Reaching Task",StartTime=StartTime)
+			# statusbar(i,NumberOfTrials,Title="Reaching Task",StartTime=StartTime)
 			# t = np.arange(0,1,0.001)
 			# x = x_initial + (x_final-x_initial)*(10*t**3 - 15*t**4 + 6*t**5) # Returns an (1,N) array
 			x = np.linspace(x_initial,x_final,1001)
@@ -707,8 +908,8 @@ while i < NumberOfTrials:
 			line, = ax_rand.plot(x,y)
 			c = line.get_color()
 			ax_rand.scatter([x[0],x[-1]],[y[0],y[-1]],color=c,marker='o')
-			if i<NumberOfTrials:
-				statusbar(i,NumberOfTrials,Title="Reaching Task",StartTime=StartTime)
+			# if i<NumberOfTrials:
+			# 	statusbar(i,NumberOfTrials,Title="Reaching Task",StartTime=StartTime)
 
 
 
@@ -741,7 +942,7 @@ if fix_ending_point == False:
 	plt.plot(x_circ_2,y_circ_2_top,'k--',LineWidth=2)
 	plt.plot(x_circ_2,y_circ_2_bottom,'k--',LineWidth=2)
 
-dt = 1/10000
+dt = 1/1000
 t = np.linspace(0,1,int(1/dt) + 1)
 r_initial = np.sqrt(x_initial**2+y_initial**2)
 r_final = np.sqrt(x_final**2+y_final**2)
@@ -766,11 +967,14 @@ r_final = np.sqrt(x_final**2+y_final**2)
 # 			return(b+ 2*c*(x-spline_structure.x_break) + 3*d*(x-spline_structure.x_break)**2)
 # 	return(dr_dt(t)*np.sqrt(x**2 + f(x)**2)/(x+df(x)*f(x)))
 fig1, (ax0, ax1) = plt.subplots(nrows=2, figsize=(7, 9.6))
-testx_1,testy_1 = spline_structure.return_parameterized_X()
+# testx_1,testy_1 = spline_structure.return_parameterized_X()
+testx_1,testy_1 = spline_structure.test_new_ode()
 testr_1 = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx_1,testy_1)))
 r_desired_1 = spline_structure.r(t)
-dr_desired_1 = spline_structure.dr_dt(t)
-if sum(abs(dr_desired_1-np.gradient(testr_1)/dt))/len(testr_1)<1e-4:
+dS_desired_1 = spline_structure.dS_dt(t)
+testdS_1 = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),\
+				np.gradient(testx_1)/dt,np.gradient(testy_1)/dt)))
+if sum(abs(dS_desired_1-testdS_1))/len(testdS_1)<1e-4:
 	color_1 = 'g'
 else:
 	color_1 = 'r'
@@ -779,12 +983,30 @@ ax0.plot(testx_1,testy_1,c=color_1,lw = 7)
 ax0.plot(np.linspace(x_initial,x_final,1001),spline_structure.pp_func(np.linspace(x_initial,x_final,1001)),'k')
 
 ax1.set_title("odeint - spline_structure piecewise function v0\nRecovered xy-plot")
-ax1.plot(t,np.gradient(testr_1)/dt,c=color_1,lw=7)
-ax1.plot(t,dr_desired_1,'k')
+# ax1.plot(t,np.gradient(testr_1)/dt,c=color_1,lw=7)
+ax1.plot(t,testdS_1,'b')
+ax1.plot(t,dS_desired_1,'k')
 r_break = np.sqrt(x_rand**2+y_rand**2)
 t_break = t[sum(r_break>r_desired_1)]
 ax1.plot([t_break,t_break],[0,15*(r_final-r_initial)/8],'k--')
+ax1.set_xlabel("Average Error: " + str(sum(abs(dS_desired_1-testdS_1))/len(testx_1)))
 
+# testx = [x_initial+0.01]
+# for i in range(1,len(t)):
+# 	testx.append(testx[-1]+(spline_structure.dS_dt(t[i])/np.sqrt(1+spline_structure.pp_deriv(testx[-1])**2))*dt)
+# testx = np.array(testx)
+# testy = spline_structure.pp_func(testx)
+# testdS = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),\
+# 						np.gradient(testx)/dt,np.gradient(testy)/dt)))
+#
+# fig2, (ax2, ax3) = plt.subplots(nrows=2, figsize=(7, 9.6))
+# ax2.plot(testdS-dS_desired_1)
+# ax2.set_title("Testing simple forward Euler againsts desired dr_dt")
+# ax2.set_xlabel("Average Error: " + str(sum(abs(dS_desired_1-testdS))/len(testx)))
+#
+# ax3.plot(testdS_1-dS_desired_1)
+# ax3.set_title("Testing odeint againsts desired dr_dt")
+# ax3.set_xlabel("Average Error: " + str(sum(abs(dS_desired_1-testdS_1))/len(testx_1)))
 #
 # def dx_dt(t,x):
 # 	r_initial = np.sqrt(x_initial**2+y_initial**2)
@@ -828,30 +1050,32 @@ ax1.plot([t_break,t_break],[0,15*(r_final-r_initial)/8],'k--')
 # ax3.plot([t_break,t_break],[0,15*(r_final-r_initial)/8],'k--')
 #
 #
-# # To show that the RK4 algorithm works...
-#
-# test_ode_1 = lambda t,x: (2*(30*t**2-60*t**3+30*t**4))\
-#                     	*np.sqrt(x**2-4*x+5)/(2*x**2-6*x+5);
-# testx_3=[0.000001]
-# for i in range(len(t)-1):
-# 	testx_3.append(fourth_order_runge_kutta(test_ode_1,t[i],testx_3[i],dt))
-# testy_3 = np.array(list(map(lambda x:-x**2+2*x,testx_3)))
+# To show that the RK4 algorithm works...
+
+# test_ode_1 = lambda x,t: (2*(30*t**2-60*t**3+30*t**4))/np.sqrt(4*x**2-8*x+5);
+# dt = 1/1000
+# t = np.linspace(0,1,int(1/dt) + 1)
+# testx_3 = sp.integrate.odeint(test_ode_1,0,t).flatten()
+# testy_3 = np.array(list(map(lambda x: -x**2+2*x,testx_3)))
 # testr_3 = np.array(list(map(lambda x,y:np.sqrt(x**2+y**2),testx_3,testy_3)))
-# testr_desired_3 = np.array(list(map(lambda t: (2)*(10*t**3 - 15*t**4 + 6*t**5),t)))
+# testdr_3 = np.array(list(map(lambda dx,dy: np.sqrt(dx**2+dy**2),np.gradient(testx_3)\
+# 												/dt,np.gradient(testy_3)/dt)))
+# # assert sum(abs((2*(30*t**2-60*t**3+30*t**4))-testdr_3))/len(testr_3)<1e-4, "Error in parameterizing path to dr/dt. Check ODE func."
+# r_desired_3 = np.array(list(map(lambda t: (2)*(10*t**3 - 15*t**4 + 6*t**5),t)))
 # dr_desired_3 = np.array(list(map(lambda t: 2*(30*t**2-60*t**3+30*t**4),t)))
-# if sum(abs(dr_desired_3-np.gradient(testr_3)/dt))/len(testr_3)<1e-4:
+# if sum(abs(dr_desired_3-testdr_3))/len(testr_3)<1e-4:
 # 	color_3 = 'g'
 # else:
 # 	color_3 = 'r'
 # fig3, (ax4, ax5) = plt.subplots(nrows=2, figsize=(7, 9.6))
-# ax4.set_title('RK4 Test with $f(x) = -x^{2}+2x$')
-# ax4.plot(t,np.gradient(testr_3)/dt,c=color_3,lw=7)
+# ax4.set_title('odeint Test with $f(x) = -x^{2}+2x$')
+# ax4.plot(t,testdr_3,c=color_3,lw=7)
 # ax4.plot(t,dr_desired_3,'k')
 #
-# ax5.set_title("RK4 Test with $f(x) = -x^{2}+2x$\nRecovered xy-plot")
+# ax5.set_title("odeint Test with $f(x) = -x^{2}+2x$\nRecovered xy-plot")
 # ax5.plot(testx_3,testy_3,c=color_3,lw=7)
 # ax5.plot(np.linspace(0,2,101),np.array(list(map(lambda x: -x**2 + 2*x,np.linspace(0,2,101)))),'k')
-#
+
 # # def test_ode_2(t,x):
 # # 	def dr_dt(t):
 # # 		return((r_final-r_initial)*(30*t**2-60*t**3+30*t**4))
