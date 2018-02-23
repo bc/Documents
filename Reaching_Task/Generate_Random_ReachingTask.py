@@ -79,9 +79,6 @@ def set_link_lengths(New_L1=None,New_L2=None,EOM = "Zadravec"):
 	elif New_L2 != None:
 		L1 = Height*0.186
 		L2 = New_L2
-def test_global_link_lengths():
-    print('L1 = ' + str(L1))
-    print('L2 = ' + str(L2))
 def create_angle_lists():
 	"""
 	Creates global lists of angles, angular velocities, and angular accelerations.
@@ -90,158 +87,6 @@ def create_angle_lists():
 	A1,A2=[],[]
 	Ȧ1,Ȧ2=[],[]
 	Ä1,Ä2=[],[]
-def inverse_kinematics(X):
-	"""
-	Takes in a (2,N) list/array with values for x and y (endpoint) and maps to the  A1 and A2 with the current angles (in radians) from the inverse kinematics.
-	"""
-	import numpy as np
-	from math import acos, sin, cos, atan, atan2
-	from numpy import pi
-	assert np.shape(X)[0]==2, "X must be either a (2,len(X)) list/array"
-	x,y = np.split(X,2,axis=0) # Returns 2 (1,N) arrays
-	"""
-	Math Logic:
-	x² + y² > (L₁+L₂)² = L₁² + 2L₁L₂ + L₂² > L₁² + L₂²
-	x² + y² - L₁² - L₂² > 0
-	a₂ = cos⁻¹((x² + y² - L₁² - L₂²)/2L₁L₂) ∊ (0,π/2)
-
-	Map functions take in (N,1) list/arrays -- i.e., only length-1 arrays can be converted to Python scalars needed for the map function. Therefore, the transpose is needed to change (1,N) to (N,1)
-	"""
-	a2 = lambda x,y: acos((x**2 + y**2 - L1**2 - L2**2)/(2*L1*L2))
-	a1 = lambda x,y,a2: atan2(y,x) - atan2(L2*sin(a2),(L1+L2*cos(a2)))
-	global A1,A2
-	A2 = np.array(list(map(a2,x.T,y.T)), dtype='float64', ndmin=2) # Returns a (1,N) array
-	A1 = np.array(list(map(a1,x.T,y.T,A2.T)), dtype='float64', ndmin=2) # Returns a (1,N) array
-def c_matrix(x1,x2,x3):
-	"""
-	Takes in the values of x1, x2, and x3 to create the C matrix needed to find the coefficients of a clamped
-	cubic spline with only one break (i.e. Cx = y, where x is an array of c coefficients for the
-	piecewise polynomial equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3). Returns a matrix.
-	"""
-	import numpy as np
-	C = np.array([	[	2*(x2-x1), 		(x2-x1), 			0			],   \
-					[	(x2-x1), 		2*(x3-x1), 		(x3-x2)		],   \
-					[	0,				(x3-x2),		2*(x3-x2)	] 	], \
-					float)
-	return(C)
-def y_vector(x1,x2,x3,y1,y2,y3,initial_slope,final_slope):
-	"""
-	Takes in the values of (x1,y1), (x2,y2), and (x3,y3) to create the y array necessary for the clamped cubic
-	spline matrix manipulation for one break only (i.e. Cx = y, where x is an array of c coefficients for the
-	piecewise polynomial equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3). Returns an array.
-	"""
-	import numpy as np
-	y = np.array([	3*(y2-y1)/(x2-x1) - 3*initial_slope ,  	\
-					3*(y3-y2)/(x3-x2) - 3*(y2-y1)/(x2-x1),  \
-					3*final_slope - 3*(y3-y2)/(x3-x2)	],  \
-					float)
-	return(y)
-def c_coefficients(x1,x2,x3,y1,y2,y3,initial_slope,final_slope):
-	"""
-	Using matrix manipulations the equation Cx = y necessary for the c coefficients for a clamped cubic spline
-	with only one break (i.e. Cx = y, where x is an array of c coefficients for the piecewise polynomial
-	equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3) can be rearranged such that x = C.T*y. The values
-	(x1,y1), (x2,y2), and (x3,y3) are the three points needed to the spline and initial_slope and final_slope
-	are the endpoint conditions. Returns an array.
-	"""
-	import numpy as np
-
-	C = c_matrix(x1,x2,x3)
-	y = y_vector(x1,x2,x3,y1,y2,y3,initial_slope,final_slope)
-	CCoefficients = (np.matrix(C)**(-1))*(np.matrix(y).T)
-	return(CCoefficients)
-def d_coefficients(x1,x2,x3,CCoefficients):
-	"""
-	Uses the c coefficients and the values of x1, x2, and x3 to find the d coefficients for the	piecewise
-	polynomial equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3). CCoefficients must be an array with
-	three elements. Returns an array.
-	"""
-	import numpy as np
-	DCoefficients = np.array([	(CCoefficients[1]-CCoefficients[0])/(3*(x2-x1)),  \
-								(CCoefficients[2]-CCoefficients[1])/(3*(x3-x2))	],  \
-								float)
-	return(DCoefficients)
-def b_coefficients(x1,x2,x3,y1,y2,y3,CCoefficients,DCoefficients):
-	"""
-	Uses the c and d coefficients and the values of (x1,y1), (x2,y2), and (x3,y3) to find the b coefficients for
-	the	piecewise polynomial equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3). CCoefficients must be an
-	array with two or more elements and DCoefficients must be an array with two elements. Returns an array.
-	"""
-	import numpy as np
-	BCoefficients = np.array([	((y2-y1)/(x2-x1)-CCoefficients[0]*(x2-x1) - DCoefficients[0]*((x2-x1)**2)),  \
-								((y3-y2)/(x3-x2)-CCoefficients[1]*(x3-x2) - DCoefficients[1]*((x3-x2)**2)) 	]).astype(float)
-	return(BCoefficients)
-def test_b_coefficients(x1,x2,x3,y1,y2,y3,CCoefficients,DCoefficients,expected_slope):
-	"""
-	Tests to make sure that the generated b coefficients match the expected slope. Uses the c and d coefficients
-	and the values of (x1,y1), (x2,y2), and (x3,y3) to find the b coefficients for the	piecewise polynomial
-	equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3). CCoefficients must be an array with two or more
-	elements and DCoefficients must be an array with two elements. Returns TRUE if expected_slope equals b.
-	"""
-	import numpy as np
-	B = b_coefficients(x1,x2,x3,y1,y2,y3,CCoefficients,DCoefficients)
-	result = abs(B[0]-expected_slope)< 0.001
-	return(result)
-	assert B[0]==expected_slope, "First b coefficient (%f) does not equal initial slope (%f)." (B[0],expected_slope)
-def a_coefficients(y1,y2):
-	"""
-	Uses the y values of (x1,y1) and (x2,y2) to find the a coefficients for the	piecewise polynomial equation
-	y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3). Returns an array.
-	"""
-	import numpy as np
-	ACoefficients = np.array([	y1,    \
-								y2  ]).astype(float)
-	return(ACoefficients)
-def spline_coefficients(x1,x2,x3,y1,y2,y3,initial_slope,final_slope):
-	"""
-	Uses the values of (x1,y1), (x2,y2), and (x3,y3) to find the coefficients for the piecewise polynomial
-	equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3) for a clamped cubic spline with one break only.
-	Returns coefficient arrays A, B, C,and D.
-	"""
-	import numpy as np
-	C = c_coefficients(x1,x2,x3,y1,y2,y3,initial_slope,final_slope)
-	D = d_coefficients(x1,x2,x3,C)
-	B = b_coefficients(x1,x2,x3,y1,y2,y3,C,D)
-	A = a_coefficients(y1,y2)
-	return(A,B,C[:2],D)
-def generate_random_cartesian_point(xmin,xmax,ymin,ymax,distr = 'Normal'):
-	"""
-	Generates a random point in Cartesian space such that x is in [xmin, xmax] and y is in [ymin,ymax].
-	Number is chosen at random from a uniform distribution. Returns two floats.
-	"""
-	assert type(distr)==str,"distr must be a string. Either 'Normal' or 'Uniform'."
-	assert distr in ['Normal','Uniform'],"distr must be either 'Normal' or 'Uniform'."
-	import numpy as np
-	np.random.seed()
-	if distr == 'Uniform':
-		x_rand = np.random.uniform(xmin,xmax)
-		y_rand = np.random.uniform(ymin,ymax)
-	if distr == 'Normal':
-		x_rand = np.random.normal(abs(xmin-xmax)/2,0.1,1000)
-		y_rand = np.random.normal(ymin,ymax)
-	return(x_rand,y_rand)
-def test_endpoint_slope(b,c,d,x_n_minus_1,x_n,expected_slope):
-	"""
-	Takes in the cubic spline coefficients for the derivative of y = a + b*(x-x_n_minus_1) + c*(x-x_n_minus_1)**2 + d*(x-x_n_minus_1)**3
-	(y' = b + 2*c*(x-x_n_minus_1) + 3*d*(x-x_n_minus_1)**2)	for the last piecewise polynomial and tests to see if the expected slope at
-	the endpoint is equal to the actual	endpoint slope. The variable x_n_minus_1 is the initial value of the final piecewise polynomial
-	and x_n is the final data point. Returns TRUE if they are equal.
-
-	"""
-	actual_slope = b + 2*c*(x_n-x_n_minus_1) + 3*d*(x_n-x_n_minus_1)**2
-	result = abs(actual_slope-expected_slope)<0.001
-	return(result)
-def test_for_discontinuity(a_n,b_n,c_n,d_n,x_n,x_n_plus_1,y_n_plus_1):
-	"""
-	Takes in the coefficients for a cubic spline polynomial y = a_n + b_n*(x-x_n) + c_n*(x-x_n)**2 + d_n*(x-x_n)**3
-	and tests to see if the final y value for this piecewise polynomial is equal to the initial y value of the next
-	piecewise polynomial (i.e. when x = x_n_plus_1). The variable x_n is the initial x value of the preceding
-	polynomial, and x_n_plus_1 is the transition value from one polynomial to the next. y_n_plus_1 is the initial y
-	value for the next piecewise polynomial.
-	"""
-	y_n_final = a_n + b_n*(x_n_plus_1-x_n) + c_n*(x_n_plus_1-x_n)**2 + d_n*(x_n_plus_1-x_n)**3
-	result = abs(y_n_final-y_n_plus_1)<0.001
-	return(result)
 class Spline:
 	"""
 	Initiate a class variable spline that has one break at x = x_break starting at x_initial and has
@@ -256,6 +101,11 @@ class Spline:
 	~~~~~~~~~~~~~~~~~~~
 
 	Takes in X array and outputs the piecewise polynomial associated with the spline's derivative.
+
+	pp_2deriv()
+	~~~~~~~~~~~~~~~~~~~
+
+	Takes in X array and outputs the piecewise polynomial associated with the spline's second derivative.
 
 	find_max_and_min()
 	~~~~~~~~~~~~~~~~~~~
@@ -278,8 +128,50 @@ class Spline:
 	is_within_bounds()
 	~~~~~~~~~~~~~~~~~~~
 
-	This checks to see if the maximum maximum value and the minimum mininum value calculated above will
-	fall between y_min and y_max. This makes use of self.find_max_and_min()
+	This checks to see if the maximum maximum value and the minimum mininum value calculated above will fall between y_min and y_max. This makes use of self.find_max_and_min()
+
+	print_func()
+	~~~~~~~~~~~~~~~~~~~
+
+	This function uses pprint() to return a printout of the piecewise polynomial f(x).
+
+	return_parameterized_X()
+	~~~~~~~~~~~~~~~~~~~
+
+	This function will return the parameterized x(t) and y(t) that follows path S along the curve y=f(x) subject to some tangential velocity profile dS/dt. This utilizes scipy.integrate.odeint to solve the time derivative to the path length function S = ∫(dx_dt)√(1 + f'(x)²)dt.
+
+	return_parameterized_dX()
+	~~~~~~~~~~~~~~~~~~~
+
+	This function takes in x(t) and returns dx/dt and dy/dt derived from the relationship of arc length S, its time derivative dS/dt, and the path f(x(t)) and its derivative with respect to x.
+
+	return_parameterized_d2X()
+	~~~~~~~~~~~~~~~~~~~
+
+	This function takes in x(t) and dx/dt and returns d²x/dt² and d²y/dt² derived from the relationship of arc length S, its first and second time derivatives, dS/dt and d²S/dt², respectively, and the path f(x(t)) and its first and second derivatives with respect to x.
+
+	find_path_length()
+	~~~~~~~~~~~~~~~~~~~
+
+	Calculates the path length of the curve y=f(x) from S = ∫(dx_dt)√(1 + f'(x)²)dt. This is needed in order to describe the minimum jerk criterion tangential velocity equation, dS/dt.
+
+	dS_dt()
+	~~~~~~~~~~~~~~~~~~~
+
+	Returns the minimum jerk criterion tangential velocity equation, dS/dt, given by:
+
+							dS/dt = S*(30t² - 60t³ + 30t⁴)
+
+	Where S is found from S = self.find_path_length()
+
+	d2S_dt2()
+	~~~~~~~~~~~~~~~~~~~
+
+	Returns the minimum jerk criterion for acceleration along the path S, d²S/dt², given by:
+
+							d²S/dt² = S*(60t - 180t² + 120t³)
+
+	Where S is found from S = self.find_path_length()
 
 	"""
 	def __init__(self,a,b,c,d,x_initial,x_break,x_final):
@@ -306,7 +198,6 @@ class Spline:
 			[lambda X: 2*self.c[0,0] + 6*self.d[0,0,0]*(X-self.x_initial), \
 			lambda X: 2*self.c[1,0] + 6*self.d[1,0,0]*(X-self.x_break)])
 		return(result)
-
 	def find_max_and_min(self,x_min,x_max,y_min,y_max):
 		def find_extrema():
 			if (4*self.c[0,0]**2 - 12*self.b[0,0,0]*self.d[0,0,0]) >= 0:
@@ -392,32 +283,35 @@ class Spline:
 		func_2 = Lambda(x,self.a[1] + self.b[1,0,0]*(x-self.x_break) + self.c[1,0]*(x-self.x_break)**2 + self.d[1,0,0]*(x-self.x_break)**3)
 		print('Function 2:\n')
 		pprint(func_2)
-	def return_parameterized_X(self):
+	def return_parameterized_X(self,t_end=1):
 		import scipy.integrate as integrate
-		dt = 1/1000
-		t = np.linspace(0,1,int(1/dt) + 1)
-		def ode_func(x,t):
-			return(self.dS_dt(t)/np.sqrt(1 + self.pp_deriv(x)**2))
-		X = integrate.odeint(ode_func,self.xlim[0],t).flatten()
+		N = 1000
+		t = np.linspace(0,t_end, N + 1)
+		dt = t[1]-t[0]
+		def ode_func(x,t,t_end):
+			return(self.dS_dt(t,t_end=t_end)/np.sqrt(1 + self.pp_deriv(x)**2))
+		X = integrate.odeint(lambda x,t: ode_func(x,t,t_end),self.xlim[0],t).flatten()
 		Y = np.array(list(map(lambda x: self.pp_func(x),X)))
 		dS = np.array(list(map(lambda dx,dy: np.sqrt(dx**2+dy**2),\
 								np.gradient(X)/dt,np.gradient(Y)/dt)))
-		assert sum(abs(self.dS_dt(t)-dS))/len(dS)<1e-4, "Error in parameterizing path to dS/dt. Check ODE func."
+		assert sum(abs(self.dS_dt(t,t_end=t_end)-dS))/len(dS)<1e-4, "Error in parameterizing path to dS/dt. Check ODE func."
 		return(X,Y)
-	def return_parameterized_dX(self,x):
-		dt = 1/1000
-		t = np.linspace(0,1,int(1/dt) + 1)
-		dS_dt = self.dS_dt(t)
+	def return_parameterized_dX(self,x,t_end=1):
+		N = 1000
+		t = np.linspace(0,t_end,N + 1)
+		# dt = t[1]-t[0]
+		dS_dt = self.dS_dt(t,t_end=t_end)
 		df_dx = self.pp_deriv(x)
 		dx_dt = np.array(list(map(lambda dS_dt,df_dx: dS_dt/np.sqrt(1 + df_dx**2),dS_dt,df_dx)))
 		dy_dt = df_dx*dx_dt
 		return(dx_dt,dy_dt)
-	def return_parameterized_d2X(self,x,dx_dt):
-		dt = 1/1000
-		t = np.linspace(0,1,int(1/dt) + 1)
+	def return_parameterized_d2X(self,x,dx_dt,t_end=1):
+		N = 1000
+		t = np.linspace(0,t_end,N + 1)
+		# dt = t[1]-t[0]
 
-		dS_dt = self.dS_dt(t)
-		d2S_dt2 = self.d2S_dt2(t)
+		dS_dt = self.dS_dt(t,t_end=t_end)
+		d2S_dt2 = self.d2S_dt2(t,t_end=t_end)
 
 		df_dx = self.pp_deriv(x)
 		d2f_dx2 = self.pp_2deriv(x)
@@ -434,95 +328,213 @@ class Spline:
 		import scipy.integrate as integrate
 		return(integrate.quad(lambda x: \
 				np.sqrt(1 + self.pp_deriv(x)**2),self.xlim[0],self.xlim[1])[0])
-	def dS_dt(self,t):
+	def dS_dt(self,t,t_end=1):
 		S_initial = 0
 		S_final = self.find_path_length()
-		return((S_final-S_initial)*(30*t**2 - 60*t**3 + 30*t**4))
-	def d2S_dt2(self,t):
+		return((S_final-S_initial)*(30*(t/t_end)**2 - 60*(t/t_end)**3 + 30*(t/t_end)**4)/t_end)
+	def d2S_dt2(self,t,t_end=1):
 		S_initial = 0
 		S_final = self.find_path_length()
-		return((S_final-S_initial)*(60*t - 180*t**2 + 120*t**3))
-def clamped_cubic_spline(x_initial,x_final,y_initial,y_final,initial_slope,final_slope,ymin,ymax,X,**options):
-	"""
-	This will take in the initial and final values for both x and y, as well as the desired initial and final
-	slopes and generate 1000 clamped cubic spline that produce y values that are within the bounds [ymin, ymax].
-	Returns a list of arrays, each of len(X). Options allows for slope limitations on shoulder rotations such
-	that the derivative of the spline is always positive to match observations (slope = "Shoulder").
-	"""
-	NumberOfTrials =  1000
-	i = 0
-	StartTime = time.time()
-	while i < NumberOfTrials:
-		x_rand,y_rand = generate_random_point(x_initial,x_final,ymin,ymax)
-		A,B,C,D = spline_coefficients(x_initial,x_rand,x_final,y_initial,y_rand,y_final,initial_slope,final_slope)
-		assert test_b_coefficients(x_initial,x_rand,x_final,y_initial,y_rand,y_final,C,D,initial_slope), "Initial slope does not match the expected value"
-		assert test_endpoint_slope(B[1],C[1],D[1],x_rand,x_final,final_slope),"Problem with Endpoint Slope"
-		assert test_for_discontinuity(A[0],B[0],C[0],D[0],x_initial,x_rand,A[1]), "Jump Discontinuity at t = %f!" %x_rand
-		spline_structure = Spline(A,B,C,D,x_initial,x_rand,x_final)
-		if options.get("angle") == "Shoulder":
-			options_slope_condition = spline_structure.is_initial_slope_positive(X,2501)
-			dof = "Shoulder: " + " "*(10-len("Shoulder: "))
-		elif options.get("angle") == "Elbow":
-			options_slope_condition = spline_structure.is_initial_slope_positive(X,501)
-			dof = "Elbow: " + " "*(10-len("Elbow: "))
-		else:
-			options_slope_condition = True
-			dof = "Wrist: " + " "*(10-len("Wrist: "))
-		if i == 0:
-			if spline_structure.is_within_bounds(x_initial,x_final, ymin, ymax) and options_slope_condition:
-				Splines = spline_structure
-				i+=1
-				statusbar = '[' + '\u25a0'*int((i+1)/(NumberOfTrials/50)) + '\u25a1'*(50-int((i+1)/(NumberOfTrials/50))) + '] '
-				print(dof + statusbar + '{0:1.1f}'.format(i/NumberOfTrials*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) + 'sec        \r', end='')
-		elif i == 1:
-			if spline_structure.is_within_bounds(x_initial,x_final, ymin, ymax) and options_slope_condition:
-				Splines = np.concatenate(([Splines], [spline_structure]), axis = 0)
-				i+=1
-				statusbar = '[' + '\u25a0'*int((i+1)/(NumberOfTrials/50)) + '\u25a1'*(50-int((i+1)/(NumberOfTrials/50))) + '] '
-				print(dof + statusbar + '{0:1.1f}'.format(i/NumberOfTrials*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) + 'sec        \r', end='')
-		else:
-			if spline_structure.is_within_bounds(x_initial,x_final, ymin, ymax) and options_slope_condition:
-				Splines = np.concatenate((Splines, [spline_structure]), axis = 0)
-				i+=1
-				statusbar = '[' + '\u25a0'*int((i+1)/(NumberOfTrials/50)) + '\u25a1'*(50-int((i+1)/(NumberOfTrials/50))) + '] '
-				print(dof + statusbar + '{0:1.1f}'.format(i/NumberOfTrials*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) + 'sec        \r', end='')
-	print('\n')
-	return(Splines)
-def generate_default_path(PathLength = 0.35,RandomXi=False,RandomXf=False):
+		return((S_final-S_initial)*(60*(t/t_end) - 180*(t/t_end)**2 + 120*(t/t_end)**3)/(t_end**2))
+# def clamped_cubic_spline(x_initial,x_final,y_initial,y_final,initial_slope,final_slope,ymin,ymax,X,**options):
+# 	"""
+# 	This will take in the initial and final values for both x and y, as well as the desired initial and final
+# 	slopes and generate 1000 clamped cubic spline that produce y values that are within the bounds [ymin, ymax].
+# 	Returns a list of arrays, each of len(X). Options allows for slope limitations on shoulder rotations such
+# 	that the derivative of the spline is always positive to match observations (slope = "Shoulder").
+# 	"""
+# 	NumberOfTrials =  1000
+# 	i = 0
+# 	StartTime = time.time()
+# 	while i < NumberOfTrials:
+# 		x_rand,y_rand = generate_random_point(x_initial,x_final,ymin,ymax)
+# 		A,B,C,D = spline_coefficients(x_initial,x_rand,x_final,y_initial,y_rand,y_final,initial_slope,final_slope)
+# 		spline_structure = Spline(A,B,C,D,x_initial,x_rand,x_final)
+# 		if options.get("angle") == "Shoulder":
+# 			options_slope_condition = spline_structure.is_initial_slope_positive(X,2501)
+# 			dof = "Shoulder: " + " "*(10-len("Shoulder: "))
+# 		elif options.get("angle") == "Elbow":
+# 			options_slope_condition = spline_structure.is_initial_slope_positive(X,501)
+# 			dof = "Elbow: " + " "*(10-len("Elbow: "))
+# 		else:
+# 			options_slope_condition = True
+# 			dof = "Wrist: " + " "*(10-len("Wrist: "))
+# 		if i == 0:
+# 			if spline_structure.is_within_bounds(x_initial,x_final, ymin, ymax) and options_slope_condition:
+# 				Splines = spline_structure
+# 				i+=1
+# 				statusbar = '[' + '\u25a0'*int((i+1)/(NumberOfTrials/50)) + '\u25a1'*(50-int((i+1)/(NumberOfTrials/50))) + '] '
+# 				print(dof + statusbar + '{0:1.1f}'.format(i/NumberOfTrials*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) + 'sec        \r', end='')
+# 		elif i == 1:
+# 			if spline_structure.is_within_bounds(x_initial,x_final, ymin, ymax) and options_slope_condition:
+# 				Splines = np.concatenate(([Splines], [spline_structure]), axis = 0)
+# 				i+=1
+# 				statusbar = '[' + '\u25a0'*int((i+1)/(NumberOfTrials/50)) + '\u25a1'*(50-int((i+1)/(NumberOfTrials/50))) + '] '
+# 				print(dof + statusbar + '{0:1.1f}'.format(i/NumberOfTrials*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) + 'sec        \r', end='')
+# 		else:
+# 			if spline_structure.is_within_bounds(x_initial,x_final, ymin, ymax) and options_slope_condition:
+# 				Splines = np.concatenate((Splines, [spline_structure]), axis = 0)
+# 				i+=1
+# 				statusbar = '[' + '\u25a0'*int((i+1)/(NumberOfTrials/50)) + '\u25a1'*(50-int((i+1)/(NumberOfTrials/50))) + '] '
+# 				print(dof + statusbar + '{0:1.1f}'.format(i/NumberOfTrials*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) + 'sec        \r', end='')
+# 	print('\n')
+# 	return(Splines)
+def generate_default_path(TargetAmplitude = 0.35,RandomXiBool=False,RandomXfBool=False):
+	def spline_coefficients(x1,x2,x3,y1,y2,y3,initial_slope,final_slope):
+		"""
+		Uses the values of (x1,y1), (x2,y2), and (x3,y3) to find the coefficients for the piecewise polynomial
+		equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3) for a clamped cubic spline with one break only.
+		Returns coefficient arrays A, B, C,and D.
+		"""
+		import numpy as np
+		def c_matrix(x1,x2,x3):
+			"""
+			Takes in the values of x1, x2, and x3 to create the C matrix needed to find the coefficients of a clamped
+			cubic spline with only one break (i.e. Cx = y, where x is an array of c coefficients for the
+			piecewise polynomial equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3). Returns a matrix.
+			"""
+			import numpy as np
+			C = np.array([	[	2*(x2-x1), 		(x2-x1), 			0			],   \
+							[	(x2-x1), 		2*(x3-x1), 		(x3-x2)		],   \
+							[	0,				(x3-x2),		2*(x3-x2)	] 	], \
+							float)
+			return(C)
+		def y_vector(x1,x2,x3,y1,y2,y3,initial_slope,final_slope):
+			"""
+			Takes in the values of (x1,y1), (x2,y2), and (x3,y3) to create the y array necessary for the clamped cubic
+			spline matrix manipulation for one break only (i.e. Cx = y, where x is an array of c coefficients for the
+			piecewise polynomial equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3). Returns an array.
+			"""
+			import numpy as np
+			y = np.array([	3*(y2-y1)/(x2-x1) - 3*initial_slope ,  	\
+							3*(y3-y2)/(x3-x2) - 3*(y2-y1)/(x2-x1),  \
+							3*final_slope - 3*(y3-y2)/(x3-x2)	],  \
+							float)
+			return(y)
+		def c_coefficients(x1,x2,x3,y1,y2,y3,initial_slope,final_slope):
+			"""
+			Using matrix manipulations the equation Cx = y necessary for the c coefficients for a clamped cubic spline
+			with only one break (i.e. Cx = y, where x is an array of c coefficients for the piecewise polynomial
+			equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3) can be rearranged such that x = C.T*y. The values
+			(x1,y1), (x2,y2), and (x3,y3) are the three points needed to the spline and initial_slope and final_slope
+			are the endpoint conditions. Returns an array.
+			"""
+			import numpy as np
+
+			C = c_matrix(x1,x2,x3)
+			y = y_vector(x1,x2,x3,y1,y2,y3,initial_slope,final_slope)
+			CCoefficients = (np.matrix(C)**(-1))*(np.matrix(y).T)
+			return(CCoefficients)
+		def d_coefficients(x1,x2,x3,CCoefficients):
+			"""
+			Uses the c coefficients and the values of x1, x2, and x3 to find the d coefficients for the	piecewise
+			polynomial equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3). CCoefficients must be an array with
+			three elements. Returns an array.
+			"""
+			import numpy as np
+			DCoefficients = np.array([	(CCoefficients[1]-CCoefficients[0])/(3*(x2-x1)),  \
+										(CCoefficients[2]-CCoefficients[1])/(3*(x3-x2))	],  \
+										float)
+			return(DCoefficients)
+		def b_coefficients(x1,x2,x3,y1,y2,y3,CCoefficients,DCoefficients):
+			"""
+			Uses the c and d coefficients and the values of (x1,y1), (x2,y2), and (x3,y3) to find the b coefficients for
+			the	piecewise polynomial equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3). CCoefficients must be an
+			array with two or more elements and DCoefficients must be an array with two elements. Returns an array.
+			"""
+			import numpy as np
+			BCoefficients = np.array([	((y2-y1)/(x2-x1)-CCoefficients[0]*(x2-x1) - DCoefficients[0]*((x2-x1)**2)),  \
+										((y3-y2)/(x3-x2)-CCoefficients[1]*(x3-x2) - DCoefficients[1]*((x3-x2)**2)) 	]).astype(float)
+			return(BCoefficients)
+		def test_b_coefficients(x1,x2,x3,y1,y2,y3,CCoefficients,DCoefficients,expected_slope):
+			"""
+			Tests to make sure that the generated b coefficients match the expected slope. Uses the c and d coefficients
+			and the values of (x1,y1), (x2,y2), and (x3,y3) to find the b coefficients for the	piecewise polynomial
+			equation y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3). CCoefficients must be an array with two or more
+			elements and DCoefficients must be an array with two elements. Returns TRUE if expected_slope equals b.
+			"""
+			import numpy as np
+			B = b_coefficients(x1,x2,x3,y1,y2,y3,CCoefficients,DCoefficients)
+			result = abs(B[0]-expected_slope)< 0.001
+			return(result)
+			assert B[0]==expected_slope, "First b coefficient (%f) does not equal initial slope (%f)." (B[0],expected_slope)
+		def a_coefficients(y1,y2):
+			"""
+			Uses the y values of (x1,y1) and (x2,y2) to find the a coefficients for the	piecewise polynomial equation
+			y = a + b*(x-x_o) + c*(x-x_o)**2 + d*(x-x_o)**3). Returns an array.
+			"""
+			import numpy as np
+			ACoefficients = np.array([	y1,    \
+										y2  ]).astype(float)
+			return(ACoefficients)
+		def test_endpoint_slope(b,c,d,x_n_minus_1,x_n,expected_slope):
+			"""
+			Takes in the cubic spline coefficients for the derivative of y = a + b*(x-x_n_minus_1) + c*(x-x_n_minus_1)**2 + d*(x-x_n_minus_1)**3
+			(y' = b + 2*c*(x-x_n_minus_1) + 3*d*(x-x_n_minus_1)**2)	for the last piecewise polynomial and tests to see if the expected slope at
+			the endpoint is equal to the actual	endpoint slope. The variable x_n_minus_1 is the initial value of the final piecewise polynomial
+			and x_n is the final data point. Returns TRUE if they are equal.
+
+			"""
+			actual_slope = b + 2*c*(x_n-x_n_minus_1) + 3*d*(x_n-x_n_minus_1)**2
+			result = abs(actual_slope-expected_slope)<0.001
+			return(result)
+		def test_for_discontinuity(a_n,b_n,c_n,d_n,x_n,x_n_plus_1,y_n_plus_1):
+			"""
+			Takes in the coefficients for a cubic spline polynomial y = a_n + b_n*(x-x_n) + c_n*(x-x_n)**2 + d_n*(x-x_n)**3
+			and tests to see if the final y value for this piecewise polynomial is equal to the initial y value of the next
+			piecewise polynomial (i.e. when x = x_n_plus_1). The variable x_n is the initial x value of the preceding
+			polynomial, and x_n_plus_1 is the transition value from one polynomial to the next. y_n_plus_1 is the initial y
+			value for the next piecewise polynomial.
+			"""
+			y_n_final = a_n + b_n*(x_n_plus_1-x_n) + c_n*(x_n_plus_1-x_n)**2 + d_n*(x_n_plus_1-x_n)**3
+			result = abs(y_n_final-y_n_plus_1)<0.001
+			return(result)
+
+		C = c_coefficients(x1,x2,x3,y1,y2,y3,initial_slope,final_slope)
+		D = d_coefficients(x1,x2,x3,C)
+		B = b_coefficients(x1,x2,x3,y1,y2,y3,C,D)
+		A = a_coefficients(y1,y2)
+
+		assert test_b_coefficients(x1,x2,x3,y1,y2,y3,C,D,initial_slope), "Initial slope does not match the expected value"
+		assert test_endpoint_slope(B[1,0,0],C[1,0],D[1,0,0],x2,x3,final_slope),"Problem with Endpoint Slope"
+		assert test_for_discontinuity(A[0],B[0,0,0],C[0,0],D[0,0,0],x1,x2,A[1]), "Jump Discontinuity at t = %f!" %x2
+
+
+		return(A,B,C[:2],D)
 	ValidPath = False
 	while ValidPath==False:
-		x_initial_desired = 0.05 # m DISPLACEMENT TO BE TRANSLATED BACK LATER
-		x_final_desired = PathLength + 0.05 # m
-		y_initial_desired = 0 # m
-		y_final_desired = 0 # m
-		boundary_sigma = 0.0025
-		allowable_error_rad = 30*(np.pi/180) #degrees
-		allowable_error_y = 0.05 # m
+		DefaultXi = 0.05 # m DISPLACEMENT TO BE TRANSLATED BACK LATER
+		DefaultXf = TargetAmplitude + 0.05 # m
+		DefaultYi = 0 # m
+		DefaultYf = 0 # m
+		EndpointErrorSigma = 0.0025
+		EndpointErrorTheta = 30*(np.pi/180) # Allowable error in initial/final slope, tan(ϑ)
+		MaximumDeviationInY = 0.05 # m
 
-		if RandomXi == False:
-			x_initial = x_initial_desired + np.random.normal(0,boundary_sigma) # cm
-			y_initial = y_initial_desired + np.random.normal(0,boundary_sigma) # cm
+		if RandomXiBool == False:
+			x_initial = DefaultXi + np.random.normal(0,EndpointErrorSigma) # cm
+			y_initial = DefaultYi + np.random.normal(0,EndpointErrorSigma) # cm
 		else:
-			x_initial = x_initial_desired # cm
-			y_initial = y_initial_desired # cm
+			x_initial = DefaultXi # cm
+			y_initial = DefaultYi # cm
 
-		if RandomXf == False:
-			x_final = x_final_desired + np.random.normal(0,boundary_sigma) # cm
-			y_final = y_final_desired + np.random.normal(0,boundary_sigma) # cm
+		if RandomXfBool == False:
+			x_final = DefaultXf + np.random.normal(0,EndpointErrorSigma) # cm
+			y_final = DefaultYf + np.random.normal(0,EndpointErrorSigma) # cm
 		else:
-			x_final = x_final_desired # cm
-			y_final = y_final_desired # cm
+			x_final = DefaultXf # cm
+			y_final = DefaultYf # cm
 
-		initialerror = np.random.uniform(-np.tan(allowable_error_rad),np.tan(allowable_error_rad))
+		initialerror = np.random.uniform(-np.tan(EndpointErrorTheta),np.tan(EndpointErrorTheta))
 		finalerror = -np.sign(initialerror)*\
-				abs(np.random.uniform(-np.tan(allowable_error_rad),np.tan(allowable_error_rad)))
+				abs(np.random.uniform(-np.tan(EndpointErrorTheta),np.tan(EndpointErrorTheta)))
 
 		if initialerror>0:
-			ymax = max([y_initial,y_final])+allowable_error_y
+			ymax = max([y_initial,y_final])+MaximumDeviationInY
 			ymin = 0
 		else:
 			ymax = 0
-			ymin = min([y_initial,y_final])-allowable_error_y
+			ymin = min([y_initial,y_final])-MaximumDeviationInY
 
 		xmax = x_final
 		xmin = x_initial
@@ -530,27 +542,13 @@ def generate_default_path(PathLength = 0.35,RandomXi=False,RandomXf=False):
 		y_rand = np.random.normal((ymax+ymin)/2,abs(ymax+ymin)/4)
 
 		A,B,C,D = spline_coefficients(x_initial,x_rand,x_final,y_initial,y_rand,y_final,initialerror,finalerror)
-		assert test_b_coefficients(x_initial,x_rand,x_final,y_initial,y_rand,y_final,C,D,initialerror), "Initial slope does not match the expected value"
-		assert test_endpoint_slope(B[1],C[1],D[1],x_rand,x_final,finalerror),"Problem with Endpoint Slope"
-		assert test_for_discontinuity(A[0],B[0],C[0],D[0],x_initial,x_rand,A[1]), "Jump Discontinuity at t = %f!" %x_rand
 		path = Spline(A,B,C,D,x_initial,x_rand,x_final)
 		if path.is_within_bounds(x_initial,x_final, ymin, ymax):
 			ValidPath = True
 		else:
 			ValidPath = False
 	return(path)
-def rotate_xy(x,y,angle):
-	XY = np.concatenate([x[np.newaxis,:],y[np.newaxis,:]],axis=0)
-	rotation_matrix = np.matrix([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
-	rotated_XY = rotation_matrix*XY
-	rotated_x = np.array(rotated_XY[0,:])[0]
-	rotated_y = np.array(rotated_XY[1,:])[0]
-	return(rotated_x,rotated_y)
-def translate_xy(x,y,px=0,py=0):
-	translated_x = x + px
-	translated_y = y + py
-	return(translated_x,translated_y)
-def return_trajectory(x,y,ReachType,IsPositionFunction):
+def return_trajectory(x,y,ReachType,IsPositionFunction,TargetAmplitude=0.35):
 	"""
 	This takes in a string -- either 'Center','Right','Left', or 'Sideways' -- and returns the necessary initial and final positions for the movement, based on Flash/Hogan (1985).
 
@@ -559,8 +557,18 @@ def return_trajectory(x,y,ReachType,IsPositionFunction):
 	# 0.35/(L1+L2) = 0.5295
 	# Sternum at -0.177 = -L1*(0.129/0.186) <-- Anthropomorphic Ratio
 	"""
+	def rotate_xy(x,y,angle):
+		XY = np.concatenate([x[np.newaxis,:],y[np.newaxis,:]],axis=0)
+		rotation_matrix = np.matrix([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
+		rotated_XY = rotation_matrix*XY
+		rotated_x = np.array(rotated_XY[0,:])[0]
+		rotated_y = np.array(rotated_XY[1,:])[0]
+		return(rotated_x,rotated_y)
+	def translate_xy(x,y,px=0,py=0):
+		translated_x = x + px
+		translated_y = y + py
+		return(translated_x,translated_y)
 	global L1,L2
-	PathLength = 0.35
 	MedianPlane = -L1*(0.129/0.186) # Sternum at -L1*(0.129/0.186) <-- Anthropomorphic Ratio
 	DefaultDisplacement_x = 0.05
 	assert ReachType.capitalize() in ['Center','Right','Left','Sideways'], \
@@ -573,10 +581,10 @@ def return_trajectory(x,y,ReachType,IsPositionFunction):
 			x_Trajectory,y_Trajectory = translate_xy(x,y,px=-DefaultDisplacement_x)
 			# x_Trajectory, y_Trajectory = rotate_xy(x_Trajectory,y_Trajectory,0)
 			x_Trajectory, y_Trajectory = translate_xy(x_Trajectory,y_Trajectory,\
-												px = MedianPlane-PathLength/2,\
-													py=0.10+PathLength/2)
-			# Xi = [-MedianPlane-PathLength/2,0.1+PathLength/2]
-			# Xf = [-MedianPlane+PathLength/2,0.1+PathLength/2]
+												px = MedianPlane-TargetAmplitude/2,\
+													py=0.10+TargetAmplitude/2)
+			# Xi = [-MedianPlane-TargetAmplitude/2,0.1+TargetAmplitude/2]
+			# Xf = [-MedianPlane+TargetAmplitude/2,0.1+TargetAmplitude/2]
 
 		# Center Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
 		elif ReachType.capitalize() == 'Center':
@@ -586,7 +594,7 @@ def return_trajectory(x,y,ReachType,IsPositionFunction):
 												px = MedianPlane,\
 													py=0.20)
 			# Xi = [-MedianPlane,0.20]
-			# Xf = [-MedianPlane,0.20 + PathLength]
+			# Xf = [-MedianPlane,0.20 + TargetAmplitude]
 
 		# # Left Diagonal Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
 		elif ReachType.capitalize() == 'Left':
@@ -596,7 +604,7 @@ def return_trajectory(x,y,ReachType,IsPositionFunction):
 												px = MedianPlane,\
 													py=0.20)
 			# Xi = [-MedianPlane,0.20]
-			# Xf = [-MedianPlane-PathLength/(2**0.5),0.20 + PathLength/(2**0.5)]
+			# Xf = [-MedianPlane-TargetAmplitude/(2**0.5),0.20 + TargetAmplitude/(2**0.5)]
 
 		# # Right Diagonal Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
 		elif ReachType.capitalize() == 'Right':
@@ -606,7 +614,7 @@ def return_trajectory(x,y,ReachType,IsPositionFunction):
 												px = MedianPlane,\
 													py=0.20)
 			# Xi = [-MedianPlane,0.20]
-			# Xf = [-MedianPlane+PathLength/(2**0.5),0.20 + PathLength/(2**0.5)]
+			# Xf = [-MedianPlane+TargetAmplitude/(2**0.5),0.20 + TargetAmplitude/(2**0.5)]
 	else:
 		# Side to Side, Path Length = 0.5295⋅(L1+L2) = 0.35
 		if ReachType.capitalize() == 'Sideways':
@@ -624,229 +632,375 @@ def return_trajectory(x,y,ReachType,IsPositionFunction):
 		elif ReachType.capitalize() == 'Right':
 			x_Trajectory, y_Trajectory = rotate_xy(x,y,np.pi/4)
 	return(x_Trajectory,y_Trajectory)
-def return_X_values(DefaultPath,ReachType,RandomXi=False,RandomXf=False,PathLength=0.35):
+def return_X_values(DefaultPath,ReachType,RandomXiBool=False,RandomXfBool=False,TargetAmplitude=0.35,t_end=1):
 	# import ipdb; ipdb.set_trace()
-	Default_x,Default_y = DefaultPath.return_parameterized_X()
-	Default_ẋ,Default_ẏ = DefaultPath.return_parameterized_dX(Default_x)
-	Default_ẍ,Default_ÿ = DefaultPath.return_parameterized_d2X(Default_x,Default_ẋ)
+	Default_x,Default_y = DefaultPath.return_parameterized_X(t_end=t_end)
+	Default_ẋ,Default_ẏ = DefaultPath.return_parameterized_dX(Default_x,t_end=t_end)
+	Default_ẍ,Default_ÿ = DefaultPath.return_parameterized_d2X(Default_x,Default_ẋ,t_end=t_end)
 
-	x,y = return_trajectory(Default_x,Default_y,ReachType,IsPositionFunction=True)
-	ẋ,ẏ = return_trajectory(Default_ẋ,Default_ẏ,ReachType,IsPositionFunction=False)
-	ẍ,ÿ = return_trajectory(Default_ẍ,Default_ÿ,ReachType,IsPositionFunction=False)
+	x,y = return_trajectory(Default_x,Default_y,ReachType,\
+								TargetAmplitude=TargetAmplitude, IsPositionFunction=True)
+	ẋ,ẏ = return_trajectory(Default_ẋ,Default_ẏ,ReachType, IsPositionFunction=False)
+	ẍ,ÿ = return_trajectory(Default_ẍ,Default_ÿ,ReachType, IsPositionFunction=False)
 
 	X = np.concatenate([x[np.newaxis,:],y[np.newaxis,:]],axis=0)
 	Ẋ = np.concatenate([ẋ[np.newaxis,:],ẏ[np.newaxis,:]],axis=0)
 	Ẍ = np.concatenate([ẍ[np.newaxis,:],ÿ[np.newaxis,:]],axis=0)
 	return(X,Ẋ,Ẍ)
-def jacobian(a1,a2):
-	import numpy as np
-	from math import cos, sin
-	J = np.matrix([[-L1*sin(a1)-L2*sin(a1+a2),-L2*sin(a1+a2)],\
-								[L1*cos(a1)+L2*cos(a1+a2),L2*cos(a1+a2)]], dtype = 'float64')
-	return(J)
-def inverse_jacobian(a1,a2):
-	import numpy as np
-	from math import cos, sin
-	det_J = L1*L2*cos(a1 + a2)*sin(a1) - L1*L2*sin(a1 + a2)*cos(a1)
-	J_inv = (1/det_J)*np.matrix([[- L2*cos(a1 + a2), 						- L2*sin(a1 + a2)],\
-								[L1*cos(a1)+L2*cos(a1 + a2),	L2*sin(a1 + a2) + L1*sin(a1)]], \
-								dtype = 'float64')
-	return(J_inv)
-def update_angular_velocity(Ẋ):
-	import numpy as np
-	global A1,A2 # both are (1,N) arrays
-	"""
-	Note: numpy.float64 does not support inverse matrix operators. Luckily, this is an always invertible 2x2 matrix (J is nonsingular within the ROM because a₂ ∊ (0,π/2)), so the inverse Jacobian function has been mapped instead.
-	"""
-	# J = list(map(jacobian,A1.T,A2.T)) # Returns a list of shape (N,2,2)
-	J_inv = list(map(inverse_jacobian,A1.T,A2.T)) # Returns a list of shape (N,2,2)
-	"""
-	In order to map properly, X (shape (2,N)) must be be first split into N (2,1) arrays (length-1). Therefore, the third argument to map() does not need to be transposed. Similar logic follows for why J_inv is not transposed, as it is has N (2,2) matrix arrays. Changing the output to an array aids in creating arrays Ȧ1 and Ȧ2.
-	"""
-	Ȧ = list(map(lambda j_inv,ẋ: np.array(j_inv*ẋ), \
-						J_inv, np.split(Ẋ,np.shape(Ẋ)[1],axis=1)))
-	global Ȧ1,Ȧ2
-	Ȧ1,Ȧ2 = np.split(np.concatenate(Ȧ, axis=1), 2, axis=0) # both are (1,N) arrays
-def update_angular_acceleration(Ẋ,Ẍ):
-	from math import cos,sin
-	import numpy as np
-
-	assert np.shape(Ẋ)[0]==2, "Ẋ must be a (2,len(Ẋ)) list/array"
-	assert np.shape(Ẍ)[0]==2, "Ẍ must be a (2,len(Ẍ)) list/array"
-	ẍ,ÿ = np.split(Ẍ,2,axis=0)
-	global A1,A2,Ȧ1,Ȧ2
-	"""
-		dȦ1/dt = (δȦ1/δA1)*(dA1/dt)
-					+ (δȦ1/δA2)*(dA2/dt)
-						+ (δȦ1/δẊ[0])*(dẊ[0]/dt)
-							+ (δȦ1/δẊ[1])*(dẊ[1]/dt)
-
-		dȦ2/dt = (δȦ2/δA1)*(dA1/dt)
-					+ (δȦ2/δA2)*(dA2/dt)
-						+ (δȦ2/δẊ[0])*(dẊ[0]/dt)
-							+ (δȦ2/δẊ[1])*(dẊ[1]/dt)
-	"""
-	ä1 = lambda a1,a2,ȧ1,ȧ2,ẋ,ẏ,ẍ,ÿ: \
-		((-sin(a1+a2)*ẋ+cos(a1+a2)*ẏ)/(L1*sin(a2)))*ȧ1 \
-		+ (((-sin(a1+a2)*ẋ+cos(a1+a2)*ẏ)*L1*sin(a2) - \
-		(cos(a1+a2)*ẋ+sin(a1+a2)*ẏ)*L1*cos(a2))/((L1**2)*(sin(a2)**2)))*ȧ2 \
-		+ (cos(a1+a2)/(L1*sin(a2)))*ẍ \
-		+ (sin(a1+a2)/(L1*sin(a2)))*ÿ
-	ä2 = lambda a1,a2,ȧ1,ȧ2,ẋ,ẏ,ẍ,ÿ: \
-		(((L1*sin(a1)+L2*sin(a1+a2))*ẋ + (-L1*cos(a1)-L2*cos(a1+a2))*ẏ)/(L1*L2*sin(a2)))*ȧ1 \
-		+ (((L2*sin(a1+a2)*ẋ + (-L2*cos(a1+a2))*ẏ)*(L1*L2*sin(a2)) \
-		- ((-L1*cos(a1)-L2*cos(a1+a2))*ẋ + (-L1*sin(a1)-L2*sin(a1+a2))*ẏ)*(L1*L2*cos(a2)))\
-		/((L1*L2*sin(a2))**2))*ȧ2 \
-		+ ((-L1*cos(a1)-L2*cos(a1+a2))/(L1*L2*sin(a2)))*ẍ + \
-		((-L1*sin(a1)-L2*sin(a1+a2))/(L1*L2*sin(a2)))*ÿ
-
-	global Ä1,Ä2
-	Ä1 = np.array(list(map(ä1,A1.T,A2.T,Ȧ1.T,Ȧ2.T,Ẋ[0].T,Ẋ[1].T,Ẍ[0].T,Ẍ[1].T))\
-					,dtype = 'float64',ndmin=2).T # returns a (1,N) array
-	Ä2 = np.array(list(map(ä2,A1.T,A2.T,Ȧ1.T,Ȧ2.T,Ẋ[0].T,Ẋ[1].T,Ẍ[0].T,Ẍ[1].T))\
-					,dtype = 'float64',ndmin=2).T # returns a (1,N) array
 def update_angle_lists(X,Ẋ,Ẍ):
 	"""
 	Takes in three (2,N) endpoint arrays and returns global lists for angles 1 and 2 of shape (1,N).
 	"""
+	def inverse_kinematics(X):
+		"""
+		Takes in a (2,N) list/array with values for x and y (endpoint) and maps to the  A1 and A2 with the current angles (in radians) from the inverse kinematics.
+		"""
+		import numpy as np
+		from math import acos, sin, cos, atan, atan2
+		from numpy import pi
+		assert np.shape(X)[0]==2, "X must be either a (2,len(X)) list/array"
+		x,y = np.split(X,2,axis=0) # Returns 2 (1,N) arrays
+		"""
+		Math Logic:
+		x² + y² > (L₁+L₂)² = L₁² + 2L₁L₂ + L₂² > L₁² + L₂²
+		x² + y² - L₁² - L₂² > 0
+		a₂ = cos⁻¹((x² + y² - L₁² - L₂²)/2L₁L₂) ∊ (0,π/2)
+
+		Map functions take in (N,1) list/arrays -- i.e., only length-1 arrays can be converted to Python scalars needed for the map function. Therefore, the transpose is needed to change (1,N) to (N,1)
+		"""
+		a2 = lambda x,y: acos((x**2 + y**2 - L1**2 - L2**2)/(2*L1*L2))
+		a1 = lambda x,y,a2: atan2(y,x) - atan2(L2*sin(a2),(L1+L2*cos(a2)))
+		global A1,A2
+		A2 = np.array(list(map(a2,x.T,y.T)), dtype='float64', ndmin=2) # Returns a (1,N) array
+		A1 = np.array(list(map(a1,x.T,y.T,A2.T)), dtype='float64', ndmin=2) # Returns a (1,N) array
+	def jacobian(a1,a2):
+		import numpy as np
+		from math import cos, sin
+		J = np.matrix([[-L1*sin(a1)-L2*sin(a1+a2),-L2*sin(a1+a2)],\
+									[L1*cos(a1)+L2*cos(a1+a2),L2*cos(a1+a2)]], dtype = 'float64')
+		return(J)
+	def inverse_jacobian(a1,a2):
+		import numpy as np
+		from math import cos, sin
+		det_J = L1*L2*cos(a1 + a2)*sin(a1) - L1*L2*sin(a1 + a2)*cos(a1)
+		J_inv = (1/det_J)*np.matrix([[- L2*cos(a1 + a2), 						- L2*sin(a1 + a2)],\
+									[L1*cos(a1)+L2*cos(a1 + a2),	L2*sin(a1 + a2) + L1*sin(a1)]], \
+									dtype = 'float64')
+		return(J_inv)
+	def update_angular_velocity(Ẋ):
+		import numpy as np
+		global A1,A2 # both are (1,N) arrays
+		"""
+		Note: numpy.float64 does not support inverse matrix operators. Luckily, this is an always invertible 2x2 matrix (J is nonsingular within the ROM because a₂ ∊ (0,π/2)), so the inverse Jacobian function has been mapped instead.
+		"""
+		# J = list(map(jacobian,A1.T,A2.T)) # Returns a list of shape (N,2,2)
+		J_inv = list(map(inverse_jacobian,A1.T,A2.T)) # Returns a list of shape (N,2,2)
+		"""
+		In order to map properly, X (shape (2,N)) must be be first split into N (2,1) arrays (length-1). Therefore, the third argument to map() does not need to be transposed. Similar logic follows for why J_inv is not transposed, as it is has N (2,2) matrix arrays. Changing the output to an array aids in creating arrays Ȧ1 and Ȧ2.
+		"""
+		Ȧ = list(map(lambda j_inv,ẋ: np.array(j_inv*ẋ), \
+							J_inv, np.split(Ẋ,np.shape(Ẋ)[1],axis=1)))
+		global Ȧ1,Ȧ2
+		Ȧ1,Ȧ2 = np.split(np.concatenate(Ȧ, axis=1), 2, axis=0) # both are (1,N) arrays
+	def update_angular_acceleration(Ẋ,Ẍ):
+		from math import cos,sin
+		import numpy as np
+
+		assert np.shape(Ẋ)[0]==2, "Ẋ must be a (2,len(Ẋ)) list/array"
+		assert np.shape(Ẍ)[0]==2, "Ẍ must be a (2,len(Ẍ)) list/array"
+		ẍ,ÿ = np.split(Ẍ,2,axis=0)
+		global A1,A2,Ȧ1,Ȧ2
+		"""
+			dȦ1/dt = (δȦ1/δA1)*(dA1/dt)
+						+ (δȦ1/δA2)*(dA2/dt)
+							+ (δȦ1/δẊ[0])*(dẊ[0]/dt)
+								+ (δȦ1/δẊ[1])*(dẊ[1]/dt)
+
+			dȦ2/dt = (δȦ2/δA1)*(dA1/dt)
+						+ (δȦ2/δA2)*(dA2/dt)
+							+ (δȦ2/δẊ[0])*(dẊ[0]/dt)
+								+ (δȦ2/δẊ[1])*(dẊ[1]/dt)
+		"""
+		ä1 = lambda a1,a2,ȧ1,ȧ2,ẋ,ẏ,ẍ,ÿ: \
+			((-sin(a1+a2)*ẋ+cos(a1+a2)*ẏ)/(L1*sin(a2)))*ȧ1 \
+			+ (((-sin(a1+a2)*ẋ+cos(a1+a2)*ẏ)*L1*sin(a2) - \
+			(cos(a1+a2)*ẋ+sin(a1+a2)*ẏ)*L1*cos(a2))/((L1**2)*(sin(a2)**2)))*ȧ2 \
+			+ (cos(a1+a2)/(L1*sin(a2)))*ẍ \
+			+ (sin(a1+a2)/(L1*sin(a2)))*ÿ
+		ä2 = lambda a1,a2,ȧ1,ȧ2,ẋ,ẏ,ẍ,ÿ: \
+			(((L1*sin(a1)+L2*sin(a1+a2))*ẋ + (-L1*cos(a1)-L2*cos(a1+a2))*ẏ)/(L1*L2*sin(a2)))*ȧ1 \
+			+ (((L2*sin(a1+a2)*ẋ + (-L2*cos(a1+a2))*ẏ)*(L1*L2*sin(a2)) \
+			- ((-L1*cos(a1)-L2*cos(a1+a2))*ẋ + (-L1*sin(a1)-L2*sin(a1+a2))*ẏ)*(L1*L2*cos(a2)))\
+			/((L1*L2*sin(a2))**2))*ȧ2 \
+			+ ((-L1*cos(a1)-L2*cos(a1+a2))/(L1*L2*sin(a2)))*ẍ + \
+			((-L1*sin(a1)-L2*sin(a1+a2))/(L1*L2*sin(a2)))*ÿ
+
+		global Ä1,Ä2
+		Ä1 = np.array(list(map(ä1,A1.T,A2.T,Ȧ1.T,Ȧ2.T,Ẋ[0].T,Ẋ[1].T,Ẍ[0].T,Ẍ[1].T))\
+						,dtype = 'float64',ndmin=2).T # returns a (1,N) array
+		Ä2 = np.array(list(map(ä2,A1.T,A2.T,Ȧ1.T,Ȧ2.T,Ẋ[0].T,Ẋ[1].T,Ẍ[0].T,Ẍ[1].T))\
+						,dtype = 'float64',ndmin=2).T # returns a (1,N) array
 	import numpy as np
+
 	inverse_kinematics(X)
 	update_angular_velocity(Ẋ)
 	update_angular_acceleration(Ẋ,Ẍ)
-def reaching_task(ReachType='Center',RandomXi=False, RandomXf=False, \
-					PathLength=0.35,EOM='Zadravec'):
+# class reaching_movement:
+# 	def __init__(self,DefaultPath,ReachType,RandomXiBool,RandomXfBool,TargetAmplitude,t_end):
+# 		self.DefaultPath = DefaultPath
+# 		self.Settings = {"Reaching Direction": ReachType, "Target Amplitude" : TargetAmplitude, \
+# 						"Random Starting Point" : RandomXiBool,"Random Ending Point" : RandomXfBool,\
+# 						"Movement Duration" : t_end, }
+# 	def return_trajectory(self,x,y,IsPositionFunction):
+# 		"""
+# 		This takes in a string -- either 'Center','Right','Left', or 'Sideways' -- and returns the necessary initial and final positions for the movement, based on Flash/Hogan (1985).
+#
+# 		Parameters:
+# 		# 0.80*(L1+L2) = 0.4586
+# 		# 0.35/(L1+L2) = 0.5295
+# 		# Sternum at -0.177 = -L1*(0.129/0.186) <-- Anthropomorphic Ratio
+# 		"""
+# 		def rotate_xy(x,y,angle):
+# 			XY = np.concatenate([x[np.newaxis,:],y[np.newaxis,:]],axis=0)
+# 			rotation_matrix = np.matrix([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
+# 			rotated_XY = rotation_matrix*XY
+# 			rotated_x = np.array(rotated_XY[0,:])[0]
+# 			rotated_y = np.array(rotated_XY[1,:])[0]
+# 			return(rotated_x,rotated_y)
+# 		def translate_xy(x,y,px=0,py=0):
+# 			translated_x = x + px
+# 			translated_y = y + py
+# 			return(translated_x,translated_y)
+#
+# 		global L1,L2
+# 		MedianPlane = -L1*(0.129/0.186) # Sternum at -L1*(0.129/0.186) <-- Anthropomorphic Ratio
+# 		DefaultDisplacement_x = 0.05
+#
+# 		assert self.Settings["Reaching Direction"].capitalize() in\
+# 		 			['Center','Right','Left','Sideways'], \
+# 						"ReachType must be either 'Center','Right','Left', or 'Sideways'."
+# 		assert type(IsPositionFunction)==bool, "IsPositionFunction is either True or False."
+#
+# 		if IsPositionFunction==True:
+# 			# Side to Side, Path Length = 0.5295⋅(L1+L2) = 0.35
+# 			if self.Settings["Reaching Direction"].capitalize() == 'Sideways':
+# 				x_Trajectory,y_Trajectory = translate_xy(x,y,px=-DefaultDisplacement_x)
+# 				# x_Trajectory, y_Trajectory = rotate_xy(x_Trajectory,y_Trajectory,0)
+# 				x_Trajectory, y_Trajectory = translate_xy(x_Trajectory,y_Trajectory,\
+# 											px = MedianPlane-self.Settings["Target Amplitude"]/2,\
+# 												py=0.10+self.Settings["Target Amplitude"]/2)
+# 				# Xi = [-MedianPlane-self.Settings["Target Amplitude"]/2,0.1+self.Settings["Target Amplitude"]/2]
+# 				# Xf = [-MedianPlane+self.Settings["Target Amplitude"]/2,0.1+self.Settings["Target Amplitude"]/2]
+#
+# 			# Center Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
+# 			elif self.Settings["Reaching Direction"].capitalize() == 'Center':
+# 				x_Trajectory,y_Trajectory = translate_xy(x,y,px=-DefaultDisplacement_x)
+# 				x_Trajectory, y_Trajectory = rotate_xy(x_Trajectory,y_Trajectory,np.pi/2)
+# 				x_Trajectory, y_Trajectory = translate_xy(x_Trajectory,y_Trajectory,\
+# 													px = MedianPlane,\
+# 														py=0.20)
+# 				# Xi = [-MedianPlane,0.20]
+# 				# Xf = [-MedianPlane,0.20 + self.Settings["Target Amplitude"]]
+#
+# 			# # Left Diagonal Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
+# 			elif self.Settings["Reaching Direction"].capitalize() == 'Left':
+# 				x_Trajectory,y_Trajectory = translate_xy(x,y,px=-DefaultDisplacement_x)
+# 				x_Trajectory, y_Trajectory = rotate_xy(x_Trajectory,y_Trajectory,3*np.pi/4)
+# 				x_Trajectory, y_Trajectory = translate_xy(x_Trajectory,y_Trajectory,\
+# 													px = MedianPlane,\
+# 														py=0.20)
+# 				# Xi = [-MedianPlane,0.20]
+# 				# Xf = [-MedianPlane-self.Settings["Target Amplitude"]/(2**0.5),\
+# 				#					0.20 + self.Settings["Target Amplitude"]/(2**0.5)]
+#
+# 			# # Right Diagonal Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
+# 			elif self.Settings["Reaching Direction"].capitalize() == 'Right':
+# 				x_Trajectory,y_Trajectory = translate_xy(x,y,px=-DefaultDisplacement_x)
+# 				x_Trajectory, y_Trajectory = rotate_xy(x_Trajectory,y_Trajectory,np.pi/4)
+# 				x_Trajectory, y_Trajectory = translate_xy(x_Trajectory,y_Trajectory,\
+# 													px = MedianPlane,\
+# 														py=0.20)
+# 				# Xi = [-MedianPlane,0.20]
+# 				# Xf = [-MedianPlane+self.Settings["Target Amplitude"]/(2**0.5),\
+# 				#					 0.20 + self.Settings["Target Amplitude"]/(2**0.5)]
+# 		else:
+# 			# Side to Side, Path Length = 0.5295⋅(L1+L2) = 0.35
+# 			if ReachType.capitalize() == 'Sideways':
+# 				x_Trajectory,y_Trajectory = x,y
+#
+# 			# Center Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
+# 			elif ReachType.capitalize() == 'Center':
+# 				x_Trajectory, y_Trajectory = rotate_xy(x,y,np.pi/2)
+#
+# 			# # Left Diagonal Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
+# 			elif ReachType.capitalize() == 'Left':
+# 				x_Trajectory, y_Trajectory = rotate_xy(x,y,3*np.pi/4)
+#
+# 			# # Right Diagonal Reach, Path Length = 0.5295⋅(L1+L2) = 0.35
+# 			elif ReachType.capitalize() == 'Right':
+# 				x_Trajectory, y_Trajectory = rotate_xy(x,y,np.pi/4)
+# 		return(x_Trajectory,y_Trajectory)
+# 	def return_X_values(self):
+# 		t_end = self.Settings["Movement Duration"]
+# 		Default_x,Default_y = self.DefaultPath.return_parameterized_X(t_end=t_end)
+# 		Default_ẋ,Default_ẏ = self.DefaultPath.return_parameterized_dX(Default_x,t_end=t_end)
+# 		Default_ẍ,Default_ÿ = self.DefaultPath.return_parameterized_d2X(Default_x,Default_ẋ,\
+# 																			t_end=t_end)
+#
+# 		x,y = self.return_trajectory(Default_x,Default_y,True)
+# 		ẋ,ẏ = self.return_trajectory(Default_ẋ,Default_ẏ,False)
+# 		ẍ,ÿ = self.return_trajectory(Default_ẍ,Default_ÿ,False)
+#
+# 		X = np.concatenate([x[np.newaxis,:],y[np.newaxis,:]],axis=0)
+# 		Ẋ = np.concatenate([ẋ[np.newaxis,:],ẏ[np.newaxis,:]],axis=0)
+# 		Ẍ = np.concatenate([ẍ[np.newaxis,:],ÿ[np.newaxis,:]],axis=0)
+# 		return(X,Ẋ,Ẍ)
+# 	def inverse_kinematics(self,X):
+# 		"""
+# 		Takes in a (2,N) list/array with values for x and y (endpoint) and maps to the  A1 and A2 with the current angles (in radians) from the inverse kinematics.
+# 		"""
+# 		import numpy as np
+# 		from math import acos, sin, cos, atan, atan2
+# 		from numpy import pi
+# 		assert np.shape(X)[0]==2, "X must be either a (2,len(X)) list/array"
+# 		x,y = np.split(X,2,axis=0) # Returns 2 (1,N) arrays
+# 		"""
+# 		Math Logic:
+# 		x² + y² > (L₁+L₂)² = L₁² + 2L₁L₂ + L₂² > L₁² + L₂²
+# 		x² + y² - L₁² - L₂² > 0
+# 		a₂ = cos⁻¹((x² + y² - L₁² - L₂²)/2L₁L₂) ∊ (0,π/2)
+#
+# 		Map functions take in (N,1) list/arrays -- i.e., only length-1 arrays can be converted to Python scalars needed for the map function. Therefore, the transpose is needed to change (1,N) to (N,1)
+# 		"""
+# 		a2 = lambda x,y: acos((x**2 + y**2 - L1**2 - L2**2)/(2*L1*L2))
+# 		a1 = lambda x,y,a2: atan2(y,x) - atan2(L2*sin(a2),(L1+L2*cos(a2)))
+# 		self.A2 = np.array(list(map(a2,x.T,y.T)), dtype='float64', ndmin=2) # Returns a (1,N) array
+# 		self.A1 = np.array(list(map(a1,x.T,y.T,self.A2.T)), dtype='float64', ndmin=2) # Returns a (1,N) array
+# 	def update_angular_velocity(self,X,Ẋ):
+# 		import numpy as np
+# 		if hasattr(self,'A1') == False:
+# 			inverse_kinematics(self,X)
+# 		def inverse_jacobian(a1,a2):
+# 			import numpy as np
+# 			from math import cos, sin
+# 			det_J = L1*L2*cos(a1 + a2)*sin(a1) - L1*L2*sin(a1 + a2)*cos(a1)
+# 			J_inv = (1/det_J)*np.matrix([[- L2*cos(a1 + a2),- L2*sin(a1 + a2)],\
+# 							[L1*cos(a1)+L2*cos(a1 + a2),	L2*sin(a1 + a2) + L1*sin(a1)]], \
+# 										dtype = 'float64')
+# 			return(J_inv)
+# 		"""
+# 		Note: numpy.float64 does not support inverse matrix operators. Luckily, this is an always invertible 2x2 matrix (J is nonsingular within the ROM because a₂ ∊ (0,π/2)), so the inverse Jacobian function has been mapped instead.
+# 		"""
+# 		# J = list(map(jacobian,A1.T,A2.T)) # Returns a list of shape (N,2,2)
+# 		J_inv = list(map(inverse_jacobian,self.A1.T,self.A2.T)) # Returns a list of shape (N,2,2)
+# 		"""
+# 		In order to map properly, X (shape (2,N)) must be be first split into N (2,1) arrays (length-1). Therefore, the third argument to map() does not need to be transposed. Similar logic follows for why J_inv is not transposed, as it is has N (2,2) matrix arrays. Changing the output to an array aids in creating arrays Ȧ1 and Ȧ2.
+# 		"""
+# 		Ȧ = list(map(lambda j_inv,ẋ: np.array(j_inv*ẋ), \
+# 							J_inv, np.split(Ẋ,np.shape(Ẋ)[1],axis=1)))
+# 		Ȧ1,Ȧ2 = np.split(np.concatenate(Ȧ, axis=1), 2, axis=0) # both are (1,N) arrays
+# 		return(Ȧ1,Ȧ2)
+# 	def update_angular_acceleration(self,Ȧ1,Ȧ2,Ẋ,Ẍ):
+# 		from math import cos,sin
+# 		import numpy as np
+#
+# 		assert np.shape(Ẋ)[0]==2, "Ẋ must be a (2,len(Ẋ)) list/array"
+# 		assert np.shape(Ẍ)[0]==2, "Ẍ must be a (2,len(Ẍ)) list/array"
+# 		ẍ,ÿ = np.split(Ẍ,2,axis=0)
+# 		"""
+# 			dȦ1/dt = (δȦ1/δA1)*(dA1/dt)
+# 						+ (δȦ1/δA2)*(dA2/dt)
+# 							+ (δȦ1/δẊ[0])*(dẊ[0]/dt)
+# 								+ (δȦ1/δẊ[1])*(dẊ[1]/dt)
+#
+# 			dȦ2/dt = (δȦ2/δA1)*(dA1/dt)
+# 						+ (δȦ2/δA2)*(dA2/dt)
+# 							+ (δȦ2/δẊ[0])*(dẊ[0]/dt)
+# 								+ (δȦ2/δẊ[1])*(dẊ[1]/dt)
+# 		"""
+# 		ä1 = lambda a1,a2,ȧ1,ȧ2,ẋ,ẏ,ẍ,ÿ: \
+# 			((-sin(a1+a2)*ẋ+cos(a1+a2)*ẏ)/(L1*sin(a2)))*ȧ1 \
+# 			+ (((-sin(a1+a2)*ẋ+cos(a1+a2)*ẏ)*L1*sin(a2) - \
+# 			(cos(a1+a2)*ẋ+sin(a1+a2)*ẏ)*L1*cos(a2))/((L1**2)*(sin(a2)**2)))*ȧ2 \
+# 			+ (cos(a1+a2)/(L1*sin(a2)))*ẍ \
+# 			+ (sin(a1+a2)/(L1*sin(a2)))*ÿ
+# 		ä2 = lambda a1,a2,ȧ1,ȧ2,ẋ,ẏ,ẍ,ÿ: \
+# 			(((L1*sin(a1)+L2*sin(a1+a2))*ẋ + (-L1*cos(a1)-L2*cos(a1+a2))*ẏ)/(L1*L2*sin(a2)))*ȧ1 \
+# 			+ (((L2*sin(a1+a2)*ẋ + (-L2*cos(a1+a2))*ẏ)*(L1*L2*sin(a2)) \
+# 			- ((-L1*cos(a1)-L2*cos(a1+a2))*ẋ + (-L1*sin(a1)-L2*sin(a1+a2))*ẏ)*(L1*L2*cos(a2)))\
+# 			/((L1*L2*sin(a2))**2))*ȧ2 \
+# 			+ ((-L1*cos(a1)-L2*cos(a1+a2))/(L1*L2*sin(a2)))*ẍ + \
+# 			((-L1*sin(a1)-L2*sin(a1+a2))/(L1*L2*sin(a2)))*ÿ
+#
+# 		Ä1 = np.array(list(map(ä1,self.A1.T,self.A2.T,Ȧ1.T,Ȧ2.T,Ẋ[0].T,Ẋ[1].T,Ẍ[0].T,Ẍ[1].T))\
+# 						,dtype = 'float64',ndmin=2).T # returns a (1,N) array
+# 		Ä2 = np.array(list(map(ä2,self.A1.T,self.A2.T,Ȧ1.T,Ȧ2.T,Ẋ[0].T,Ẋ[1].T,Ẍ[0].T,Ẍ[1].T))\
+# 						,dtype = 'float64',ndmin=2).T # returns a (1,N) array
+# 		return(Ä1,Ä2)
+# 	def update_angle_lists(self,X,Ẋ,Ẍ):
+# 		"""
+# 		Takes in three (2,N) endpoint arrays and returns global lists for angles 1 and 2 of shape (1,N).
+# 		"""
+# 		import numpy as np
+# 		self.inverse_kinematics(X)
+# 		Ȧ1,Ȧ2 = self.update_angular_velocity(X,Ẋ)
+# 		Ä1,Ä2 = self.update_angular_acceleration(Ȧ1,Ȧ2,Ẋ,Ẍ)
+# 		return(Ȧ1,Ȧ2,Ä1,Ä2)
+# 	def reaching_task_kinematics(self,EOM='Zadravec'):
+# 		def set_link_lengths(New_L1=None,New_L2=None,EOM = "Zadravec"):
+# 			"""
+# 			Sets the global link lengths for a 2 DOF planar reaching task. Changes the values of the link lengths. New_L1 and New_L2 must be numbers. Set EOM to Uno of Zadravec.
+#
+# 			Default L1 and L2 values are calculated from Winter's Anthropomorphic measurement scales for a 72 inch tall subject. L2 is currently the sum of forearm and hand measurements with some added value to reflect the reaching apparatus.
+# 			"""
+# 			if New_L1 != None:
+# 				assert type(New_L1) == int or type(New_L1)==float, "New_L1 must be a number."
+# 			if New_L2 != None:
+# 				assert type(New_L2) == int or type(New_L2)==float, "New_L2 must be a number."
+# 			assert EOM in [None,"Uno","Zadravec"], "EOM can be either None, 'Uno', or 'Zadravec'"
+# 			global L1, L2
+# 			# 72
+# 			Height_inches = 64.5
+# 			Height = 2.54*Height_inches/100
+# 			if New_L1 == None and New_L2 == None:
+# 				if EOM == "Uno":
+# 					L1 = 0.256
+# 					L2 = 0.315
+# 				elif EOM == "Zadravec":
+# 					L1 = 0.298
+# 					L2 = 0.419
+# 				else:
+# 					L1 = Height*0.186
+# 					L2 = Height*(0.146+0.108)
+# 			elif New_L1 != None:
+# 				L1 = New_L1
+# 				L2 = Height*(0.146+0.108)
+# 			elif New_L2 != None:
+# 				L1 = Height*0.186
+# 				L2 = New_L2
+# 		import numpy as np
+# 		assert self.ReachType.capitalize() in ['Center','Right','Left','Sideways'], \
+# 			"ReachType must be either 'Center','Right','Left', or 'Sideways'."
+# 		set_link_lengths()
+# 		create_angle_lists()
+# 		X,Ẋ,Ẍ = self.return_X_values()
+# 		Ȧ1,Ȧ2,Ä1,Ä2=update_angle_lists(X,Ẋ,Ẍ)
+# 		# calculate_torques(EOM=EOM)
+# 		return(Ȧ1,Ȧ2,Ä1,Ä2,X,Ẋ,Ẍ)
+def reaching_task(ReachType='Center',RandomXiBool=False, RandomXfBool=False, \
+					TargetAmplitude=0.35,EOM='Zadravec',t_end=1):
 	import numpy as np
 	assert ReachType.capitalize() in ['Center','Right','Left','Sideways'], \
 		"ReachType must be either 'Center','Right','Left', or 'Sideways'."
 	set_link_lengths()
 	create_angle_lists()
 	# t = np.array(np.arange(0,1+dt,dt),dtype='float64',ndmin=2)
-	DefaultPath = generate_default_path(PathLength=PathLength,RandomXi=RandomXi,RandomXf=RandomXf)
-	X,Ẋ,Ẍ = return_X_values(DefaultPath,ReachType,RandomXi=RandomXi,\
-								RandomXf=RandomXf,PathLength=PathLength)
+	DefaultPath = generate_default_path(TargetAmplitude=TargetAmplitude,RandomXiBool=RandomXiBool,RandomXfBool=RandomXfBool)
+	X,Ẋ,Ẍ = return_X_values(DefaultPath,ReachType,RandomXiBool=RandomXiBool,\
+								RandomXfBool=RandomXfBool,TargetAmplitude=TargetAmplitude,t_end=t_end)
 	update_angle_lists(X,Ẋ,Ẍ)
 	# calculate_torques(EOM=EOM)
 	return(X,Ẋ,Ẍ)
-def plot_resulting_kinematics():
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from math import cos,sin
-
-    dt = 1/(len(A1)-1)
-    t = np.arange(0,1+dt,dt)
-    x = np.array([L1*cos(A1[i])+L2*cos(A1[i]+A2[i]) for i in range(len(A1))])
-    y = np.array([L1*sin(A1[i])+L2*sin(A1[i]+A2[i]) for i in range(len(A1))])
-
-    plt.figure()
-    plt.plot(x,y)
-    ax1 = plt.gca()
-    ax1.set_aspect('equal')
-    ax1.set_title("Total Trajectory")
-    ax1.set_xlabel('x (m)')
-    ax1.set_ylabel('y (m)')
-    ax1.set_ylim(ymin=min(y)-abs(0.05*(max(y)-min(y))),ymax=max(y)+abs(0.05*(max(y)-min(y))))
-    ax1.set_xlim(xmin=min(x)-abs(0.05*(max(x)-min(x))),xmax=max(x)+abs(0.05*(max(x)-min(x))))
-
-    plt.figure()
-    plt.plot(t,x)
-    ax2 = plt.gca()
-    ax2.set_title("Trajectory x-Component")
-    ax2.set_xlabel('Normalized Time')
-    ax2.set_ylabel('x (m)')
-
-    plt.figure()
-    plt.plot(t,y)
-    ax3 = plt.gca()
-    ax3.set_title("Trajectory y-Component")
-    ax3.set_xlabel('Normalized Time')
-    ax3.set_ylabel('y (m)')
-def MA_function(Parameters):
-	"""
-	Note:
-
-	Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
-
-	Notes:
-
-	threshold is only needed for Pigeon or Ramsay MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
-
-	dof only needed for Pigeon (Ramsay only handles EFE for this 2 DOF system). Must be either 'Shoulder' or 'Elbow'.
-
-	eq is only needed for Ramsay (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
-	"""
-	import sympy as sp
-	import numpy as np
-
-	src = Parameters['src']
-	Coefficients = Parameters['MA']
-	eq = Parameters['eq']
-	dof = Parameters['dof']
-	threshold = Parameters['threshold']
-
-	global q1,q2,q_PS
-	assert type(src) == str, "src must be a str."
-	assert src.capitalize() in ['Ramsay','Pigeon','Est'], "src must be either Ramsay, Pigeon or Est (Estimate)."
-	if dof != None:
-		assert type(dof) == str, "dof must be a str."
-		assert dof.capitalize() in ['Shoulder','Elbow'], "dof must be either Shoulder or Elbow."
-	if src.capitalize() == 'Pigeon' :
-		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
-		assert dof != None, "For Pigeon (1996), dof must be stated."
-		eq = None
-		if dof.capitalize() == 'Elbow' :
-			q = q2
-		else:
-			q = q1
-		MomentArm = (np.matrix(Coefficients,dtype='float64')\
-						*np.matrix([1,q,q**2,q**3,q**4,q**5]).T)[0,0]
-	elif src.capitalize() == 'Est' :
-		MomentArm = np.array(Coefficients,dtype='float64')
-	else: #src.capitalize() == 'Ramsay'
-		q = q2
-		assert type(Coefficients) == list, "Coefficients must be a list."
-		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
-		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay (2009)."
-		if eq == 1:
-			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
-			MomentArm = (sp.Matrix(Coefficients,dtype='float64').T\
-							*sp.Matrix([1,q,q**2,q**3,q**4]))[0,0]
-		elif eq == 2:
-			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
-			MomentArm = (sp.Matrix(Coefficients,dtype='float64').T*\
-							sp.Matrix([1, q, q_PS, q*q_PS, q**2, \
-										q_PS**2, (q**2)*q_PS, q*(q_PS**2), \
-										(q**2)*(q_PS**2), q**3, q_PS**3, \
-										(q**3)*q_PS, q*(q_PS**3), \
-										(q**3)*(q_PS**2), (q**2)*(q_PS**3), \
-										(q**3)*(q_PS**3)]))[0, 0]
-		else: # eq == 3
-			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
-			MomentArm = (sp.Matrix(Coefficients,dtype='float64').T*\
-							sp.Matrix([1, q, q_PS, q*q_PS, q**2, \
-								q_PS**2, (q**2)*q_PS, q*(q_PS**2), (q**2)*(q_PS**2), \
-								q**3, (q**3)*q_PS, (q**3)*(q_PS**2), \
-								q**4, (q**4)*q_PS, (q**4)*(q_PS**2),  \
-								q**5, (q**5)*q_PS, (q**5)*(q_PS**2)]))[0, 0]
-	if threshold == None:
-		return(MomentArm)
-	else:
-		assert type(threshold) in [int,float], "threshold must be a number."
-		MomentArm = sp.Piecewise((MomentArm,q<threshold),(MomentArm.subs(q,threshold),q>=threshold))
-		return(MomentArm)
-def Pigeon_coeff_conversion(Coefficients):
-	"""
-	Takes in Coefficient values from Pigeon (1996) -- which take in angles in degrees -- and coverts them into the properly scaled coefficients for radians, additionally scaled by the magnitude listed in the paper.
-
-	Note that the coefficients listed in Pigeon (1996) are given in decending order (i.e., c₅,c₄,c₃,c₂,c₁,c₀). However to maintain continuity with the equations given in Ramsay (2009), we list coefficients in order of increasing power (i.e., c₀,c₁,c₂,c₃,c₄,c₅).
-	"""
-	import numpy as np
-	assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
-	assert type(Coefficients)==list, 'Coefficients must be a 6 element list.'
-	rad_conversion = np.multiply(Coefficients,\
-			np.array([1,(180/np.pi),(180/np.pi)**2,(180/np.pi)**3,(180/np.pi)**4,(180/np.pi)**5],dtype = 'float64'))
-	new_Coefficients =\
-	 	np.multiply(rad_conversion,np.array([1,1e-1,1e-3,1e-5,1e-7,1e-9],dtype='float64'))
-	return(new_Coefficients)
 def global_R_matrix():
 	"""
 	Notes:
@@ -909,6 +1063,94 @@ def global_R_matrix():
 
 	# Coefficients from observation, Ramsay, Pigeon, FVC, Holtzbaur, or Banks.
 	# Moment arms are in mm. Mass is in grams. threshold is in radians.
+
+	def MA_function(Parameters):
+		"""
+		Note:
+
+		Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
+
+		Notes:
+
+		threshold is only needed for Pigeon or Ramsay MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
+
+		dof only needed for Pigeon (Ramsay only handles EFE for this 2 DOF system). Must be either 'Shoulder' or 'Elbow'.
+
+		eq is only needed for Ramsay (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
+		"""
+		import sympy as sp
+		import numpy as np
+
+		src = Parameters['src']
+		Coefficients = Parameters['MA']
+		eq = Parameters['eq']
+		dof = Parameters['dof']
+		threshold = Parameters['threshold']
+
+		global q1,q2,q_PS
+		assert type(src) == str, "src must be a str."
+		assert src.capitalize() in ['Ramsay','Pigeon','Est'], "src must be either Ramsay, Pigeon or Est (Estimate)."
+		if dof != None:
+			assert type(dof) == str, "dof must be a str."
+			assert dof.capitalize() in ['Shoulder','Elbow'], "dof must be either Shoulder or Elbow."
+		if src.capitalize() == 'Pigeon' :
+			assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
+			assert dof != None, "For Pigeon (1996), dof must be stated."
+			eq = None
+			if dof.capitalize() == 'Elbow' :
+				q = q2
+			else:
+				q = q1
+			MomentArm = (np.matrix(Coefficients,dtype='float64')\
+							*np.matrix([1,q,q**2,q**3,q**4,q**5]).T)[0,0]
+		elif src.capitalize() == 'Est' :
+			MomentArm = np.array(Coefficients,dtype='float64')
+		else: #src.capitalize() == 'Ramsay'
+			q = q2
+			assert type(Coefficients) == list, "Coefficients must be a list."
+			assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
+			assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay (2009)."
+			if eq == 1:
+				assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
+				MomentArm = (sp.Matrix(Coefficients,dtype='float64').T\
+								*sp.Matrix([1,q,q**2,q**3,q**4]))[0,0]
+			elif eq == 2:
+				assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
+				MomentArm = (sp.Matrix(Coefficients,dtype='float64').T*\
+								sp.Matrix([1, q, q_PS, q*q_PS, q**2, \
+											q_PS**2, (q**2)*q_PS, q*(q_PS**2), \
+											(q**2)*(q_PS**2), q**3, q_PS**3, \
+											(q**3)*q_PS, q*(q_PS**3), \
+											(q**3)*(q_PS**2), (q**2)*(q_PS**3), \
+											(q**3)*(q_PS**3)]))[0, 0]
+			else: # eq == 3
+				assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
+				MomentArm = (sp.Matrix(Coefficients,dtype='float64').T*\
+								sp.Matrix([1, q, q_PS, q*q_PS, q**2, \
+									q_PS**2, (q**2)*q_PS, q*(q_PS**2), (q**2)*(q_PS**2), \
+									q**3, (q**3)*q_PS, (q**3)*(q_PS**2), \
+									q**4, (q**4)*q_PS, (q**4)*(q_PS**2),  \
+									q**5, (q**5)*q_PS, (q**5)*(q_PS**2)]))[0, 0]
+		if threshold == None:
+			return(MomentArm)
+		else:
+			assert type(threshold) in [int,float], "threshold must be a number."
+			MomentArm = sp.Piecewise((MomentArm,q<threshold),(MomentArm.subs(q,threshold),q>=threshold))
+			return(MomentArm)
+	def Pigeon_coeff_conversion(Coefficients):
+		"""
+		Takes in Coefficient values from Pigeon (1996) -- which take in angles in degrees -- and coverts them into the properly scaled coefficients for radians, additionally scaled by the magnitude listed in the paper.
+
+		Note that the coefficients listed in Pigeon (1996) are given in decending order (i.e., c₅,c₄,c₃,c₂,c₁,c₀). However to maintain continuity with the equations given in Ramsay (2009), we list coefficients in order of increasing power (i.e., c₀,c₁,c₂,c₃,c₄,c₅).
+		"""
+		import numpy as np
+		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
+		assert type(Coefficients)==list, 'Coefficients must be a 6 element list.'
+		rad_conversion = np.multiply(Coefficients,\
+				np.array([1,(180/np.pi),(180/np.pi)**2,(180/np.pi)**3,(180/np.pi)**4,(180/np.pi)**5],dtype = 'float64'))
+		new_Coefficients =\
+		 	np.multiply(rad_conversion,np.array([1,1e-1,1e-3,1e-5,1e-7,1e-9],dtype='float64'))
+		return(new_Coefficients)
 
 	PC_Coefficients = {\
 		'Shoulder' : {\
@@ -1456,7 +1698,7 @@ def concentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,costtype = 'l
 	TotalNegativeExcursion = np.trapz(NegativeMuscleVelocities,dx=t_end*dt)
 	ConcentricCost = cost_function(TotalNegativeExcursion,costtype=costtype)
 	return(ConcentricCost)
-def animate_plots(response,ReachType, Weighted=False, save_as_gif = False):
+def animate_plots(response,ReachType, Weighted=False, save_as_gif = False,t_end=1):
 	assert type(response)==bool, "Input must be either True or False."
 	assert type(Weighted)==bool, "Weighted must be either True or False."
 	assert ReachType in ['Sideways','Center','Left','Right'], "ReachType must be either 'Sideways','Center','Left', or 'Right'"
@@ -1486,19 +1728,25 @@ def animate_plots(response,ReachType, Weighted=False, save_as_gif = False):
 		plt.subplots_adjust(top=0.9,hspace=0.2,bottom=0.2,left=0.2)
 
 		if ReachType == 'Left':
-			DescriptiveTitle = "45$^\circ$ Reach Left"
+			DescriptiveTitle = "45$^\circ$ Reach Left\n"
 		elif ReachType == 'Right':
-			DescriptiveTitle = "45$^\circ$ Reach Right"
+			DescriptiveTitle = "45$^\circ$ Reach Right\n"
 		elif ReachType == 'Sideways':
-			DescriptiveTitle = 'Side-to-side Reach'
+			DescriptiveTitle = "Side-to-side Reach\n"
 		else:
-			DescriptiveTitle = 'Straight Forward (Center) Reach'
+			DescriptiveTitle = "Straight Forward (Center) Reach\n"
 
-		if Weighted==True:
-			TypeString = "\n(Afferent-Weighted $\hat{v}_m$)\n"
+		# if Weighted==True:
+		# 	TypeString = "\n(Afferent-Weighted $\hat{v}_m$)\n"
+		# else:
+		# 	TypeString = "\n(Normalized $\hat{v}_m$)\n"
+		if t_end == 1:
+			MovementDurationString = "Movement Duration : " + str(t_end) \
+									+ " sec\n"
 		else:
-			TypeString = "\n(Normalized $\hat{v}_m$)\n"
-		plt.suptitle(DescriptiveTitle + TypeString,Fontsize=20,y=0.975)
+			MovementDurationString = "Movement Duration : " + str(t_end) \
+									+ " secs\n"
+		plt.suptitle(DescriptiveTitle + MovementDurationString,Fontsize=20,y=0.975)
 
 		#Forward Model
 
@@ -1716,8 +1964,8 @@ def animate_plots(response,ReachType, Weighted=False, save_as_gif = False):
 								-0.02*np.cos(A1_forward[0,i]+A2_forward[0,i]))
 			StickFigure_f.set_xdata(np.cumsum([0,L1*np.cos(A1_forward[0,i]),L2*(0.146/(0.146+0.108))*np.cos(A1_forward[0,i]+A2_forward[0,i]),L2*(0.108/(0.146+0.108))*np.cos(A1_forward[0,i]+A2_forward[0,i])]))
 			StickFigure_f.set_ydata(np.cumsum([0,L1*np.sin(A1_forward[0,i]),L2*(0.146/(0.146+0.108))*np.sin(A1_forward[0,i]+A2_forward[0,i]),L2*(0.108/(0.146+0.108))*np.sin(A1_forward[0,i]+A2_forward[0,i])]))
-			Screen_f.xy = (i/len(t.T),-13)
-			Screen_f._width = t_end - i/len(t.T)
+			Screen_f.xy = (t_end*i/len(t.T),-13)
+			Screen_f._width = t_end*(1 - i/len(t.T))
 
 			movement_r.set_xdata(list(map(lambda a1,a2: L1*np.cos(a1)+L2*np.cos(a1+a2),\
 								A1_reverse[0,:i],A2_reverse[0,:i])))  # update the data
@@ -1742,8 +1990,8 @@ def animate_plots(response,ReachType, Weighted=False, save_as_gif = False):
 								-0.02*np.cos(A1_reverse[0,i]+A2_reverse[0,i]))
 			StickFigure_r.set_xdata(np.cumsum([0,L1*np.cos(A1_reverse[0,i]),L2*(0.146/(0.146+0.108))*np.cos(A1_reverse[0,i]+A2_reverse[0,i]),L2*(0.108/(0.146+0.108))*np.cos(A1_reverse[0,i]+A2_reverse[0,i])]))
 			StickFigure_r.set_ydata(np.cumsum([0,L1*np.sin(A1_reverse[0,i]),L2*(0.146/(0.146+0.108))*np.sin(A1_reverse[0,i]+A2_reverse[0,i]),L2*(0.108/(0.146+0.108))*np.sin(A1_reverse[0,i]+A2_reverse[0,i])]))
-			Screen_r.xy = (i/len(t.T),-13)
-			Screen_r._width = t_end - i/len(t.T)
+			Screen_r.xy = (t_end*i/len(t.T),-13)
+			Screen_r._width = t_end*(1 - i/len(t.T))
 						# Arm.set_xdata(np.cumsum([0,L1*np.cos(A1_forward[0,i]),L2*(0.146/(0.146+0.108))*np.cos(A1_forward[0,i]+A2_forward[0,i]),L2*(0.108/(0.146+0.108))*np.cos(A1_forward[0,i]+A2_forward[0,i])]))
 			# Arm.set_ydata(np.cumsum([0,L1*np.sin(A1_forward[0,i]),L2*(0.146/(0.146+0.108))*np.sin(A1_forward[0,i]+A2_forward[0,i]),L2*(0.108/(0.146+0.108))*np.sin(A1_forward[0,i]+A2_forward[0,i])]))
 			return Elbow_f,Endpoint_f,Wrist_f,UpperArm_f,Forearm_f,Hand_f,StickFigure_f,movement_f,Screen_f,Elbow_r,Endpoint_r,Wrist_r,UpperArm_r,Forearm_r,Hand_r,StickFigure_r,movement_r,Screen_r,Angle1_f,Angle2_f,Angle1_r,Angle2_r,
@@ -1843,33 +2091,83 @@ def animate_plots(response,ReachType, Weighted=False, save_as_gif = False):
 			return Elbow_f,Endpoint_f,Wrist_f,UpperArm_f,Forearm_f,Hand_f,StickFigure_f,Screen_f,Elbow_r,Endpoint_r,Wrist_r,UpperArm_r,Forearm_r,Hand_r,StickFigure_r,Screen_r,
 
 		ani = animation.FuncAnimation(fig, animate, np.arange(1, len(A1_forward[0,:]),10), init_func=init,interval=25, blit=True)
-		if save_as_gif:
-			ani.save('test.mp4',fps=50, dpi=100)
+		# if save_as_gif:
+		# 	ani.save('test.gif', writer='imagemagick', fps=30)
 		plt.show()
-
-def run_N_loops(NumberOfLoops):
-	for LoopNumber in range(NumberOfLoops):
-		XSplines = clamped_cubic_spline(0,EndTime,XInitial,XFinal,ẊInitial, \
-												ẊFinal,XMin,XMax,Time,\
-												angle = "Shoulder")
-		Angle2Splines = clamped_cubic_spline(0,EndTime,Angle2Initial,Angle2Final,AngularVelocity2Initial, \
-												AngularVelocity2Final,Angle2Bounds[0],Angle2Bounds[1],Time, \
-												angle = "Elbow")
-		Angle3Splines = clamped_cubic_spline(0,EndTime,Angle3Initial,Angle3Final,AngularVelocity3Initial, \
-												AngularVelocity3Final,Angle3Bounds[0],Angle3Bounds[1],Time)
-		if LoopNumber <= 8:
-			print('-'*37 + 'End of Loop ' + str(LoopNumber+1) + '-'*37)
+def reach_type_prompt():
+	import numpy as np
+	import random
+	DefaultSettings = False
+	ValidResponse_1 = False
+	while ValidResponse_1 == False:
+		ReachTypeNumber = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nPlease select reaching movement number:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Side-to-side\n (2) - Straight (Center)\n (3) - 45° Left\n (4) - 45° Right\n  ⏎  - Random\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMovement Type: ")
+		if ReachTypeNumber not in ['1','2','3','4','']:
+			print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
+			ValidResponse_1 = False
+		elif ReachTypeNumber == '':
+			ReachTypeNumber = random.randint(0,3)
+			DefaultSettings = True
+			ValidResponse_1 = True
 		else:
-			print('-'*36 + 'End of Loop ' + str(LoopNumber+1) + '-'*37)
-		pickle.dump([Angle1Splines, Angle2Splines, Angle3Splines], open('LoopNumber' + str(LoopNumber+1) + '.pkl','wb'),pickle.HIGHEST_PROTOCOL)
+			ReachTypeNumber = int(ReachTypeNumber)-1
+			print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n')
+			ValidResponse_1 = True
+	ReachType = ['Sideways','Center','Left','Right'][ReachTypeNumber]
+	DescriptiveTitle = ReachType + ' Reach'
 
+	if DefaultSettings == False:
+		ValidResponse_2 = False
+		while ValidResponse_2 == False:
+			RandomXiResponse = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nFix Starting Point?\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - True\n (2) - False\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
+			if RandomXiResponse not in ['1','2']:
+				print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
+				ValidResponse_2 = False
+			else:
+				RandomXiResponse = int(RandomXiResponse)-1
+				print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n')
+				ValidResponse_2 = True
+		RandomXiBool = [True,False][RandomXiResponse]
+
+		ValidResponse_3 = False
+		while ValidResponse_3 == False:
+			RandomXfResponse = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nFix Ending Point?\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - True\n (2) - False\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
+			if RandomXfResponse not in ['1','2']:
+				print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
+				ValidResponse_3 = False
+			else:
+				RandomXfResponse = int(RandomXfResponse)-1
+				print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n')
+				ValidResponse_3 = True
+		RandomXfBool = [True,False][RandomXfResponse]
+	else:
+		RandomXiBool = False
+		RandomXfBool = False
+	return(DescriptiveTitle,ReachType,RandomXiBool,RandomXfBool)
+# def run_N_loops(NumberOfLoops):
+# 	for LoopNumber in range(NumberOfLoops):
+# 		XSplines = clamped_cubic_spline(0,EndTime,XInitial,XFinal,ẊInitial, \
+# 												ẊFinal,XMin,XMax,Time,\
+# 												angle = "Shoulder")
+# 		Angle2Splines = clamped_cubic_spline(0,EndTime,Angle2Initial,Angle2Final,AngularVelocity2Initial, \
+# 												AngularVelocity2Final,Angle2Bounds[0],Angle2Bounds[1],Time, \
+# 												angle = "Elbow")
+# 		Angle3Splines = clamped_cubic_spline(0,EndTime,Angle3Initial,Angle3Final,AngularVelocity3Initial, \
+# 												AngularVelocity3Final,Angle3Bounds[0],Angle3Bounds[1],Time)
+# 		if LoopNumber <= 8:
+# 			print('-'*37 + 'End of Loop ' + str(LoopNumber+1) + '-'*37)
+# 		else:
+# 			print('-'*36 + 'End of Loop ' + str(LoopNumber+1) + '-'*37)
+# 		pickle.dump([Angle1Splines, Angle2Splines, Angle3Splines], open('LoopNumber' + str(LoopNumber+1) + '.pkl','wb'),pickle.HIGHEST_PROTOCOL)
 # run_N_loops(10)
+
 import numpy as np
 import matplotlib.pyplot as plt
 import time
 import scipy as sp
-
+import random
 import sys
+
+random.seed()
 
 	# Save Output Figures?
 
@@ -1877,76 +2175,41 @@ SaveOutputFigures = False
 
 	# DescriptiveTitle should be something to identify the trial either by reaching location, (i.e., Left, Right, Center, or Sideways) or by what has changed in the most current iteration (e.g., CB_Ramsay, DELTa_Est, etc.). Spaces will be replaced by '_' symbols for the filename but kept for figure titles.
 
-ValidResponse_1 = False
-while ValidResponse_1 == False:
-	ReachTypeNumber = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nPlease select reaching movement number:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Side-to-side\n (2) - Straight (Center)\n (3) - 45° Left\n (4) - 45° Right\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMovement Number: ")
-	if ReachTypeNumber not in ['1','2','3','4']:
-		print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
-		ValidResponse_1 = False
-	else:
-		ReachTypeNumber = int(ReachTypeNumber)-1
-		print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n')
-		ValidResponse_1 = True
-ReachType = ['Sideways','Center','Left','Right'][ReachTypeNumber]
-DescriptiveTitle = ReachType + ' Reach'
-
-ValidResponse_2 = False
-while ValidResponse_2 == False:
-	fix_starting_point_number = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nFix Starting Point?\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - True\n (2) - False\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
-	if fix_starting_point_number not in ['1','2']:
-		print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
-		ValidResponse_2 = False
-	else:
-		fix_starting_point_number = int(fix_starting_point_number)-1
-		print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n')
-		ValidResponse_2 = True
-fix_starting_point = [True,False][fix_starting_point_number]
-
-ValidResponse_3 = False
-while ValidResponse_3 == False:
-	fix_ending_point_number = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nFix Ending Point?\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - True\n (2) - False\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
-	if fix_ending_point_number not in ['1','2']:
-		print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
-		ValidResponse_3 = False
-	else:
-		fix_ending_point_number = int(fix_ending_point_number)-1
-		print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n')
-		ValidResponse_3 = True
-fix_ending_point = [True,False][fix_ending_point_number]
-
-x_initial_desired = 0.01 # cm
-x_final_desired = 0.41 # cm
-y_initial_desired = 0 # cm
-y_final_desired = 0 # cm
-boundary_sigma = 0.0025
-allowable_error_rad = 30*(np.pi/180) #degrees
-allowable_error_y = 0.05 # cm
+DescriptiveTitle,ReachType,RandomXiBool,RandomXfBool = reach_type_prompt()
+TargetAmplitude = 0.35 # cm
 NumberOfTrials =  100
-dt = 1/1000
-t = np.linspace(0,1,int(1/dt) + 1)
-t_end = t[-1]
+
+	# Define time scale
+
+N = 1000
+t_end = 2
+t = np.linspace(0,t_end,N + 1)
+dt = t[1]-t[0]
+
+	# Set up Model
 
 set_link_lengths()
 global_R_matrix()
-n_muscles=len(AllCoefficients)
-n_extensors = sum([AllCoefficients[key]['Group']=='extensor' for key in AllCoefficients.keys()])
-n_flexors = sum([AllCoefficients[key]['Group']=='flexor' for key in AllCoefficients.keys()])
-flexor_cmap=plt.get_cmap('autumn')
-extensor_cmap = plt.get_cmap('YlGnBu')
-flexor_colors = iter(flexor_cmap(np.linspace(0,1,n_flexors)))
-extensor_colors = iter(list(reversed(extensor_cmap(np.linspace(0,1,n_flexors)))))
-flexor_colors_list = []
-extensor_colors_list = []
+
+NumMuscles=len(AllCoefficients)
+NumExtensors = sum([AllCoefficients[key]['Group']=='extensor' for key in AllCoefficients.keys()])
+NumFlexors = sum([AllCoefficients[key]['Group']=='flexor' for key in AllCoefficients.keys()])
+FlexorCMap=plt.get_cmap('autumn')
+ExtensorCMap = plt.get_cmap('YlGnBu')
+FlexorColors = iter(FlexorCMap(np.linspace(0,1,NumFlexors)))
+ExtensorColors = iter(list(reversed(ExtensorCMap(np.linspace(0,1,NumFlexors)))))
+FlexorColorsList = []
+ExtensorColorsList = []
 FlexorOrderedMuscleList = []
 ExtensorOrderedMuscleList = []
-for muscle in AllCoefficients:
-   if AllCoefficients[muscle]['Group'] == 'flexor':
-        flexor_colors_list.append(next(flexor_colors))
-        FlexorOrderedMuscleList.append(muscle)
+for Muscle in AllCoefficients:
+   if AllCoefficients[Muscle]['Group'] == 'flexor':
+        FlexorColorsList.append(next(FlexorColors))
+        FlexorOrderedMuscleList.append(Muscle)
    else:
-        extensor_colors_list.append(next(extensor_colors))
-        ExtensorOrderedMuscleList.append(muscle)
-OrderedColorsList = flexor_colors_list + list(reversed(extensor_colors_list))
+        ExtensorColorsList.append(next(ExtensorColors))
+        ExtensorOrderedMuscleList.append(Muscle)
+OrderedColorsList = FlexorColorsList + list(reversed(ExtensorColorsList))
 OrderedMuscleList = FlexorOrderedMuscleList + list(reversed(ExtensorOrderedMuscleList))
 OrderNumber = [list(AllCoefficients.keys()).index(el) for el in OrderedMuscleList]
 
@@ -1954,8 +2217,8 @@ OrderNumber = [list(AllCoefficients.keys()).index(el) for el in OrderedMuscleLis
 
 	# Forward Direction
 
-X_Forward = reaching_task(ReachType=ReachType,RandomXi=fix_starting_point,\
-					RandomXf=fix_ending_point)
+X_Forward = reaching_task(TargetAmplitude=TargetAmplitude,ReachType=ReachType,RandomXiBool=RandomXiBool,\
+					RandomXfBool=RandomXfBool,t_end=t_end)
 return_MA_matrix()
 
 	# Calculate resulting muscle velocities, lengths, etc.
@@ -2064,7 +2327,7 @@ ConcentricCost_Forward = concentric_cost(WeightedNormalizedMuscleVelocity_Forwar
 #
 # 	# Test to make sure that the muscle velocities are negative, time-reversed versions of each other for the forward and backwards movement.
 #
-# assert np.array([np.array(abs(NormalizedMuscleVelocity_Forward[j,0,:].T-np.array(list(reversed(-NormalizedMuscleVelocity_Reverse[j,0,:]))).T)<1e-12).all() for j in range(n_muscles)]).all(), "The muscle velocities are not reversed and negative versions of each other."
+# assert np.array([np.array(abs(NormalizedMuscleVelocity_Forward[j,0,:].T-np.array(list(reversed(-NormalizedMuscleVelocity_Reverse[j,0,:]))).T)<1e-12).all() for j in range(NumMuscles)]).all(), "The muscle velocities are not reversed and negative versions of each other."
 #
 # 	# Plot Afferent-Weighted Muscle Velocity (Reverse)
 #
@@ -2168,7 +2431,7 @@ ConcentricCost_Forward = concentric_cost(WeightedNormalizedMuscleVelocity_Forwar
 
 ###################################################################################################
 
-animate_plots(True,ReachType,Weighted=False,save_as_gif=True)
+animate_plots(True,ReachType,Weighted=False,save_as_gif=True,t_end=t_end)
 
 
 ##############################################################################
@@ -2183,30 +2446,30 @@ animate_plots(True,ReachType,Weighted=False,save_as_gif=True)
 # StartTime = time.time()
 #
 # while i < NumberOfTrials:
-# 	if fix_starting_point == False:
-# 		x_initial = x_initial_desired + np.random.normal(0,boundary_sigma) # cm
-# 		y_initial = y_initial_desired + np.random.normal(0,boundary_sigma) # cm
+# 	if RandomXiBool == False:
+# 		x_initial = DefaultXi + np.random.normal(0,EndpointErrorSigma) # cm
+# 		y_initial = DefaultYi + np.random.normal(0,EndpointErrorSigma) # cm
 # 	else:
-# 		x_initial = x_initial_desired # cm
-# 		y_initial = y_initial_desired # cm
+# 		x_initial = DefaultXi # cm
+# 		y_initial = DefaultYi # cm
 #
-# 	if fix_ending_point == False:
-# 		x_final = x_final_desired + np.random.normal(0,boundary_sigma) # cm
-# 		y_final = y_final_desired + np.random.normal(0,boundary_sigma) # cm
+# 	if RandomXfBool == False:
+# 		x_final = DefaultXf + np.random.normal(0,EndpointErrorSigma) # cm
+# 		y_final = DefaultYf + np.random.normal(0,EndpointErrorSigma) # cm
 # 	else:
-# 		x_final = x_final_desired # cm
-# 		y_final = y_final_desired # cm
+# 		x_final = DefaultXf # cm
+# 		y_final = DefaultYf # cm
 #
-# 	initialerror = np.random.uniform(-np.tan(allowable_error_rad),np.tan(allowable_error_rad))
+# 	initialerror = np.random.uniform(-np.tan(EndpointErrorTheta),np.tan(EndpointErrorTheta))
 # 	finalerror = -np.sign(initialerror)*\
-# 			abs(np.random.uniform(-np.tan(allowable_error_rad),np.tan(allowable_error_rad)))
+# 			abs(np.random.uniform(-np.tan(EndpointErrorTheta),np.tan(EndpointErrorTheta)))
 # 	# finalerror = -np.random.normal(initialerror/2,abs(initialerror)/4)
 # 	if initialerror>0:
-# 		ymax = max([y_initial,y_final])+allowable_error_y
+# 		ymax = max([y_initial,y_final])+MaximumDeviationInY
 # 		ymin = 0
 # 	else:
 # 		ymax = 0
-# 		ymin = min([y_initial,y_final])-allowable_error_y
+# 		ymin = min([y_initial,y_final])-MaximumDeviationInY
 #
 # 	xmax = x_final
 # 	xmin = x_initial
@@ -2259,31 +2522,31 @@ animate_plots(True,ReachType,Weighted=False,save_as_gif=True)
 #
 #
 #
-# plt.plot([x_initial_desired,allowable_error_y/np.tan(allowable_error_rad)+x_initial_desired],[y_initial_desired, y_initial_desired + allowable_error_y],'k--',LineWidth=2)
-# plt.plot([x_initial_desired,allowable_error_y/np.tan(allowable_error_rad)+x_initial_desired],[y_initial_desired, y_initial_desired - allowable_error_y],'k--',LineWidth=2)
+# plt.plot([DefaultXi,MaximumDeviationInY/np.tan(EndpointErrorTheta)+DefaultXi],[DefaultYi, DefaultYi + MaximumDeviationInY],'k--',LineWidth=2)
+# plt.plot([DefaultXi,MaximumDeviationInY/np.tan(EndpointErrorTheta)+DefaultXi],[DefaultYi, DefaultYi - MaximumDeviationInY],'k--',LineWidth=2)
 #
-# plt.plot([x_final_desired-allowable_error_y/np.tan(allowable_error_rad),x_final_desired],[y_final_desired+allowable_error_y, y_final_desired],'k--',LineWidth=2)
-# plt.plot([x_final_desired-allowable_error_y/np.tan(allowable_error_rad),x_final_desired],[y_final_desired-allowable_error_y, y_final_desired],'k--',LineWidth=2)
+# plt.plot([DefaultXf-MaximumDeviationInY/np.tan(EndpointErrorTheta),DefaultXf],[DefaultYf+MaximumDeviationInY, DefaultYf],'k--',LineWidth=2)
+# plt.plot([DefaultXf-MaximumDeviationInY/np.tan(EndpointErrorTheta),DefaultXf],[DefaultYf-MaximumDeviationInY, DefaultYf],'k--',LineWidth=2)
 #
-# plt.plot([allowable_error_y/np.tan(allowable_error_rad)+x_initial_desired,x_final_desired-allowable_error_y/np.tan(allowable_error_rad)],[y_initial_desired+allowable_error_y,y_final_desired+allowable_error_y],'k--',LineWidth=2)
-# plt.plot([allowable_error_y/np.tan(allowable_error_rad)+x_initial_desired,x_final_desired-allowable_error_y/np.tan(allowable_error_rad)],[y_initial_desired-allowable_error_y,y_final_desired-allowable_error_y],'k--',LineWidth=2)
+# plt.plot([MaximumDeviationInY/np.tan(EndpointErrorTheta)+DefaultXi,DefaultXf-MaximumDeviationInY/np.tan(EndpointErrorTheta)],[DefaultYi+MaximumDeviationInY,DefaultYf+MaximumDeviationInY],'k--',LineWidth=2)
+# plt.plot([MaximumDeviationInY/np.tan(EndpointErrorTheta)+DefaultXi,DefaultXf-MaximumDeviationInY/np.tan(EndpointErrorTheta)],[DefaultYi-MaximumDeviationInY,DefaultYf-MaximumDeviationInY],'k--',LineWidth=2)
 #
-# if fix_starting_point == False:
-# 	x_circ_1 = np.linspace(-4*boundary_sigma + x_initial_desired + 0.00001,\
-# 							4*boundary_sigma + x_initial_desired - 0.00001,\
+# if RandomXiBool == False:
+# 	x_circ_1 = np.linspace(-4*EndpointErrorSigma + DefaultXi + 0.00001,\
+# 							4*EndpointErrorSigma + DefaultXi - 0.00001,\
 # 								200)
-# 	y_circ_1_top = np.array(list(map(lambda X: y_initial_desired+np.sqrt((4*boundary_sigma)**2-(X-x_initial_desired)**2),x_circ_1)))
-# 	y_circ_1_bottom = np.array(list(map(lambda X: y_initial_desired-np.sqrt((4*boundary_sigma)**2-(X-x_initial_desired)**2),x_circ_1)))
+# 	y_circ_1_top = np.array(list(map(lambda X: DefaultYi+np.sqrt((4*EndpointErrorSigma)**2-(X-DefaultXi)**2),x_circ_1)))
+# 	y_circ_1_bottom = np.array(list(map(lambda X: DefaultYi-np.sqrt((4*EndpointErrorSigma)**2-(X-DefaultXi)**2),x_circ_1)))
 #
 # 	plt.plot(x_circ_1,y_circ_1_top,'k--',LineWidth=2)
 # 	plt.plot(x_circ_1,y_circ_1_bottom,'k--',LineWidth=2)
 #
-# if fix_ending_point == False:
-# 	x_circ_2 = np.linspace(-4*boundary_sigma + x_final_desired + 0.00001,\
-# 							4*boundary_sigma + x_final_desired - 0.00001,\
+# if RandomXfBool == False:
+# 	x_circ_2 = np.linspace(-4*EndpointErrorSigma + DefaultXf + 0.00001,\
+# 							4*EndpointErrorSigma + DefaultXf - 0.00001,\
 # 								100)
-# 	y_circ_2_top = np.array(list(map(lambda X: y_final_desired+np.sqrt((4*boundary_sigma)**2-(X-x_final_desired)**2),x_circ_2)))
-# 	y_circ_2_bottom = np.array(list(map(lambda X: y_final_desired-np.sqrt((4*boundary_sigma)**2-(X-x_final_desired)**2),x_circ_2)))
+# 	y_circ_2_top = np.array(list(map(lambda X: DefaultYf+np.sqrt((4*EndpointErrorSigma)**2-(X-DefaultXf)**2),x_circ_2)))
+# 	y_circ_2_bottom = np.array(list(map(lambda X: DefaultYf-np.sqrt((4*EndpointErrorSigma)**2-(X-DefaultXf)**2),x_circ_2)))
 #
 # 	plt.plot(x_circ_2,y_circ_2_top,'k--',LineWidth=2)
 # 	plt.plot(x_circ_2,y_circ_2_bottom,'k--',LineWidth=2)

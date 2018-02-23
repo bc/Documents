@@ -151,7 +151,7 @@ def set_initial_and_final_positions(ReachType):
 		Xf = [-MedianPlane+PathLength/(2**0.5),0.20 + PathLength/(2**0.5)]
 
 	return(Xi,Xf)
-def find_X_values(t,Xi,Xf):
+def find_X_values(t,Xi,Xf,t_end=1):
 	"""
 	This takes t (a numpy.ndarray (dtype = 'float64', ndmin = 2) of normalized time ∈ [0,1]) and either a (2,) or (2,1) list/array with values for both initial and final x and y (endpoint). To avoid singularities, ||X[i]|| cannot be greater than L1 + L2.
 
@@ -167,8 +167,8 @@ def find_X_values(t,Xi,Xf):
 	xf,yf = Xf
 	if np.shape(Xi) == (2,1): xi,yi = xi[0],yi[0]
 	if np.shape(Xf) == (2,1): xf,yf = xf[0],yf[0]
-	x = xi + (xf-xi)*(10*t**3 - 15*t**4 + 6*t**5) # Returns an (1,N) array
-	y = yi + (yf-yi)*(10*t**3 - 15*t**4 + 6*t**5) # Returns an (1,N) array
+	x = xi + (xf-xi)*(10*(t/t_end)**3 - 15*(t/t_end)**4 + 6*(t/t_end)**5) # Returns an (1,N) array
+	y = yi + (yf-yi)*(10*(t/t_end)**3 - 15*(t/t_end)**4 + 6*(t/t_end)**5) # Returns an (1,N) array
 	X = np.concatenate((x,y),axis=0) # Returns an (2,N) array
 
 		# Test of singularities
@@ -191,8 +191,8 @@ def find_Ẋ_values(t,Xi,Xf,t_end = 1):
 	xf,yf = Xf
 	if np.shape(Xi) == (2,1): xi,yi = xi[0],yi[0]
 	if np.shape(Xf) == (2,1): xf,yf = xf[0],yf[0]
-	ẋ = (xf-xi)*(30*t**2 - 60*t**3 + 30*t**4)/t_end # Returns an (1,N) array
-	ẏ = (yf-yi)*(30*t**2 - 60*t**3 + 30*t**4)/t_end # Returns an (1,N) array
+	ẋ = (xf-xi)*(30*(t/t_end)**2 - 60*(t/t_end)**3 + 30*(t/t_end)**4)/t_end # Returns an (1,N) array
+	ẏ = (yf-yi)*(30*(t/t_end)**2 - 60*(t/t_end)**3 + 30*(t/t_end)**4)/t_end # Returns an (1,N) array
 	Ẋ = np.concatenate((ẋ,ẏ),axis=0) # Returns an (2,N) array
 	return(Ẋ)
 def find_Ẍ_values(t,Xi,Xf,t_end=1):
@@ -211,12 +211,12 @@ def find_Ẍ_values(t,Xi,Xf,t_end=1):
 	xf,yf = Xf
 	if np.shape(Xi) == (2,1): xi,yi = xi[0],yi[0]
 	if np.shape(Xf) == (2,1): xf,yf = xf[0],yf[0]
-	ẍ = (xf-xi)*(60*t - 180*t**2 + 120*t**3)/(t_end**2) # Returns an (1,N) array
-	ÿ = (yf-yi)*(60*t - 180*t**2 + 120*t**3)/(t_end**2) # Returns an (1,N) array
+	ẍ = (xf-xi)*(60*(t/t_end) - 180*(t/t_end)**2 + 120*(t/t_end)**3)/(t_end**2) # Returns an (1,N) array
+	ÿ = (yf-yi)*(60*(t/t_end) - 180*(t/t_end)**2 + 120*(t/t_end)**3)/(t_end**2) # Returns an (1,N) array
 	Ẍ = np.concatenate((ẍ,ÿ),axis=0) # Returns an (2,N) array
 	return(Ẍ)
 def return_X_values(t,Xi,Xf,t_end):
-	X = find_X_values(t,Xi,Xf)
+	X = find_X_values(t,Xi,Xf,t_end=t_end)
 	Ẋ = find_Ẋ_values(t,Xi,Xf,t_end=t_end)
 	Ẍ = find_Ẍ_values(t,Xi,Xf,t_end=t_end)
 	return(X,Ẋ,Ẍ)
@@ -478,7 +478,7 @@ def calculate_potential_variability(X,δT1,δT2,dt=0.001,EOM = 'Uno',scheme = "T
 def reaching_task(dt = 0.001, Xi = [0,0.25], Xf = [0.25,0.50],t_end=1,EOM='Uno'):
 	import numpy as np
 	create_angle_lists()
-	t = np.array(np.arange(0,1+dt,dt),dtype='float64',ndmin=2)
+	t = np.array(np.linspace(0,t_end,int(1/dt)+1),dtype='float64',ndmin=2)
 	X,Ẋ,Ẍ = return_X_values(t,Xi,Xf,t_end)
 	update_angle_lists(X,Ẋ,Ẍ)
 	calculate_torques(EOM=EOM)
@@ -1330,7 +1330,7 @@ def calculate_muscle_lengths():
 									- (MA_function_integral(AllCoefficients[j][0],Angle1Current) - MA_function_integral(AllCoefficients[j][0],Angle1Initial)) \
 									- (MA_function_integral(AllCoefficients[j][1],Angle2Current) - MA_function_integral(AllCoefficients[j][1],Angle2Initial))
 			MuscleLengths[j].append(TemporaryMuscleLength)
-def animate_plots(response,ReachType, Weighted=False, save_as_gif = False):
+def animate_plots(response,ReachType, Weighted=False, save_as_gif = False,t_end=1):
 	assert type(response)==bool, "Input must be either True or False."
 	assert type(Weighted)==bool, "Weighted must be either True or False."
 	assert ReachType in ['Sideways','Center','Left','Right'], "ReachType must be either 'Sideways','Center','Left', or 'Right'"
@@ -1360,19 +1360,25 @@ def animate_plots(response,ReachType, Weighted=False, save_as_gif = False):
 		plt.subplots_adjust(top=0.9,hspace=0.2,bottom=0.2,left=0.2)
 
 		if ReachType == 'Left':
-			DescriptiveTitle = "45$^\circ$ Reach Left"
+			DescriptiveTitle = "45$^\circ$ Reach Left\n"
 		elif ReachType == 'Right':
-			DescriptiveTitle = "45$^\circ$ Reach Right"
+			DescriptiveTitle = "45$^\circ$ Reach Right\n"
 		elif ReachType == 'Sideways':
-			DescriptiveTitle = 'Side-to-side Reach'
+			DescriptiveTitle = 'Side-to-side Reach\n'
 		else:
-			DescriptiveTitle = 'Straight Forward (Center) Reach'
+			DescriptiveTitle = 'Straight Forward (Center) Reach\n'
 
-		if Weighted==True:
-			TypeString = "\n(Afferent-Weighted $\hat{v}_m$)\n"
+		# if Weighted==True:
+		# 	TypeString = "\n(Afferent-Weighted $\hat{v}_m$)\n"
+		# else:
+		# 	TypeString = "\n(Normalized $\hat{v}_m$)\n"
+		if t_end == 1:
+			MovementDurationString = "Movement Duration : " + str(t_end) \
+									+ " sec\n"
 		else:
-			TypeString = "\n(Normalized $\hat{v}_m$)\n"
-		plt.suptitle(DescriptiveTitle + TypeString,Fontsize=20,y=0.975)
+			MovementDurationString = "Movement Duration : " + str(t_end) \
+									+ " secs\n"
+		plt.suptitle(DescriptiveTitle + MovementDurationString,Fontsize=20,y=0.975)
 
 		#Forward Model
 
@@ -1590,8 +1596,8 @@ def animate_plots(response,ReachType, Weighted=False, save_as_gif = False):
 								-0.02*np.cos(A1_forward[0,i]+A2_forward[0,i]))
 			StickFigure_f.set_xdata(np.cumsum([0,L1*np.cos(A1_forward[0,i]),L2*(0.146/(0.146+0.108))*np.cos(A1_forward[0,i]+A2_forward[0,i]),L2*(0.108/(0.146+0.108))*np.cos(A1_forward[0,i]+A2_forward[0,i])]))
 			StickFigure_f.set_ydata(np.cumsum([0,L1*np.sin(A1_forward[0,i]),L2*(0.146/(0.146+0.108))*np.sin(A1_forward[0,i]+A2_forward[0,i]),L2*(0.108/(0.146+0.108))*np.sin(A1_forward[0,i]+A2_forward[0,i])]))
-			Screen_f.xy = (i/len(t.T),-13)
-			Screen_f._width = t_end - i/len(t.T)
+			Screen_f.xy = (t_end*i/len(t.T),-13)
+			Screen_f._width = t_end*(1 - i/len(t.T))
 
 			movement_r.set_xdata(list(map(lambda a1,a2: L1*np.cos(a1)+L2*np.cos(a1+a2),\
 								A1_reverse[0,:i],A2_reverse[0,:i])))  # update the data
@@ -1616,8 +1622,8 @@ def animate_plots(response,ReachType, Weighted=False, save_as_gif = False):
 								-0.02*np.cos(A1_reverse[0,i]+A2_reverse[0,i]))
 			StickFigure_r.set_xdata(np.cumsum([0,L1*np.cos(A1_reverse[0,i]),L2*(0.146/(0.146+0.108))*np.cos(A1_reverse[0,i]+A2_reverse[0,i]),L2*(0.108/(0.146+0.108))*np.cos(A1_reverse[0,i]+A2_reverse[0,i])]))
 			StickFigure_r.set_ydata(np.cumsum([0,L1*np.sin(A1_reverse[0,i]),L2*(0.146/(0.146+0.108))*np.sin(A1_reverse[0,i]+A2_reverse[0,i]),L2*(0.108/(0.146+0.108))*np.sin(A1_reverse[0,i]+A2_reverse[0,i])]))
-			Screen_r.xy = (i/len(t.T),-13)
-			Screen_r._width = t_end - i/len(t.T)
+			Screen_r.xy = (t_end*i/len(t.T),-13)
+			Screen_r._width = t_end*(1 - i/len(t.T))
 						# Arm.set_xdata(np.cumsum([0,L1*np.cos(A1_forward[0,i]),L2*(0.146/(0.146+0.108))*np.cos(A1_forward[0,i]+A2_forward[0,i]),L2*(0.108/(0.146+0.108))*np.cos(A1_forward[0,i]+A2_forward[0,i])]))
 			# Arm.set_ydata(np.cumsum([0,L1*np.sin(A1_forward[0,i]),L2*(0.146/(0.146+0.108))*np.sin(A1_forward[0,i]+A2_forward[0,i]),L2*(0.108/(0.146+0.108))*np.sin(A1_forward[0,i]+A2_forward[0,i])]))
 			return Elbow_f,Endpoint_f,Wrist_f,UpperArm_f,Forearm_f,Hand_f,StickFigure_f,movement_f,Screen_f,Elbow_r,Endpoint_r,Wrist_r,UpperArm_r,Forearm_r,Hand_r,StickFigure_r,movement_r,Screen_r,Angle1_f,Angle2_f,Angle1_r,Angle2_r,
@@ -1728,25 +1734,30 @@ import time
 from matplotlib.backends.backend_pdf import PdfPages
 import ipdb
 import sys
+import random
+random.seed()
 
 	# Save Output Figures?
 
 SaveOutputFigures = False
 
 	# DescriptiveTitle should be something to identify the trial either by reaching location, (i.e., Left, Right, Center, or Sideways) or by what has changed in the most current iteration (e.g., CB_Ramsay, DELTa_Est, etc.). Spaces will be replaced by '_' symbols for the filename but kept for figure titles.
-ValidResponse = False
-while ValidResponse == False:
-	ReachTypeNumber = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nPlease select reaching movement number:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Side-to-side\n (2) - Straight (Center)\n (3) - 45° Left\n (4) - 45° Right\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMovement Number: ")
-	if ReachTypeNumber not in ['1','2','3','4']:
+
+ValidResponse_1 = False
+while ValidResponse_1 == False:
+	ReachTypeNumber = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nPlease select reaching movement number:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Side-to-side\n (2) - Straight (Center)\n (3) - 45° Left\n (4) - 45° Right\n  ⏎  - Random\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMovement Type: ")
+	if ReachTypeNumber not in ['1','2','3','4','']:
 		print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
-		ValidResponse = False
+		ValidResponse_1 = False
+	elif ReachTypeNumber == '':
+		ReachTypeNumber = random.randint(0,3)
+		ValidResponse_1 = True
 	else:
 		ReachTypeNumber = int(ReachTypeNumber)-1
 		print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n')
-		ValidResponse = True
+		ValidResponse_1 = True
 ReachType = ['Sideways','Center','Left','Right'][ReachTypeNumber]
 DescriptiveTitle = ReachType + ' Reach'
-
 	# Define the Equations of Motion to be used. Can be either 'Zadravec' or 'Uno'
 
 EOM = 'Uno'
@@ -2080,6 +2091,6 @@ if SaveOutputFigures == True:
 
 	plt.close('all')
 plt.close('all')
-animate_plots(True,ReachType,Weighted=False,save_as_gif=True)
+animate_plots(True,ReachType,Weighted=False,save_as_gif=True,t_end=t_end)
 
 # plt.show()
