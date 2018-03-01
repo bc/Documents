@@ -1000,7 +1000,7 @@ def reaching_task(ReachType='Center',RandomXiBool=False, RandomXfBool=False, \
 								RandomXfBool=RandomXfBool,TargetAmplitude=TargetAmplitude,t_end=t_end)
 	update_angle_lists(X,Ẋ,Ẍ)
 	# calculate_torques(EOM=EOM)
-	return(X,Ẋ,Ẍ)
+	return(X,Ẋ,Ẍ,DefaultPath)
 def global_R_matrix():
 	"""
 	Notes:
@@ -2097,7 +2097,7 @@ def animate_plots(response,ReachType, Weighted=False, save_as_gif = False,t_end=
 def reach_type_prompt():
 	import numpy as np
 	import random
-	DefaultSettings = False
+	RandomSettings = False
 	ValidResponse_1 = False
 	while ValidResponse_1 == False:
 		ReachTypeNumber = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nPlease select reaching movement number:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Side-to-side\n (2) - Straight (Center)\n (3) - 45° Left\n (4) - 45° Right\n  ⏎  - Random\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMovement Type: ")
@@ -2106,7 +2106,7 @@ def reach_type_prompt():
 			ValidResponse_1 = False
 		elif ReachTypeNumber == '':
 			ReachTypeNumber = random.randint(0,3)
-			DefaultSettings = True
+			RandomSettings = True
 			ValidResponse_1 = True
 		else:
 			ReachTypeNumber = int(ReachTypeNumber)-1
@@ -2115,7 +2115,7 @@ def reach_type_prompt():
 	ReachType = ['Sideways','Center','Left','Right'][ReachTypeNumber]
 	DescriptiveTitle = ReachType + ' Reach'
 
-	if DefaultSettings == False:
+	if RandomSettings == False:
 		ValidResponse_2 = False
 		while ValidResponse_2 == False:
 			RandomXiResponse = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nFix Starting Point?\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - True\n (2) - False\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
@@ -2140,8 +2140,8 @@ def reach_type_prompt():
 				ValidResponse_3 = True
 		RandomXfBool = [True,False][RandomXfResponse]
 	else:
-		RandomXiBool = False
-		RandomXfBool = False
+		RandomXiBool = True
+		RandomXfBool = True
 	return(DescriptiveTitle,ReachType,RandomXiBool,RandomXfBool)
 # def run_N_loops(NumberOfLoops):
 # 	for LoopNumber in range(NumberOfLoops):
@@ -2217,7 +2217,7 @@ OrderNumber = [list(AllCoefficients.keys()).index(el) for el in OrderedMuscleLis
 
 	# Forward Direction
 
-X_Forward = reaching_task(TargetAmplitude=TargetAmplitude,ReachType=ReachType,RandomXiBool=RandomXiBool,\
+X_Forward,Ẋ_Forward,Ẍ_Forward,DefaultPath = reaching_task(TargetAmplitude=TargetAmplitude,ReachType=ReachType,RandomXiBool=RandomXiBool,\
 					RandomXfBool=RandomXfBool,t_end=t_end)
 return_MA_matrix()
 
