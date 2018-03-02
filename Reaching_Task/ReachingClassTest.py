@@ -35,6 +35,7 @@ def statusbar(i,N,**kwargs):
 	assert len(Title) <= 22, "Title should be less than 25 characters"
 	if Title != '' : Title = ' '*(22-len(Title)) + Title + ' : '
 	statusbar = Title +'[' + '\u25a0'*int((i+1)/(N/50)) + '\u25a1'*(50-int((i+1)/(N/50))) + '] '
+	TimeBreak = abs
 	if StartTime != False:
 		if i==0:
 			time_array = []
@@ -44,7 +45,7 @@ def statusbar(i,N,**kwargs):
 			TimeLeft = '{0:1.1f}'.format(time_array[-1]*(N/(i+1)))
 		elif i%int(0.02*N)==0:
 			time_array.append(time.time()-StartTime)
-			TimeLeft = '{0:1.1f}'.format(float(interpolate.interp1d(np.arange(len(time_array)),time_array,fill_value='extrapolate')(49)))
+			TimeLeft = '{0:1.1f}'.format(float(interpolate.interp1d(np.arange(len(time_array)),time_array,fill_value='extrapolate')(49))-time_array[-1])
 		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete, ' + '{0:1.1f}'.format(time.time() - StartTime) \
 			+ 'sec, (est. ' + TimeLeft,' sec left)		\r', end='')
 	else:
@@ -2689,8 +2690,306 @@ def plot_all_trajectories(TrialData,Weighted=False,Statusbar = False):
 			statusbar(i,len(TrialData["Default Paths"]),StartTime=StartTime,\
 							Title = TrialData["Reach Type"])
 	plt.show()
+def plot_individual_muscles(TrialData,Weighted=False,Statusbar=False):
+	import numpy as np
+	import matplotlib.pyplot as plt
+	from matplotlib.patches import Ellipse
+	import matplotlib.patches as patches
+	import time
 
+	TotalColorsList = TrialData["Ordered Muscle Colors List"]*len(TrialData["Default Paths"])
+
+	NumMuscles = len(TrialData["All Muscle Settings"])
+	NumRows = int(np.ceil(NumMuscles/5))
+	if NumMuscles < 5:
+		NumColumns = NumMuscles
+	else:
+		NumColumns = 5
+
+	ColumnNumber = [el%5 for el in np.arange(0,NumMuscles,1)]
+	RowNumber = [int(el/5) for el in np.arange(0,NumMuscles,1)]
+
+	fig, axes = plt.subplots(NumRows,NumColumns,figsize=(2*NumColumns+1,2*NumRows))
+
+	t_end = TrialData["Movement Duration"]
+	N = 1000
+	t = np.linspace(0,t_end, N + 1)
+	L1,L2 = TrialData["Limb Lengths"]
+	MedianPlane = L1*(0.129/0.186)
+	bound = [0]*NumMuscles
+
+	if TrialData["Reach Type"][:-6] == 'Left':
+		DescriptiveTitle = "45$^\circ$ Reach Left\n"
+	elif TrialData["Reach Type"][:-6] == 'Right':
+		DescriptiveTitle = "45$^\circ$ Reach Right\n"
+	elif TrialData["Reach Type"][:-6] == 'Sideways':
+		DescriptiveTitle = "Side-to-side Reach\n"
+	else:
+		DescriptiveTitle = "Straight Forward (Center) Reach\n"
+
+	if t_end == 1:
+		MovementDurationString = "Movement Duration : " + str(t_end) \
+								+ " sec\n"
+	else:
+		MovementDurationString = "Movement Duration : " + str(t_end) \
+								+ " secs\n"
+	plt.suptitle(DescriptiveTitle + MovementDurationString,Fontsize=20,y=0.975)
+	if NumMuscles == 1:
+		axes.set_xlim(0,t_end)
+		axes.set_xticks([0,t_end])
+		axes.set_title(list(TrialData["All Muscle Settings"].keys())[0],Color = TrialData["Ordered Muscle Colors List"][0])
+		if Weighted == True:
+			axes.set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+		else:
+			axes.set_ylabel('Normalized $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+		# bounds = max([Vm_forward.max(),Vm_reverse.max()])
+	else:
+		for j in range(NumMuscles):
+			axes[RowNumber[j],ColumnNumber[j]].set_xlim(0,t_end)
+			axes[RowNumber[j],ColumnNumber[j]].set_xticks([0,t_end])
+			if RowNumber[j] == RowNumber[-1]:
+				axes[RowNumber[j],ColumnNumber[j]].set_xticklabels(['Start','Finish'])
+			axes[RowNumber[j],ColumnNumber[j]].set_title(TrialData["Ordered Muscle List"][j],\
+									Color = TrialData["Ordered Muscle Colors List"][j])
+			if ColumnNumber[j] == 0:
+				if Weighted == True:
+					axes[RowNumber[j],ColumnNumber[j]].set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+				else:
+					axes[RowNumber[j],ColumnNumber[j]].set_ylabel('Normalized $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+		if NumMuscles%5!=0:
+			[fig.delaxes(axes[RowNumber[-1],el]) for el in range(ColumnNumber[-1]+1,5)]
+	StartTime = time.time()
+	for i in range(len(TrialData["Default Paths"])):
+		Path = TrialData["Default Paths"][i]
+		Movement = reaching_movement(Path)
+
+		MuscleVelocities = Movement.return_muscle_velocities(TrialData,Weighted=Weighted)
+		Vm_forward = MuscleVelocities
+		Vm_reverse = -np.array(list(reversed(Vm_forward.T))).T
+
+		for j in TrialData["Ordered Muscle Numbers"]:
+			axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[j].T,\
+												c=TrialData["Ordered Muscle Colors List"][j])
+
+			# [k.set_color(TotalColorsList[j]) for j,k in enumerate(ax3.lines)]
+
+			bounds[j] = max([ max(Vm_forward[j]), bounds[j] ])
+
+
+			ax3.spines['right'].set_visible(False)
+			ax3.spines['top'].set_visible(False)
+			ax3.set_ylim([-1.1*bounds,1.1*bounds])
+			ax5.plot(t.T,A1_forward.T,\
+						color = TrialData["Ordered Muscle Colors List"][j])
+
+		A1_forward = Movement.A1
+		A2_forward = Movement.A2
+		A1_reverse = np.array(list(reversed(Movement.A1.T))).T
+		A2_reverse = np.array(list(reversed(Movement.A2.T))).T
+
+		#Forward Model
+
+		Angle1_f, = ax5.plot(t.T,A1_forward.T,color = 'c')
+		Angle2_f, = ax5.plot(t.T,A2_forward.T,color = 'r')
+		ax5.set_xlim(0,t_end)
+		ax5.set_xticks([0,t_end])
+		ax5.set_xticklabels(['Start','Finish'])
+		ax5.set_ylim(0,np.pi)
+		ax5.set_yticks([0,np.pi/2,np.pi])
+		ax5.set_yticklabels(['0',r'$\frac{\pi}{2}$','$\pi$'],fontsize=12)
+		ax5.spines['right'].set_visible(False)
+		ax5.spines['top'].set_visible(False)
+		# ax5.set_ylabel('Joint Angles\n(in Radians)')
+		ax5.legend(["Shoulder\nAngle","Elbow\nAngle"],loc='center right',bbox_to_anchor=(-0.1, 0.5))
+
+		ax1.get_xaxis().set_ticks([])
+		ax1.get_yaxis().set_ticks([])
+		ax1.set_frame_on(True)
+		RightShoulder_f = plt.Circle((0,0),radius=0.05,Color='#4682b4')
+		ax1.add_patch(RightShoulder_f)
+		LeftShoulder_f = plt.Circle((-MedianPlane*2,0),radius=0.05,Color='#4682b4')
+		ax1.add_patch(LeftShoulder_f)
+		Torso_f = plt.Rectangle((-MedianPlane*2,-0.05),MedianPlane*2,0.1,Color='#4682b4')
+		ax1.add_patch(Torso_f)
+		Head_f = Ellipse((-MedianPlane,0),0.2,0.225,FaceColor='w',EdgeColor='#4682b4',Linewidth=3)
+		ax1.add_patch(Head_f)
+		JointCoordinates_f = \
+			np.concatenate([[np.cumsum([0,L1*np.cos(A1_forward[0,0]),L2*(0.146/(0.146+0.108))*np.cos(A1_forward[0,0]+A2_forward[0,0]),L2*(0.108/(0.146+0.108))*np.cos(A1_forward[0,0]+A2_forward[0,0])])],\
+			[np.cumsum([0,L1*np.sin(A1_forward[0,0]),L2*(0.146/(0.146+0.108))*np.sin(A1_forward[0,0]+A2_forward[0,0]),L2*(0.108/(0.146+0.108))*np.sin(A1_forward[0,0]+A2_forward[0,0])])]],\
+			axis=0)
+		Elbow_f = plt.Circle((L1*np.cos(A1_forward[0,0]),L1*np.sin(A1_forward[0,0])),radius=0.03,color='#4682b4')
+		Endpoint_f = plt.Circle((L1*np.cos(A1_forward[0,0])+L2*np.cos(A1_forward[0,0]+A2_forward[0,0]),\
+							L1*np.sin(A1_forward[0,0])+L2*np.sin(A1_forward[0,0]+A2_forward[0,0])),\
+							radius = 0.02,color='#4682b4')
+		Wrist_f = plt.Circle((L1*np.cos(A1_forward[0,0])+L2*(0.146/(0.146+0.108))*np.cos(A1_forward[0,0]+A2_forward[0,0]),\
+							L1*np.sin(A1_forward[0,0])+L2*(0.146/(0.146+0.108))*np.sin(A1_forward[0,0]+A2_forward[0,0])),\
+							radius = 0.03,color='#4682b4')
+		StickFigure_f, = ax1.plot(JointCoordinates_f[0,:],JointCoordinates_f[1,:],'ko-',LineWidth=2,MarkerFaceColor='k')
+		movement_f, = ax1.plot(L1*np.cos(A1_forward[0,:])+L2*np.cos(A1_forward[0,:]+A2_forward[0,:]),\
+							L1*np.sin(A1_forward[0,:])+L2*np.sin(A1_forward[0,:]+A2_forward[0,:]),\
+							color='0.60')
+		UpperArm_f = plt.Rectangle((0.02*np.sin(A1_forward[0,0]),\
+										-0.02*np.cos(A1_forward[0,0])),\
+										L1, 0.04,\
+										angle=A1_forward[0,0]*180/np.pi,color='#4682b4')
+		ax1.add_patch(UpperArm_f)
+		Forearm_f = plt.Rectangle((L1*np.cos(A1_forward[0,0]) + 0.02*np.sin(A1_forward[0,0]+A2_forward[0,0]),\
+										L1*np.sin(A1_forward[0,0]) -0.02*np.cos(A1_forward[0,0]+A2_forward[0,0])),\
+										L2*(0.146/(0.146+0.108)), 0.04,\
+										angle=(A1_forward[0,0]+A2_forward[0,0])*180/np.pi,color='#4682b4')
+		ax1.add_patch(Forearm_f)
+		Hand_f = plt.Rectangle((L1*np.cos(A1_forward[0,0])\
+								+ L2*(0.146/(0.146+0.108))*np.cos(A1_forward[0,0]+A2_forward[0,0]) \
+									+ 0.02*np.sin(A1_forward[0,0]+A2_forward[0,0]),\
+							L1*np.sin(A1_forward[0,0])\
+								+ L2*(0.146/(0.146+0.108))*np.sin(A1_forward[0,0]+A2_forward[0,0]) \
+									-0.02*np.cos(A1_forward[0,0]+A2_forward[0,0])),\
+										L2*(0.108/(0.146+0.108)), 0.04,\
+										angle=(A1_forward[0,0]+A2_forward[0,0])*180/np.pi,color='#4682b4')
+		ax1.add_patch(Hand_f)
+
+		ax3.set_xlim(0,t_end)
+		ax3.set_xticks([0,t_end])
+		ax3.set_xticklabels(['Start','Finish'])
+		if Weighted == True:
+			ax3.set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+		else:
+			ax3.set_ylabel('Normalized $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+		if np.shape(Vm_forward) == (len(Vm_forward),):
+			NormalizedVmPlots_forward = ax3.plot(t,Vm_forward,c=TrialData["Ordered Muscle Colors List"][0])
+			plt.figlegend(NormalizedVmPlots_forward,TrialData["Ordered Muscle List"],\
+							loc='lower center',ncol=5,mode='expand')
+			bounds = max([Vm_forward.max(),Vm_reverse.max()])
+		else:
+			NormalizedVmPlots_forward = [ax3.plot(t.T,Vm_forward[j].T) \
+												for j in TrialData["Ordered Muscle Numbers"]]
+			TotalColorsList = TrialData["Ordered Muscle Colors List"]\
+								*len(TrialData["Default Paths"])
+			[k.set_color(TotalColorsList[j]) for j,k in enumerate(ax3.lines)]
+
+			bounds = max([	max([max(Vm_forward[i]) \
+								for i in range(len(TrialData["Ordered Muscle List"]))]),\
+							max([max(Vm_reverse[i]) \
+								for i in range(len(TrialData["Ordered Muscle List"]))]) ] )
+			plt.figlegend([el[0] for el in NormalizedVmPlots_forward],TrialData["Ordered Muscle List"],loc='lower center',ncol=5,mode='expand')
+
+		ax3.spines['right'].set_visible(False)
+		ax3.spines['top'].set_visible(False)
+		ax3.set_ylim([-1.1*bounds,1.1*bounds])
+
+		#Reverse Model
+
+		Angle1_r, = ax6.plot(t.T,A1_reverse.T,color = 'c')
+		Angle2_r, = ax6.plot(t.T,A2_reverse.T,color = 'r')
+		ax6.set_xlim(0,t_end)
+		ax6.set_xticks([0,t_end])
+		ax6.set_xticklabels(['Start','Finish'])
+		ax6.set_ylim(0,np.pi)
+		ax6.set_yticks([0,np.pi/2,np.pi])
+		ax6.set_yticklabels(['0',r'$\frac{\pi}{2}$','$\pi$'],fontsize=12)
+		ax6.spines['right'].set_visible(False)
+		ax6.spines['top'].set_visible(False)
+
+		ax2.get_xaxis().set_ticks([])
+		ax2.get_yaxis().set_ticks([])
+		ax2.set_frame_on(True)
+		RightShoulder_r = plt.Circle((0,0),radius=0.05,Color='#4682b4')
+		ax2.add_patch(RightShoulder_r)
+		LeftShoulder_r = plt.Circle((-MedianPlane*2,0),radius=0.05,Color='#4682b4')
+		ax2.add_patch(LeftShoulder_r)
+		Torso_r = plt.Rectangle((-MedianPlane*2,-0.05),MedianPlane*2,0.1,Color='#4682b4')
+		ax2.add_patch(Torso_r)
+		Head_r = Ellipse((-MedianPlane,0),0.2,0.225,FaceColor='w',EdgeColor='#4682b4',Linewidth=3)
+		ax2.add_patch(Head_r)
+		JointCoordinates_r = \
+			np.concatenate([[np.cumsum([0,L1*np.cos(A1_reverse[0,0]),L2*(0.146/(0.146+0.108))*np.cos(A1_reverse[0,0]+A2_reverse[0,0]),L2*(0.108/(0.146+0.108))*np.cos(A1_reverse[0,0]+A2_reverse[0,0])])],\
+			[np.cumsum([0,L1*np.sin(A1_reverse[0,0]),L2*(0.146/(0.146+0.108))*np.sin(A1_reverse[0,0]+A2_reverse[0,0]),L2*(0.108/(0.146+0.108))*np.sin(A1_reverse[0,0]+A2_reverse[0,0])])]],\
+			axis=0)
+		Elbow_r = plt.Circle((L1*np.cos(A1_reverse[0,0]),L1*np.sin(A1_reverse[0,0])),radius=0.03,color='#4682b4')
+		Endpoint_r = plt.Circle((L1*np.cos(A1_reverse[0,0])+L2*np.cos(A1_reverse[0,0]+A2_reverse[0,0]),\
+							L1*np.sin(A1_reverse[0,0])+L2*np.sin(A1_reverse[0,0]+A2_reverse[0,0])),\
+							radius = 0.02,color='#4682b4')
+		Wrist_r = plt.Circle((L1*np.cos(A1_reverse[0,0])+L2*(0.146/(0.146+0.108))*np.cos(A1_reverse[0,0]+A2_reverse[0,0]),\
+							L1*np.sin(A1_reverse[0,0])+L2*(0.146/(0.146+0.108))*np.sin(A1_reverse[0,0]+A2_reverse[0,0])),\
+							radius = 0.03,color='#4682b4')
+		StickFigure_r, = ax2.plot(JointCoordinates_r[0,:],JointCoordinates_r[1,:],'ko-',LineWidth=2,MarkerFaceColor='k')
+		movement_r, = ax2.plot(L1*np.cos(A1_reverse[0,:])+L2*np.cos(A1_reverse[0,:]+A2_reverse[0,:]),\
+							L1*np.sin(A1_reverse[0,:])+L2*np.sin(A1_reverse[0,:]+A2_reverse[0,:]),\
+							color='0.60')
+		UpperArm_r = plt.Rectangle((0.02*np.sin(A1_reverse[0,0]),\
+										-0.02*np.cos(A1_reverse[0,0])),\
+										L1, 0.04,\
+										angle=A1_reverse[0,0]*180/np.pi,color='#4682b4')
+		ax2.add_patch(UpperArm_r)
+		Forearm_r = plt.Rectangle((L1*np.cos(A1_reverse[0,0]) \
+						+ 0.02*np.sin(A1_reverse[0,0]+A2_reverse[0,0]),\
+						L1*np.sin(A1_reverse[0,0]) -0.02*np.cos(A1_reverse[0,0]+A2_reverse[0,0])),\
+						L2*(0.146/(0.146+0.108)), 0.04,\
+						angle=(A1_reverse[0,0]+A2_reverse[0,0])*180/np.pi,color='#4682b4')
+		ax2.add_patch(Forearm_r)
+		Hand_r = plt.Rectangle((L1*np.cos(A1_reverse[0,0])\
+								+ L2*(0.146/(0.146+0.108))*np.cos(A1_reverse[0,0]+A2_reverse[0,0]) \
+									+ 0.02*np.sin(A1_reverse[0,0]+A2_reverse[0,0]),\
+							L1*np.sin(A1_reverse[0,0])\
+								+ L2*(0.146/(0.146+0.108))*np.sin(A1_reverse[0,0]+A2_reverse[0,0]) \
+									-0.02*np.cos(A1_reverse[0,0]+A2_reverse[0,0])),\
+										L2*(0.108/(0.146+0.108)), 0.04,\
+										angle=(A1_reverse[0,0]+A2_reverse[0,0])*180/np.pi,color='#4682b4')
+		ax2.add_patch(Hand_r)
+
+
+		#Might need to add t,WeightedNormalizedMuscleVelocity_Forward,TrialData["Ordered Muscle Numbers"],etc
+		ax4.set_xlim(0,t_end)
+		ax4.set_ylim(-12,12)
+		ax4.set_xticks([0,t_end])
+		ax4.set_xticklabels(['Start','Finish'])
+
+		if np.shape(Vm_reverse) == (len(Vm_reverse),):
+			NormalizedVmPlots_reverse = ax4.plot(t,Vm_reverse,c=TrialData["Ordered Muscle Colors List"][0])
+		else:
+			NormalizedVmPlots_reverse = [ax4.plot(t.T,Vm_reverse[j].T) \
+												for j in TrialData["Ordered Muscle Numbers"]]
+			TotalColorsList = TrialData["Ordered Muscle Colors List"]\
+								*len(TrialData["Default Paths"])
+			[k.set_color(TotalColorsList[j]) for j,k in enumerate(ax4.lines)]
+		ax4.spines['right'].set_visible(False)
+		ax4.spines['top'].set_visible(False)
+		ax4.set_ylim([-1.1*bounds,1.1*bounds])
+
+		max_x = np.concatenate(\
+					[np.cumsum([0,\
+						L1*np.cos(A1_reverse[0,i]),\
+							L2*(0.146/(0.146+0.108))*np.cos(A1_reverse[0,i]+A2_reverse[0,i]),\
+								L2*(0.108/(0.146+0.108))*np.cos(A1_reverse[0,i]+A2_reverse[0,i])]) \
+									for i in range(len(t.T))],axis=0).max()
+		max_y = np.concatenate(\
+					[np.cumsum([0,\
+						L1*np.sin(A1_reverse[0,i]),\
+							L2*(0.146/(0.146+0.108))*np.sin(A1_reverse[0,i]+A2_reverse[0,i]),\
+								L2*(0.108/(0.146+0.108))*np.sin(A1_reverse[0,i]+A2_reverse[0,i])]) \
+									for i in range(len(t.T))],axis=0).max()
+		min_x = np.concatenate(\
+					[np.cumsum([0,\
+						L1*np.cos(A1_reverse[0,i]),\
+							L2*(0.146/(0.146+0.108))*np.cos(A1_reverse[0,i]+A2_reverse[0,i]),\
+								L2*(0.108/(0.146+0.108))*np.cos(A1_reverse[0,i]+A2_reverse[0,i])]) \
+									for i in range(len(t.T))],axis=0).min()
+		if min_x>(-2*MedianPlane):
+			min_x =	-2*MedianPlane
+
+		ax2.set_xlim([min_x-0.1,max_x+0.1])
+		ax2.set_ylim([-0.125,max_y+0.1])
+		ax2.set_aspect('equal')
+
+		ax1.set_xlim(ax2.get_xlim())
+		ax1.set_ylim(ax2.get_ylim())
+		ax1.set_aspect('equal')
+
+		if Statusbar == True:
+			statusbar(i,len(TrialData["Default Paths"]),StartTime=StartTime,\
+							Title = TrialData["Reach Type"])
+	plt.show()
 # NumberOfTrials should be greater than 50 if using statusbar())
 TrialData = create_trial_data(NumberOfTrials=50)
-# plot_random_trajectory(TrialData)
+plot_random_trajectory(TrialData)
 plot_all_trajectories(TrialData,Statusbar=True)
