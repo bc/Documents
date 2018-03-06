@@ -616,8 +616,8 @@ def reach_type_prompt():
 	DefaultSettings = False
 	ValidResponse_1 = False
 	while ValidResponse_1 == False:
-		ReachTypeNumber = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nPlease select reaching movement number:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Side-to-side\n (2) - Straight (Center)\n (3) - 45° Left\n (4) - 45° Right\n  ⏎  - Random\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMovement Type: ")
-		if ReachTypeNumber not in ['1','2','3','4','']:
+		ReachTypeNumber = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nPlease select reaching movement number:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Side-to-side\n (2) - Straight (Center)\n (3) - 45° Left\n (4) - 45° Right\n (5) - Fixed-target\n  ⏎  - Random\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMovement Type: ")
+		if ReachTypeNumber not in ['1','2','3','4','5','']:
 			print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
 			ValidResponse_1 = False
 		elif ReachTypeNumber == '':
@@ -628,7 +628,7 @@ def reach_type_prompt():
 			ReachTypeNumber = int(ReachTypeNumber)-1
 			print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n')
 			ValidResponse_1 = True
-	ReachType = ['Sideways','Center','Left','Right'][ReachTypeNumber]
+	ReachType = ['Sideways','Center','Left','Right','Fixed-target'][ReachTypeNumber]
 	DescriptiveTitle = ReachType + ' Reach'
 
 	if DefaultSettings == False:
@@ -658,6 +658,20 @@ def reach_type_prompt():
 	else:
 		RandomXiBool = True
 		RandomXfBool = True
+
+	if DescriptiveTitle == "Fixed-target Reach":
+		"""
+		This will allow for an input to be passed along to the reaching_movement.return_X_values(TrialData) in the DescriptiveTitle that will denote where along the arc of radius TrialData["Target Amplitude"] to start the movement. By convention, 0 radians will be associated with the 3 o'clock position and follow a counterclockwise rotation through 2π. Realistic starting positions will likely be in [π,2π].
+		"""
+		ValidResponse_4 = False
+		while ValidResponse_4 == False:
+			StartingPositionInRadians = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInput starting position along the arc with\nradius equal to the target amplitude as a \nmultiple of π. (Note: 0 radians corresp. to \n3 o'clock from  target.)\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse (in rads): π ⨉ ")
+			if any(ch.isalpha() for ch in StartingPositionInRadians) == True:
+				print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response (Numbers only)! Please try again.')
+				ValidResponse_4 = False
+			else:
+				DescriptiveTitle = DescriptiveTitle + "_" + StartingPositionInRadians
+				ValidResponse_4 = True
 	return(DescriptiveTitle,ReachType,RandomXiBool,RandomXfBool)
 def return_ordered_muscle_list_with_colors(TrialData):
 	import numpy as np
@@ -1202,7 +1216,7 @@ class reaching_movement:
 		DefaultDisplacement_x = 0.05
 
 		assert TrialData["Reach Type"][:-6].capitalize() in\
-		 			['Center','Right','Left','Sideways'], \
+		 			['Center','Right','Left','Sideways','Fixed-target'], \
 						"ReachType must be either 'Center','Right','Left', or 'Sideways'."
 
 		if TrialData["Reach Type"][:-6].capitalize() == 'Sideways':
@@ -1272,6 +1286,27 @@ class reaching_movement:
 			ẋ,ẏ = rotate_xy(ẋ,ẏ,np.pi/4)
 
 			ẍ,ÿ = rotate_xy(ẍ,ÿ,np.pi/4)
+
+		elif TrialData["Reach Type"][:-6].capitalize() == 'Fixed-target':
+			"""
+			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+			~~~~~~~~~~~~~~~~~ Fixed Target Reach ~~~~~~~~~~~~~~~~~~
+			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+			Xi = [-MedianPlane,0.20]
+			Xf = [-MedianPlane,0.20 + TargetAmplitude]
+			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+			"""
+			ϕ = TrialData["Reach Angle"] - np.pi
+			TargetAmplitude = TrialData["Target Amplitude"]
+			x,y = translate_xy(x,y,px=-DefaultDisplacement_x)
+			x,y = rotate_xy(x,y,ϕ)
+			px = MedianPlane - TargetAmplitude*np.cos(ϕ)
+			py = 0.20 + TargetAmplitude - TargetAmplitude*np.sin(ϕ)
+			x,y = translate_xy(x,y,px=px,py=py)
+
+			ẋ,ẏ = rotate_xy(ẋ,ẏ,ϕ)
+
+			ẍ,ÿ = rotate_xy(ẍ,ÿ,ϕ)
 
 		X = np.concatenate([x[np.newaxis,:],y[np.newaxis,:]],axis=0)
 		Ẋ = np.concatenate([ẋ[np.newaxis,:],ẏ[np.newaxis,:]],axis=0)
@@ -1407,7 +1442,7 @@ class reaching_movement:
 		# 		L2 = New_L2
 		import numpy as np
 		assert TrialData["Reach Type"][:-6].capitalize() in \
-			['Center','Right','Left','Sideways'], \
+			['Center','Right','Left','Sideways','Fixed-target'], \
 				"ReachType must be either 'Center','Right','Left', or 'Sideways'."
 		set_link_lengths()
 		X,Ẋ,Ẍ = self.return_X_values(TrialData)
@@ -2081,28 +2116,20 @@ def create_trial_data(NumberOfTrials=100):
 
 	DescriptiveTitle,ReachType,RandomXiBool,RandomXfBool = reach_type_prompt()
 	AllMuscleSettings = return_muscle_settings()
-	# Rᵀ_func, Ṙᵀ_func = return_MA_matrix_functions(AllMuscleSettings)
 	Notes = input_notes()
 
-	# TrialData = {	"Reach Type" : DescriptiveTitle,\
-	# 				"All Muscle Settings" : AllMuscleSettings, \
-	# 				"Notes" : Notes, \
-	# 				"Equations of Motion" : "Zadravec", \
-	# 				"Target Amplitude" : 0.35,\
-	# 				"Movement Duration" : 1,\
-	# 				"Randomize Boundary Positions" : [RandomXiBool,RandomXfBool],\
-	# 				"Moment Arm Matrix Function" : Rᵀ_func, \
-	# 				"Moment Arm Matrix Derivative" : Ṙᵀ_func, \
-	# 				"Default Paths" : []}
-
-	TrialData = {	"Reach Type" : DescriptiveTitle,\
-					"All Muscle Settings" : AllMuscleSettings, \
+	TrialData = {	"All Muscle Settings" : AllMuscleSettings, \
 					"Notes" : Notes, \
 					"Equations of Motion" : "Zadravec", \
 					"Target Amplitude" : 0.35,\
 					"Movement Duration" : 1,\
 					"Randomize Boundary Positions" : [RandomXiBool,RandomXfBool],\
 					"Default Paths" : []}
+	if DescriptiveTitle[:5]=="Fixed":
+		TrialData["Reach Type"] = DescriptiveTitle[:18]
+		TrialData["Reach Angle"] = np.pi*eval(DescriptiveTitle[19:])
+	else:
+		TrialData["Reach Type"] = DescriptiveTitle
 
 	OrderNumber, OrderedMuscleList, OrderedColorsList = \
 	 												return_ordered_muscle_list_with_colors(TrialData)
