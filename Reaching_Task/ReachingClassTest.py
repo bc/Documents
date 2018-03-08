@@ -570,7 +570,7 @@ def return_MA_matrix_functions(AllMuscleSettings):
 	Ṙᵀ_func = lambdify([q1,q2,q_PS],Ṙᵀ_symbolic)
 	# returns an (n,m) matrix when n is the number of muscles and m is the number of DOFS. We chose to return R.T because this is commonly utilized in muscle velocity calculations.
 	return(Rᵀ_func,Ṙᵀ_func)
-def plot_MA_ranges(TrialData):
+def plot_MA_ranges(TrialData,ReturnFig=False):
 	import numpy as np
 	import matplotlib.pyplot as plt
 	import sympy as sp
@@ -599,7 +599,7 @@ def plot_MA_ranges(TrialData):
 		ax2.set_xlabel("Elbow Angle")
 	plt.figlegend(Shoulder_MA_plots,TrialData["Ordered Muscle List"],\
 						loc='lower center',ncol=5,mode='expand')
-	plt.show()
+	if ReturnFig == True: return(fig)
 def input_notes():
 	"""
 	This function is designed to allow for a string of specific notes to be placed in the overall trial dict so that specific information regarding muscle parameters, MA functions, reaching directions, etc. can be documented so the trials are repeatable.
@@ -1141,7 +1141,7 @@ def generate_default_path(TrialData):
 		DefaultYf = 0 # m
 		EndpointErrorSigma = 0.0025
 		EndpointErrorTheta = 30*(np.pi/180) # Allowable error in initial/final slope, tan(ϑ)
-		MaximumDeviationInY = 0.05 # m
+		MaximumDeviationInY = 0.02 # m
 
 		if TrialData["Randomize Boundary Positions"][0] == False:
 			x_initial = DefaultXi + np.random.normal(0,EndpointErrorSigma) # cm
@@ -1686,7 +1686,7 @@ def concentric_cost(NormalizedMuscleVelocity,t_end = 1, dt = 0.001,costtype = 'l
 def animate_plots(response,Movement,TrialData,Weighted=False, save_as_gif = False):
 	assert type(response)==bool, "Input must be either True or False."
 	assert type(Weighted)==bool, "Weighted must be either True or False."
-	assert TrialData["Reach Type"][:-6] in ['Sideways','Center','Left','Right'], "ReachType must be either 'Sideways','Center','Left', or 'Right'"
+	assert TrialData["Reach Type"][:-6] in ['Sideways','Center','Left','Right','Fixed-target'], "ReachType must be either 'Sideways','Center','Left', or 'Right'"
 
 	if response == True:
 		import numpy as np
@@ -1720,8 +1720,10 @@ def animate_plots(response,Movement,TrialData,Weighted=False, save_as_gif = Fals
 			DescriptiveTitle = "45$^\circ$ Reach Right\n"
 		elif TrialData["Reach Type"][:-6] == 'Sideways':
 			DescriptiveTitle = "Side-to-side Reach\n"
-		else:
+		elif TrialData["Reach Type"][:-6] == 'Center':
 			DescriptiveTitle = "Straight Forward (Center) Reach\n"
+		elif TrialData["Reach Type"][:-6] == 'Fixed-target':
+			DescriptiveTitle = "Fixed Target Reach\n"
 
 		# if Weighted==True:
 		# 	TypeString = "\n(Afferent-Weighted $\hat{v}_m$)\n"
@@ -2143,7 +2145,7 @@ def create_trial_data(NumberOfTrials=100):
 		TrialData["Default Paths"].append(DefaultPath)
 
 	return(TrialData)
-def plot_random_trajectory(TrialData):
+def animate_random_trajectory(TrialData):
 	import numpy as np
 	import matplotlib.pyplot as plt
 	np.random.seed()
@@ -2151,7 +2153,7 @@ def plot_random_trajectory(TrialData):
 	RandomPath = TrialData["Default Paths"][np.random.randint(0,len(TrialData["Default Paths"]))]
 	RandomMovement = reaching_movement(RandomPath)
 	animate_plots(True,RandomMovement,TrialData)
-def plot_all_trajectories(TrialData,Weighted=False,Statusbar = False):
+def plot_all_on_same_axes(TrialData,Weighted=False,Statusbar = False,ReturnFig=False):
 	import numpy as np
 	import matplotlib.pyplot as plt
 	from matplotlib.patches import Ellipse
@@ -2170,8 +2172,12 @@ def plot_all_trajectories(TrialData,Weighted=False,Statusbar = False):
 		DescriptiveTitle = "45$^\circ$ Reach Right\n"
 	elif TrialData["Reach Type"][:-6] == 'Sideways':
 		DescriptiveTitle = "Side-to-side Reach\n"
-	else:
+	elif TrialData["Reach Type"][:-6] == 'Center':
 		DescriptiveTitle = "Straight Forward (Center) Reach\n"
+	elif TrialData["Reach Type"][:-6] == 'Fixed-target':
+		DescriptiveTitle = "Fixed Target Reach\n"
+	else:
+		DescriptiveTitle = "Error in Title"
 
 	fig, ((ax5,ax6),(ax1,ax2),(ax3,ax4)) = plt.subplots(3,2,figsize=(11,8))
 
@@ -2399,8 +2405,121 @@ def plot_all_trajectories(TrialData,Weighted=False,Statusbar = False):
 			statusbar(i,len(TrialData["Default Paths"]),StartTime=StartTime,\
 							Title = TrialData["Reach Type"])
 	print('\n')
-	plt.show()
-def plot_individual_muscles(TrialData,Weighted=False,Statusbar=False,SameScale=False,Scale=[]):
+	if ReturnFig == True: return(fig)
+def plot_all_trajectories(TrialData,Statusbar = False,ReturnFig=False):
+	import numpy as np
+	import matplotlib.pyplot as plt
+	from matplotlib.patches import Ellipse
+	import matplotlib.patches as patches
+	import time
+
+	t_end = TrialData["Movement Duration"]
+	N = 1000
+	t = np.linspace(0,t_end, N + 1)
+	L1,L2 = TrialData["Limb Lengths"]
+	MedianPlane = L1*(0.129/0.186)
+
+	if TrialData["Reach Type"][:-6] == 'Left':
+		DescriptiveTitle = "45$^\circ$ Reach Left\n"
+	elif TrialData["Reach Type"][:-6] == 'Right':
+		DescriptiveTitle = "45$^\circ$ Reach Right\n"
+	elif TrialData["Reach Type"][:-6] == 'Sideways':
+		DescriptiveTitle = "Side-to-side Reach\n"
+	elif TrialData["Reach Type"][:-6] == 'Straight':
+		DescriptiveTitle = "Straight Forward (Center) Reach\n"
+	elif TrialData["Reach Type"][:-6] == 'Fixed-target':
+		DescriptiveTitle = "Fixed-Target Reach\n"
+	else:
+		DescriptiveTitle = "Error in Title"
+
+	fig, (ax1,ax2) = plt.subplots(2,1,figsize=(11,8))
+
+	if t_end == 1:
+		MovementDurationString = "Movement Duration : " + str(t_end) \
+								+ " sec\n"
+	else:
+		MovementDurationString = "Movement Duration : " + str(t_end) \
+								+ " secs\n"
+	plt.suptitle(DescriptiveTitle + MovementDurationString,Fontsize=20,y=0.975)
+
+	StartTime = time.time()
+	for i in range(len(TrialData["Default Paths"])):
+		Path = TrialData["Default Paths"][i]
+		Movement = reaching_movement(Path)
+		X,_,_ = Movement.return_X_values(TrialData)
+		Movement.inverse_kinematics(X,TrialData)
+		A1 = Movement.A1
+		A2 = Movement.A2
+
+		Angle1, = ax1.plot(t.T,A1.T,color = 'c')
+		Angle2, = ax1.plot(t.T,A2.T,color = 'r')
+		ax1.set_xlim(0,t_end)
+		ax1.set_xticks([0,t_end])
+		ax1.set_xticklabels(['Start','Finish'])
+		ax1.set_ylim(-np.pi/2,np.pi)
+		ax1.set_yticks([-np.pi/2,0,np.pi/2,np.pi])
+		ax1.set_yticklabels([r'$\frac{-\pi}{2}$','0',r'$\frac{\pi}{2}$','$\pi$'],fontsize=12)
+		ax1.spines['right'].set_visible(False)
+		ax1.spines['top'].set_visible(False)
+		# ax1.set_ylabel('Joint Angles\n(in Radians)')
+		ax1.legend(["Shoulder\nAngle","Elbow\nAngle"],loc='best')
+
+		ax2.get_xaxis().set_ticks([])
+		ax2.get_yaxis().set_ticks([])
+		ax2.set_frame_on(True)
+		RightShoulder = plt.Circle((0,0),radius=0.05,Color='#4682b4')
+		ax2.add_patch(RightShoulder)
+		LeftShoulder = plt.Circle((-MedianPlane*2,0),radius=0.05,Color='#4682b4')
+		ax2.add_patch(LeftShoulder)
+		Torso = plt.Rectangle((-MedianPlane*2,-0.05),MedianPlane*2,0.1,Color='#4682b4')
+		ax2.add_patch(Torso)
+		Head = Ellipse((-MedianPlane,0),0.2,0.225,FaceColor='w',EdgeColor='#4682b4',Linewidth=3)
+		ax2.add_patch(Head)
+		JointCoordinates = \
+			np.concatenate([[np.cumsum([0,L1*np.cos(A1[0,0]),L2*(0.146/(0.146+0.108))*np.cos(A1[0,0]+A2[0,0]),L2*(0.108/(0.146+0.108))*np.cos(A1[0,0]+A2[0,0])])],\
+			[np.cumsum([0,L1*np.sin(A1[0,0]),L2*(0.146/(0.146+0.108))*np.sin(A1[0,0]+A2[0,0]),L2*(0.108/(0.146+0.108))*np.sin(A1[0,0]+A2[0,0])])]],\
+			axis=0)
+		Elbow = plt.Circle((L1*np.cos(A1[0,0]),L1*np.sin(A1[0,0])),radius=0.03,color='#4682b4')
+		ax2.add_patch(Elbow)
+		Endpoint = plt.Circle((L1*np.cos(A1[0,0])+L2*np.cos(A1[0,0]+A2[0,0]),\
+							L1*np.sin(A1[0,0])+L2*np.sin(A1[0,0]+A2[0,0])),\
+							radius = 0.02,color='#4682b4')
+		ax2.add_patch(Endpoint)
+		Wrist = plt.Circle((L1*np.cos(A1[0,0])+L2*(0.146/(0.146+0.108))*np.cos(A1[0,0]+A2[0,0]),\
+							L1*np.sin(A1[0,0])+L2*(0.146/(0.146+0.108))*np.sin(A1[0,0]+A2[0,0])),\
+							radius = 0.03,color='#4682b4')
+		ax2.add_patch(Wrist)
+		StickFigure, = ax2.plot(JointCoordinates[0,:],JointCoordinates[1,:],'ko-',LineWidth=2,MarkerFaceColor='k')
+		movement, = ax2.plot(L1*np.cos(A1[0,:])+L2*np.cos(A1[0,:]+A2[0,:]),\
+							L1*np.sin(A1[0,:])+L2*np.sin(A1[0,:]+A2[0,:]),\
+							color='0.60')
+		UpperArm = plt.Rectangle((0.02*np.sin(A1[0,0]),\
+										-0.02*np.cos(A1[0,0])),\
+										L1, 0.04,\
+										angle=A1[0,0]*180/np.pi,color='#4682b4')
+		ax2.add_patch(UpperArm)
+		Forearm = plt.Rectangle((L1*np.cos(A1[0,0]) + 0.02*np.sin(A1[0,0]+A2[0,0]),\
+										L1*np.sin(A1[0,0]) -0.02*np.cos(A1[0,0]+A2[0,0])),\
+										L2*(0.146/(0.146+0.108)), 0.04,\
+										angle=(A1[0,0]+A2[0,0])*180/np.pi,color='#4682b4')
+		ax2.add_patch(Forearm)
+		Hand = plt.Rectangle((L1*np.cos(A1[0,0])\
+								+ L2*(0.146/(0.146+0.108))*np.cos(A1[0,0]+A2[0,0]) \
+									+ 0.02*np.sin(A1[0,0]+A2[0,0]),\
+							L1*np.sin(A1[0,0])\
+								+ L2*(0.146/(0.146+0.108))*np.sin(A1[0,0]+A2[0,0]) \
+									-0.02*np.cos(A1[0,0]+A2[0,0])),\
+										L2*(0.108/(0.146+0.108)), 0.04,\
+										angle=(A1[0,0]+A2[0,0])*180/np.pi,color='#4682b4')
+		ax2.add_patch(Hand)
+		ax2.set_aspect('equal')
+		if Statusbar == True:
+			statusbar(i,len(TrialData["Default Paths"]),StartTime=StartTime,\
+							Title = TrialData["Reach Type"])
+	print('\n')
+	if ReturnFig == True: return(fig)
+def plot_individual_muscles(TrialData,Weighted=False,Statusbar=False,\
+								SameScale=False,Scale=[],ReturnFig=False):
 	import numpy as np
 	import matplotlib.pyplot as plt
 	from matplotlib.patches import Ellipse
@@ -2434,8 +2553,12 @@ def plot_individual_muscles(TrialData,Weighted=False,Statusbar=False,SameScale=F
 		DescriptiveTitle = "45$^\circ$ Reach Right\n"
 	elif TrialData["Reach Type"][:-6] == 'Sideways':
 		DescriptiveTitle = "Side-to-side Reach\n"
-	else:
+	elif TrialData["Reach Type"][:-6] == 'Center':
 		DescriptiveTitle = "Straight Forward (Center) Reach\n"
+	elif TrialData["Reach Type"][:-6] == 'Fixed-target':
+		DescriptiveTitle = "Fixed Target Reach\n"
+	else:
+		DescriptiveTitle = "Error in Title\n"
 
 	if t_end == 1:
 		MovementDurationString = "Movement Duration : " + str(t_end) \
@@ -2527,7 +2650,7 @@ def plot_individual_muscles(TrialData,Weighted=False,Statusbar=False,SameScale=F
 					axes[RowNumber[j],ColumnNumber[j]].spines['right'].set_visible(False)
 					axes[RowNumber[j],ColumnNumber[j]].spines['top'].set_visible(False)
 					axes[RowNumber[j],ColumnNumber[j]].set_ylim(Scale)
-	plt.show()
+	if ReturnFig == True: return(fig)
 def save_trial_data_prompt(TrialData):
 	import numpy as np
 	import pickle
@@ -2597,11 +2720,77 @@ def load_trial_data_prompt():
 			print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n')
 			ValidResponse_1 = True
 			pass
+def calculate_torques(EOM="Uno"):
+	from math import cos,sin
+	import numpy as np
+	assert EOM in ["Uno","Zadravec"], "EOM can be either 'Uno' or 'Zadravec'"
+	if EOM == "Uno": # Uno et al. Biological Cybernetics (1989)
+		m1,m2 = 1.02,1.16 # kg
+		c1,c2 = 0.104,0.165 # m
+		I1,I2 = 0.0167,0.0474 # kg⋅m²
+		b11,b12,b21,b22 = 0.8,0,0,0.8
+		α = I1 + I2 + m2*(L1**2)
+		β = m2*L1*c2
+		δ = I2
+	else: # Zadravec, Biocybernetics and Biomedical Engineering (2013)
+		m1,m2 = 2.089,1.912 # kg
+		c1,c2 = 0.152,0.181 # m
+		I1,I2 = 0.0159,0.0257 # kg⋅m²
+		b11,b12,b21,b22 = 0.74,0.10,0.10,0.82
+		α = I1 + I2 + m1*(c1**2) + m2*(L1**2 + c2**2)
+		β = m2*L1*c2
+		δ = I2 + m2*(c2**2)
+	C_matrix = lambda a1,a2,ȧ1,ȧ2: \
+	        np.matrix([ [-β*ȧ2*sin(a2),     -β*(ȧ1 + ȧ2)*sin(a2)],
+	                    [β*ȧ1*sin(a2),      0]]) # kg⋅m² (N⋅m⋅s²)
+	M_matrix = lambda a1,a2: \
+	        np.matrix([ [α + 2*β*cos(a2),   δ + β*cos(a2)],
+	                    [δ + β*cos(a2),     δ]],\
+						dtype = 'float64') # kg⋅m² (N⋅m⋅s²)
+	B_matrix = np.matrix([ [b11, b12],\
+	                	[b21, b22]]) # kg⋅m²/s (N⋅m⋅s)
+	global T1,T2
+	T1,T2 = [],[]
+	Ȧ = np.swapaxes(np.array(np.concatenate((Ȧ1,Ȧ2),axis=0),ndmin=3),0,2)
+	Ä = np.swapaxes(np.array(np.concatenate((Ä1,Ä2),axis=0),ndmin=3),0,2)
+	M = np.array(list(map(M_matrix,A1.T,A2.T)))
+	C = np.array(list(map(C_matrix,A1.T,A2.T,Ȧ1.T,Ȧ2.T)))
+	MÄ = np.array(list(map(lambda m,ä: np.matrix(m)*ä,M,Ä)))
+	CȦ = np.array(list(map(lambda c,ȧ: np.matrix(np.array(c,ndmin=2,dtype='float64'))*ȧ,C,Ȧ)))
+	BȦ = np.array(list(map(lambda ȧ: B_matrix*ȧ,Ȧ)))
+	T = MÄ + CȦ + BȦ
+	# returns a (N,1,2) 3D array. Therefore we must transpose it first and select first element
+	T1,T2 = np.split(T.T[0],2,axis=0) # returns 2 (1,N) arrays
+def save_figures(TrialData,figs):
+	import os.path
+	from matplotlib.backends.backend_pdf import PdfPages
+	i = 1
+	FileName = TrialData["Reach Type"].replace(' ','_').capitalize() + "_" \
+					+ "{:0>2d}".format(i) +".pdf"
+	if os.path.exists(FileName) == True:
+		while os.path.exists(FileName) == True:
+			i += 1
+			FileName = TrialData["Reach Type"].replace(' ','_').capitalize()\
+			 				+ "_" + "{:0>2d}".format(i) +".pdf"
+	PDFFile = PdfPages(FileName)
+	if len(figs)==1:
+		PDFFile.savefig(figs)
+	else:
+		[PDFFile.savefig(fig) for fig in figs]
+	PDFFile.close()
 
 # NumberOfTrials should be greater than 50 if using statusbar())
-TrialData = create_trial_data(NumberOfTrials=100)
-# plot_random_trajectory(TrialData)
-# plot_all_trajectories(TrialData,Statusbar=True)
-plot_individual_muscles(TrialData,Statusbar=True,SameScale=True,Scale=[-1.1,1.1])
+NumberOfTrials = 100
+if NumberOfTrials<50:
+	Statusbar_bool = False
+else:
+	Statusbar_bool = True
+TrialData = create_trial_data(NumberOfTrials=NumberOfTrials)
+# animate_random_trajectory(TrialData)
+# plot_all_on_same_axes(TrialData,Statusbar=Statusbar_bool)
+fig1 = plot_all_trajectories(TrialData,Statusbar=Statusbar_bool,ReturnFig=True)
+fig2 = plot_individual_muscles(TrialData,Statusbar=Statusbar_bool,\
+								SameScale=True,Scale=[-1.2,1.2],ReturnFig=True)
+save_figures(TrialData,[fig1,fig2])
 save_trial_data_prompt(TrialData)
 # load_trial_data_prompt()
