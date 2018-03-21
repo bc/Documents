@@ -2743,6 +2743,12 @@ def plot_individual_muscles(TrialData,Weighted=False,Statusbar=False,\
 					axes[RowNumber[j],ColumnNumber[j]].spines['top'].set_visible(False)
 					axes[RowNumber[j],ColumnNumber[j]].set_ylim(Scale)
 	if ReturnFig == True: return(fig)
+def parallel_test(TrialData,i,Weighted=False):
+	Path = TrialData["Default Paths"][i]
+	Movement = reaching_movement(Path)
+	X,_,_ = Movement.return_X_values(TrialData)
+	MuscleVelocities = Movement.return_muscle_velocities(TrialData,Weighted=Weighted)
+	return(X,MuscleVelocities)
 def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=False,\
 								Scale=[],ReturnFig=False):
 	import numpy as np
@@ -2750,6 +2756,9 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 	from matplotlib.patches import Ellipse
 	import matplotlib.patches as patches
 	import time
+	from joblib import Parallel, delayed
+	import multiprocessing
+	import dill
 
 	TotalColorsList = TrialData["Ordered Muscle Colors List"]*len(TrialData["Default Paths"])
 
@@ -2784,6 +2793,9 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 
 	MuscleIndices = list(range(NumMuscles))
 	MuscleIndices.remove(4)
+	MuscleNumbers = list(range(NumMuscles - 1))
+	MuscleNumbers[5:9] = MuscleNumbers[4:8]
+	MuscleNumbers[4] = None
 
 	for j in MuscleIndices:
 		axes[RowNumber[j],ColumnNumber[j]].set_xlim(0,t_end)
@@ -2800,38 +2812,97 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 		else:
 			axes[RowNumber[j],ColumnNumber[j]].set_xticklabels(['',''])
 			axes[RowNumber[j],ColumnNumber[j]].set_yticklabels(['','','','',''])
-		if j<4:
-			axes[RowNumber[j],ColumnNumber[j]].set_title(TrialData["Ordered Muscle List"][j],\
-								Color = TrialData["Ordered Muscle Colors List"][j])
-		else:
-			axes[RowNumber[j],ColumnNumber[j]].set_title(TrialData["Ordered Muscle List"][j-1],\
-								Color = TrialData["Ordered Muscle Colors List"][j-1])
+		axes[RowNumber[j],ColumnNumber[j]].set_title(\
+					TrialData["Ordered Muscle List"][MuscleNumbers[j]],\
+							Color = TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
+		# if j<4:
+		# 	axes[RowNumber[j],ColumnNumber[j]].set_title(TrialData["Ordered Muscle List"][j],\
+		# 						Color = TrialData["Ordered Muscle Colors List"][j])
+		# else:
+		# 	axes[RowNumber[j],ColumnNumber[j]].set_title(TrialData["Ordered Muscle List"][j-1],\
+		# 						Color = TrialData["Ordered Muscle Colors List"][j-1])
 	StartTime = time.time()
+	# Inputs = range(len(TrialData["Default Paths"]))
+	# def parallel_test(TrialData,axes,i):
+	# 	import dill
+	# 	Path = TrialData["Default Paths"][i]
+	# 	Movement = reaching_movement(Path)
+	# 	X,_,_ = Movement.return_X_values(TrialData)
+	# 	MuscleVelocities = Movement.return_muscle_velocities(TrialData,Weighted=Weighted)
+	# 	Vm_forward = MuscleVelocities
+	# 	Vm_reverse = -np.array(list(reversed(Vm_forward.T))).T
+	#
+	# 	axes[RowNumber[4],ColumnNumber[4]].plot(X[0,:],X[1,:],c='0.60')
+	# 	for j in MuscleIndices:
+	# 		MuscleNumber = TrialData["Ordered Muscle Numbers"][MuscleNumbers[j]]
+	# 		axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
+	# 				c=TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
+	# 		bounds[MuscleNumbers[j]] = \
+	# 			max([ max(abs(Vm_forward[MuscleNumber])), bounds[MuscleNumbers[j]] ])
+	# NumberOfCores = multiprocessing.cpu_count()
+	# p = multiprocessing.Pool(NumberOfCores)
+	# p.map(parallel_test,Inputs)
+	# Parallel(n_jobs=NumberOfCores)(delayed(parallel_test)(TrialData,axes,i) for i in Inputs)
+	Inputs = range(len(TrialData["Default Paths"]))
+	NumberOfCores = multiprocessing.cpu_count()
+	Out = Parallel(n_jobs=NumberOfCores)(delayed(parallel_test)(TrialData,i,Weighted=Weighted) for i in range(len(TrialData["Default Paths"])))
+	AllX = [Out[:][i][0][:] for i in Inputs]
+	AllVm = [Out[:][i][1][:] for i in Inputs]
+	# import ipdb; ipdb.set_trace()
 	for i in range(len(TrialData["Default Paths"])):
-		Path = TrialData["Default Paths"][i]
-		Movement = reaching_movement(Path)
-		X,_,_ = Movement.return_X_values(TrialData)
-		MuscleVelocities = Movement.return_muscle_velocities(TrialData,Weighted=Weighted)
-		Vm_forward = MuscleVelocities
-		Vm_reverse = -np.array(list(reversed(Vm_forward.T))).T
-
-		axes[RowNumber[4],ColumnNumber[4]].plot(X[0,:],X[1,:],c='0.60')
+		axes[RowNumber[4],ColumnNumber[4]].plot(AllX[i][0],AllX[i][1],c='0.60')
 		for j in MuscleIndices:
-			if j<4:
-				MuscleNumber = TrialData["Ordered Muscle Numbers"][j]
-				axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
-						c=TrialData["Ordered Muscle Colors List"][j])
-				bounds[j] = \
-					max([ max(abs(Vm_forward[MuscleNumber])), bounds[j] ])
-			else:
-				MuscleNumber = TrialData["Ordered Muscle Numbers"][j-1]
-				axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
-						c=TrialData["Ordered Muscle Colors List"][j-1])
-				bounds[j-1] = \
-					max([ max(abs(Vm_forward[MuscleNumber])), bounds[j-1] ])
+			MuscleNumber = TrialData["Ordered Muscle Numbers"][MuscleNumbers[j]]
+			axes[RowNumber[j],ColumnNumber[j]].plot(t,AllVm[i][MuscleNumber],\
+					c=TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
+			bounds[MuscleNumbers[j]] = \
+				max([ max(abs(AllVm[i][MuscleNumber])), bounds[MuscleNumbers[j]] ])
+			# if j<4:
+			# 	MuscleNumber = TrialData["Ordered Muscle Numbers"][j]
+			# 	axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
+			# 			c=TrialData["Ordered Muscle Colors List"][j])
+			# 	bounds[j] = \
+			# 		max([ max(abs(Vm_forward[MuscleNumber])), bounds[j] ])
+			# else:
+			# 	MuscleNumber = TrialData["Ordered Muscle Numbers"][j-1]
+			# 	axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
+			# 			c=TrialData["Ordered Muscle Colors List"][j-1])
+			# 	bounds[j-1] = \
+			# 		max([ max(abs(Vm_forward[MuscleNumber])), bounds[j-1] ])
 		if Statusbar == True:
 			statusbar(i,len(TrialData["Default Paths"]),StartTime=StartTime,\
 							Title = TrialData["Reach Type"])
+	# import ipdb; ipdb.set_trace()
+	# for i in range(len(TrialData["Default Paths"])):
+	# 	Path = TrialData["Default Paths"][i]
+	# 	Movement = reaching_movement(Path)
+	# 	X,_,_ = Movement.return_X_values(TrialData)
+	# 	MuscleVelocities = Movement.return_muscle_velocities(TrialData,Weighted=Weighted)
+	# 	Vm_forward = MuscleVelocities
+	# 	Vm_reverse = -np.array(list(reversed(Vm_forward.T))).T
+	#
+	# 	axes[RowNumber[4],ColumnNumber[4]].plot(X[0,:],X[1,:],c='0.60')
+	# 	for j in MuscleIndices:
+	# 		MuscleNumber = TrialData["Ordered Muscle Numbers"][MuscleNumbers[j]]
+	# 		axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
+	# 				c=TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
+	# 		bounds[MuscleNumbers[j]] = \
+	# 			max([ max(abs(Vm_forward[MuscleNumber])), bounds[MuscleNumbers[j]] ])
+	# 		# if j<4:
+	# 		# 	MuscleNumber = TrialData["Ordered Muscle Numbers"][j]
+	# 		# 	axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
+	# 		# 			c=TrialData["Ordered Muscle Colors List"][j])
+	# 		# 	bounds[j] = \
+	# 		# 		max([ max(abs(Vm_forward[MuscleNumber])), bounds[j] ])
+	# 		# else:
+	# 		# 	MuscleNumber = TrialData["Ordered Muscle Numbers"][j-1]
+	# 		# 	axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
+	# 		# 			c=TrialData["Ordered Muscle Colors List"][j-1])
+	# 		# 	bounds[j-1] = \
+	# 		# 		max([ max(abs(Vm_forward[MuscleNumber])), bounds[j-1] ])
+	# 	if Statusbar == True:
+	# 		statusbar(i,len(TrialData["Default Paths"]),StartTime=StartTime,\
+	# 						Title = TrialData["Reach Type"])
 	print('\n')
 
 	assert type(Scale)==list and len(Scale)==2, "Scale must be list of length 2"
@@ -2983,7 +3054,7 @@ def save_figures(TrialData,figs):
 	PDFFile.close()
 
 # NumberOfTrials should be greater than 50 if using statusbar())
-NumberOfTrials = 10
+NumberOfTrials = 100
 if NumberOfTrials<50:
 	Statusbar_bool = False
 else:
