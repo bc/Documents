@@ -55,12 +55,12 @@ def return_muscle_settings():
 	Notes:
 	Coefficients from observation, Ramsay, FVC, Holtzbaur, Pigeon, Kuechle, or Banks.
 
-	BRA EFE MA for Ramsay has R² = 0.990 whereas Pigeon has R² = 0.9988. Curve appears to be a better fit, as it experiences its smallest MA when Elbow angle = 0. Coefficients and equation number/type are listed below to test either implementation.
+	BRA (Brachialis) EFE MA for Ramsay has R² = 0.990 whereas Pigeon has R² = 0.9988. Curve appears to be a better fit, as it experiences its smallest MA when Elbow angle = 0. Coefficients and equation number/type are listed below to test either implementation.
 
 	src = 'Ramsay', eq = 1, Coefficients = [16.1991,-16.1463,24.5512,-6.3335,0], threshold = None
 	src = 'Pigeon', dof = 'elbow', eq = None, Coefficients = Pigeon_coeff_conversion([5.5492,2.3080,2.3425,-2.0530,0,0]), threshold = None
 
-	BRD for Ramsay has R² = 0.988 whereas Pigeon has R² = 0.9989. Pigeon, however, only takes elbow angle into account, whereas Ramsay takes in variable PS angles. Coefficients and equation number/type are listed below to test either implementation.
+	BRD (Brachioradialis) for Ramsay has R² = 0.988 whereas Pigeon has R² = 0.9989. Pigeon, however, only takes elbow angle into account, whereas Ramsay takes in variable PS angles. Coefficients and equation number/type are listed below to test either implementation.
 
 	src = 'Ramsay', eq = 2, Coefficients = [15.2564,-11.8355,2.8129,-5.7781,44.8143,0,2.9032,0,0,-13.4956,0,-0.3940,0,0,0,0]
 	src = 'Pigeon', dof = 'elbow', eq = None, Coefficients = Pigeon_coeff_conversion([19.490,1.6681,10.084,-6.5171,0,0])
@@ -616,8 +616,8 @@ def reach_type_prompt():
 	DefaultSettings = False
 	ValidResponse_1 = False
 	while ValidResponse_1 == False:
-		ReachTypeNumber = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nPlease select reaching movement number:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Side-to-side\n (2) - Straight (Center)\n (3) - 45° Left\n (4) - 45° Right\n (5) - Fixed-target\n  ⏎  - Random\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMovement Type: ")
-		if ReachTypeNumber not in ['1','2','3','4','5','']:
+		ReachTypeNumber = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nPlease select reaching movement number:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Side-to-side\n (2) - Straight (Center)\n (3) - 45° Left\n (4) - 45° Right\n (5) - Fixed-target\n (6) - Fixed-start\n  ⏎  - Random\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMovement Type: ")
+		if ReachTypeNumber not in ['1','2','3','4','5','6','']:
 			print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
 			ValidResponse_1 = False
 		elif ReachTypeNumber == '':
@@ -628,7 +628,7 @@ def reach_type_prompt():
 			ReachTypeNumber = int(ReachTypeNumber)-1
 			print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n')
 			ValidResponse_1 = True
-	ReachType = ['Sideways','Center','Left','Right','Fixed-target'][ReachTypeNumber]
+	ReachType = ['Sideways','Center','Left','Right','Fixed-target','Fixed-start'][ReachTypeNumber]
 	DescriptiveTitle = ReachType + ' Reach'
 
 	if DefaultSettings == False:
@@ -672,6 +672,19 @@ def reach_type_prompt():
 			else:
 				DescriptiveTitle = DescriptiveTitle + "_" + StartingPositionInRadians
 				ValidResponse_4 = True
+	if DescriptiveTitle == "Fixed-start Reach":
+		"""
+		This will allow for an input to be passed along to the reaching_movement.return_X_values(TrialData) in the DescriptiveTitle that will denote the reaching angle. By convention, 0 radians will be associated with the 3 o'clock position and follow a counterclockwise rotation through 2π. Realistic starting positions will likely be in [0,π].
+		"""
+		ValidResponse_5 = False
+		while ValidResponse_5 == False:
+			InitialAngleInRadians = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInput initial reaching angle. (Note: 0 \nradians corresp. to 3 o'clock from  target.)\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse (in rads): π ⨉ ")
+			if any(ch.isalpha() for ch in InitialAngleInRadians) == True:
+				print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response (Numbers only)! Please try again.')
+				ValidResponse_5 = False
+			else:
+				DescriptiveTitle = DescriptiveTitle + "_" + InitialAngleInRadians
+				ValidResponse_5 = True
 	return(DescriptiveTitle,ReachType,RandomXiBool,RandomXfBool)
 def return_ordered_muscle_list_with_colors(TrialData):
 	import numpy as np
@@ -1216,16 +1229,16 @@ class reaching_movement:
 		DefaultDisplacement_x = 0.05
 
 		assert TrialData["Reach Type"][:-6].capitalize() in\
-		 			['Center','Right','Left','Sideways','Fixed-target'], \
-						"ReachType must be either 'Center','Right','Left', or 'Sideways'."
+		 			['Center','Right','Left','Sideways','Fixed-target','Fixed-start'], \
+						"ReachType must be either 'Center','Right','Left', 'Sideways', 'Fixed-target', or 'Fixed-start'."
 
 		if TrialData["Reach Type"][:-6].capitalize() == 'Sideways':
 			"""
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			~~~~~~~~~~~~~~~~~~    Side to Side   ~~~~~~~~~~~~~~~~~~
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-			Xi = [-MedianPlane-TargetAmplitude/2,0.1+TargetAmplitude/2]
-			Xf = [-MedianPlane+TargetAmplitude/2,0.1+TargetAmplitude/2]
+			Xi = [MedianPlane-TargetAmplitude/2,0.1+TargetAmplitude/2]
+			Xf = [MedianPlane+TargetAmplitude/2,0.1+TargetAmplitude/2]
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			"""
 			x,y = translate_xy(x,y,px=-DefaultDisplacement_x)
@@ -1241,8 +1254,8 @@ class reaching_movement:
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			~~~~~~~~~~~~~~~~~    Center Reach     ~~~~~~~~~~~~~~~~~
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-			Xi = [-MedianPlane,0.20]
-			Xf = [-MedianPlane,0.20 + TargetAmplitude]
+			Xi = [MedianPlane,0.20]
+			Xf = [MedianPlane,0.20 + TargetAmplitude]
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			"""
 			x,y = translate_xy(x,y,px=-DefaultDisplacement_x)
@@ -1258,8 +1271,8 @@ class reaching_movement:
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			~~~~~~~~~~~~~~~~~ Left Diagonal Reach ~~~~~~~~~~~~~~~~~
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-			Xi = [-MedianPlane,0.20]
-			Xf = [-MedianPlane-TargetAmplitude/(2**0.5), 0.20 + TargetAmplitude/(2**0.5)]
+			Xi = [MedianPlane,0.20]
+			Xf = [MedianPlane-TargetAmplitude/(2**0.5), 0.20 + TargetAmplitude/(2**0.5)]
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			"""
 			x,y = translate_xy(x,y,px=-DefaultDisplacement_x)
@@ -1275,8 +1288,8 @@ class reaching_movement:
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			~~~~~~~~~~~~~~~~ Right Diagonal Reach ~~~~~~~~~~~~~~~~~
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-			Xi = [-MedianPlane,0.20]
-			Xf = [-MedianPlane+TargetAmplitude/(2**0.5), 0.20 + TargetAmplitude/(2**0.5)]
+			Xi = [MedianPlane,0.20]
+			Xf = [MedianPlane+TargetAmplitude/(2**0.5), 0.20 + TargetAmplitude/(2**0.5)]
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			"""
 			x,y = translate_xy(x,y,px=-DefaultDisplacement_x)
@@ -1292,8 +1305,7 @@ class reaching_movement:
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			~~~~~~~~~~~~~~~~~ Fixed Target Reach ~~~~~~~~~~~~~~~~~~
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-			Xi = [-MedianPlane,0.20]
-			Xf = [-MedianPlane,0.20 + TargetAmplitude]
+			Xf = [MedianPlane,0.20 + TargetAmplitude]
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			"""
 			ϕ = TrialData["Reach Angle"] - np.pi
@@ -1303,6 +1315,24 @@ class reaching_movement:
 			px = MedianPlane - TargetAmplitude*np.cos(ϕ)
 			py = 0.20 + TargetAmplitude - TargetAmplitude*np.sin(ϕ)
 			x,y = translate_xy(x,y,px=px,py=py)
+
+			ẋ,ẏ = rotate_xy(ẋ,ẏ,ϕ)
+
+			ẍ,ÿ = rotate_xy(ẍ,ÿ,ϕ)
+
+		elif TrialData["Reach Type"][:-6].capitalize() == 'Fixed-start':
+			"""
+			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+			~~~~~~~~~~~~~~~~~~ Fixed Start Reach ~~~~~~~~~~~~~~~~~~
+			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+			Xi = [MedianPlane,0.20]
+			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+			"""
+			ϕ = TrialData["Reach Angle"]
+			TargetAmplitude = TrialData["Target Amplitude"]
+			x,y = translate_xy(x,y,px=-DefaultDisplacement_x)
+			x,y = rotate_xy(x,y,ϕ)
+			x,y = translate_xy(x,y,px=MedianPlane,py=0.20)
 
 			ẋ,ẏ = rotate_xy(ẋ,ẏ,ϕ)
 
@@ -2109,6 +2139,66 @@ def animate_plots(response,Movement,TrialData,Weighted=False, save_as_gif = Fals
 		# if save_as_gif:
 		# 	ani.save('test.gif', writer='imagemagick', fps=30)
 		plt.show()
+def interpret_descriptive_title(DescriptiveTitle,TrialData):
+	import numpy as np
+	if DescriptiveTitle[:12]=="Fixed-target":
+		ReachType = DescriptiveTitle[:18]
+		ReachAngle = np.pi*eval(DescriptiveTitle[19:])
+		L1,_ = TrialData["Limb Lengths"]
+		MedianPlane = -L1*(0.129/0.186)
+		xi = MedianPlane - TrialData["Target Amplitude"]*np.cos(ReachAngle-np.pi)
+		yi = 0.20 + TrialData["Target Amplitude"]*(1 - np.sin(ReachAngle-np.pi))
+		Xi = [xi,yi]
+		Xf = [MedianPlane, 0.20 + TrialData["Target Amplitude"]]
+		IdealBoundaryPositions = [Xi,Xf]
+	elif DescriptiveTitle[:11]=="Fixed-start":
+		ReachType = DescriptiveTitle[:17]
+		ReachAngle = np.pi*eval(DescriptiveTitle[18:])
+		L1,_ = TrialData["Limb Lengths"]
+		MedianPlane = -L1*(0.129/0.186)
+		Xi = [MedianPlane,0.20]
+		xf = MedianPlane + TrialData["Target Amplitude"]*np.cos(ReachAngle)
+		yf = 0.20 + TrialData["Target Amplitude"]*np.sin(ReachAngle)
+		Xf = [xf,yf]
+		IdealBoundaryPositions = [Xi,Xf]
+	else:
+		if DescriptiveTitle == "Sideways Reach":
+			ReachType = DescriptiveTitle
+			ReachAngle = None
+			L1,_ = TrialData["Limb Lengths"]
+			MedianPlane = -L1*(0.129/0.186)
+			TargetAmplitude = TrialData["target Amplitude"]
+			Xi = [-MedianPlane-TargetAmplitude/2,0.1+TargetAmplitude/2]
+			Xf = [-MedianPlane+TargetAmplitude/2,0.1+TargetAmplitude/2]
+			IdealBoundaryPositions = [Xi,Xf]
+		elif DescriptiveTitle == "Center Reach":
+			ReachType = DescriptiveTitle
+			ReachAngle = np.pi/2
+			L1,_ = TrialData["Limb Lengths"]
+			MedianPlane = -L1*(0.129/0.186)
+			TargetAmplitude = TrialData["target Amplitude"]
+			Xi = [MedianPlane,0.20]
+			Xf = [MedianPlane,0.20 + TargetAmplitude]
+			IdealBoundaryPositions = [Xi,Xf]
+		elif DescriptiveTitle == "Left Reach":
+			ReachType = DescriptiveTitle
+			ReachAngle = 3*np.pi/4
+			L1,_ = TrialData["Limb Lengths"]
+			MedianPlane = -L1*(0.129/0.186)
+			TargetAmplitude = TrialData["target Amplitude"]
+			Xi = [MedianPlane,0.20]
+			Xf = [MedianPlane-TargetAmplitude/(2**0.5), 0.20 + TargetAmplitude/(2**0.5)]
+			IdealBoundaryPositions = [Xi,Xf]
+		elif DescriptiveTitle == "Right Reach":
+			ReachType = DescriptiveTitle
+			ReachAngle = np.pi/4
+			L1,_ = TrialData["Limb Lengths"]
+			MedianPlane = -L1*(0.129/0.186)
+			TargetAmplitude = TrialData["target Amplitude"]
+			Xi = [MedianPlane,0.20]
+			Xf = [MedianPlane+TargetAmplitude/(2**0.5), 0.20 + TargetAmplitude/(2**0.5)]
+			IdealBoundaryPositions = [Xi,Xf]
+	return(ReachType,ReachAngle,IdealBoundaryPositions)
 def create_trial_data(NumberOfTrials=100):
 	"""
 	Returns dict TrialData with NumberOfTrials properly oriented reaching movements.
@@ -2127,18 +2217,20 @@ def create_trial_data(NumberOfTrials=100):
 					"Movement Duration" : 1,\
 					"Randomize Boundary Positions" : [RandomXiBool,RandomXfBool],\
 					"Default Paths" : []}
-	if DescriptiveTitle[:5]=="Fixed":
-		TrialData["Reach Type"] = DescriptiveTitle[:18]
-		TrialData["Reach Angle"] = np.pi*eval(DescriptiveTitle[19:])
-	else:
-		TrialData["Reach Type"] = DescriptiveTitle
+
+	TrialData["Limb Lengths"] = list(set_link_lengths(EOM=TrialData["Equations of Motion"]))
+
+	ReachType,ReachAngle,IdealBoundaryPositions = \
+			interpret_descriptive_title(DescriptiveTitle,TrialData)
+	TrialData["Reach Type"] = ReachType
+	TrialData["Reach Angle"] = ReachAngle
+	TrialData["Ideal Boundary Positions"] = IdealBoundaryPositions
 
 	OrderNumber, OrderedMuscleList, OrderedColorsList = \
-	 												return_ordered_muscle_list_with_colors(TrialData)
+	 		return_ordered_muscle_list_with_colors(TrialData)
 	TrialData["Ordered Muscle List"] = OrderedMuscleList
 	TrialData["Ordered Muscle Colors List"] = OrderedColorsList
 	TrialData["Ordered Muscle Numbers"] = OrderNumber
-	TrialData["Limb Lengths"] = list(set_link_lengths(EOM=TrialData["Equations of Motion"]))
 
 	for i in range(NumberOfTrials):
 		DefaultPath = generate_default_path(TrialData)
@@ -2651,6 +2743,117 @@ def plot_individual_muscles(TrialData,Weighted=False,Statusbar=False,\
 					axes[RowNumber[j],ColumnNumber[j]].spines['top'].set_visible(False)
 					axes[RowNumber[j],ColumnNumber[j]].set_ylim(Scale)
 	if ReturnFig == True: return(fig)
+def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=False,\
+								Scale=[],ReturnFig=False):
+	import numpy as np
+	import matplotlib.pyplot as plt
+	from matplotlib.patches import Ellipse
+	import matplotlib.patches as patches
+	import time
+
+	TotalColorsList = TrialData["Ordered Muscle Colors List"]*len(TrialData["Default Paths"])
+
+	NumMuscles = len(TrialData["All Muscle Settings"]) + 1
+	assert NumMuscles == 9, "For consistent animation sizes, the same 8 muscles must be used. (1-6,8,11 on Mar 21, 2018)"
+	NumRows = 3
+	NumColumns = 3
+
+	ColumnNumber = [el%3 for el in np.arange(0,NumMuscles,1)]
+	RowNumber = [int(el/3) for el in np.arange(0,NumMuscles,1)]
+
+	fig, axes = plt.subplots(NumRows,NumColumns,figsize=(2*NumColumns+2,2*NumRows + 2))
+
+	t_end = TrialData["Movement Duration"]
+	N = 1000
+	t = np.linspace(0,t_end, N + 1)
+	L1,L2 = TrialData["Limb Lengths"]
+	MedianPlane = -L1*(0.129/0.186)
+	TargetAmplitude = TrialData["Target Amplitude"]
+	bounds = [0]*NumMuscles
+	if TrialData["Reach Type"][:-6] == 'Fixed-target':
+		DescriptiveTitle = "Fixed Final Position\n"
+	else:
+		DescriptiveTitle = "Fixed Initial Position\n"
+	if t_end == 1:
+		MovementDurationString = "Movement Duration : " + str(t_end) \
+								+ " sec\n"
+	else:
+		MovementDurationString = "Movement Duration : " + str(t_end) \
+								+ " secs\n"
+	plt.suptitle(DescriptiveTitle + MovementDurationString,Fontsize=20,y=0.975)
+
+	MuscleIndices = list(range(NumMuscles))
+	MuscleIndices.remove(4)
+
+	for j in MuscleIndices:
+		axes[RowNumber[j],ColumnNumber[j]].set_xlim(0,t_end)
+		axes[RowNumber[j],ColumnNumber[j]].set_xticks([0,t_end])
+		axes[RowNumber[j],ColumnNumber[j]].set_yticks([-1,-0.5,0,0.5,1])
+
+		if RowNumber[j] == RowNumber[-1] and ColumnNumber[j]==0:
+			axes[RowNumber[j],ColumnNumber[j]].set_xticklabels(['Start','Finish'])
+			axes[RowNumber[j],ColumnNumber[j]].set_yticklabels([str(-np.floor(abs(Scale[0]))),'','0','',str(np.floor(abs(Scale[1])))])
+			if Weighted == True:
+				axes[RowNumber[j],ColumnNumber[j]].set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+			else:
+				axes[RowNumber[j],ColumnNumber[j]].set_ylabel('Normalized $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+		else:
+			axes[RowNumber[j],ColumnNumber[j]].set_xticklabels(['',''])
+			axes[RowNumber[j],ColumnNumber[j]].set_yticklabels(['','','','',''])
+		if j<4:
+			axes[RowNumber[j],ColumnNumber[j]].set_title(TrialData["Ordered Muscle List"][j],\
+								Color = TrialData["Ordered Muscle Colors List"][j])
+		else:
+			axes[RowNumber[j],ColumnNumber[j]].set_title(TrialData["Ordered Muscle List"][j-1],\
+								Color = TrialData["Ordered Muscle Colors List"][j-1])
+	StartTime = time.time()
+	for i in range(len(TrialData["Default Paths"])):
+		Path = TrialData["Default Paths"][i]
+		Movement = reaching_movement(Path)
+		X,_,_ = Movement.return_X_values(TrialData)
+		MuscleVelocities = Movement.return_muscle_velocities(TrialData,Weighted=Weighted)
+		Vm_forward = MuscleVelocities
+		Vm_reverse = -np.array(list(reversed(Vm_forward.T))).T
+
+		axes[RowNumber[4],ColumnNumber[4]].plot(X[0,:],X[1,:],c='0.60')
+		for j in MuscleIndices:
+			if j<4:
+				MuscleNumber = TrialData["Ordered Muscle Numbers"][j]
+				axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
+						c=TrialData["Ordered Muscle Colors List"][j])
+				bounds[j] = \
+					max([ max(abs(Vm_forward[MuscleNumber])), bounds[j] ])
+			else:
+				MuscleNumber = TrialData["Ordered Muscle Numbers"][j-1]
+				axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
+						c=TrialData["Ordered Muscle Colors List"][j-1])
+				bounds[j-1] = \
+					max([ max(abs(Vm_forward[MuscleNumber])), bounds[j-1] ])
+		if Statusbar == True:
+			statusbar(i,len(TrialData["Default Paths"]),StartTime=StartTime,\
+							Title = TrialData["Reach Type"])
+	print('\n')
+
+	assert type(Scale)==list and len(Scale)==2, "Scale must be list of length 2"
+	for j in MuscleIndices:
+		axes[RowNumber[j],ColumnNumber[j]].spines['right'].set_visible(False)
+		axes[RowNumber[j],ColumnNumber[j]].spines['top'].set_visible(False)
+		axes[RowNumber[j],ColumnNumber[j]].set_ylim(Scale)
+
+	axes[RowNumber[4],ColumnNumber[4]].plot(TrialData["Ideal Boundary Positions"][0][0],\
+											TrialData["Ideal Boundary Positions"][0][1],'go',lw=2)
+	axes[RowNumber[4],ColumnNumber[4]].plot(TrialData["Ideal Boundary Positions"][1][0],\
+											TrialData["Ideal Boundary Positions"][1][1],'ro',lw=2)
+	axes[RowNumber[4],ColumnNumber[4]].get_xaxis().set_ticks([])
+	axes[RowNumber[4],ColumnNumber[4]].get_yaxis().set_ticks([])
+	axes[RowNumber[4],ColumnNumber[4]].set_frame_on(True)
+
+	axes[RowNumber[4],ColumnNumber[4]].set_ylim([0.20-0.05,\
+													0.20+TargetAmplitude+0.05])
+	axes[RowNumber[4],ColumnNumber[4]].set_xlim([MedianPlane-TargetAmplitude-0.05,\
+													MedianPlane+TargetAmplitude+0.05])
+	axes[RowNumber[4],ColumnNumber[4]].set_aspect('equal')
+	if ReturnFig == True: return(fig)
 def save_trial_data_prompt(TrialData):
 	import numpy as np
 	import pickle
@@ -2774,13 +2977,13 @@ def save_figures(TrialData,figs):
 			 				+ "_" + "{:0>2d}".format(i) +".pdf"
 	PDFFile = PdfPages(FileName)
 	if len(figs)==1:
-		PDFFile.savefig(figs)
+		PDFFile.savefig(figs[0])
 	else:
 		[PDFFile.savefig(fig) for fig in figs]
 	PDFFile.close()
 
 # NumberOfTrials should be greater than 50 if using statusbar())
-NumberOfTrials = 100
+NumberOfTrials = 10
 if NumberOfTrials<50:
 	Statusbar_bool = False
 else:
@@ -2788,9 +2991,12 @@ else:
 TrialData = create_trial_data(NumberOfTrials=NumberOfTrials)
 # animate_random_trajectory(TrialData)
 # plot_all_on_same_axes(TrialData,Statusbar=Statusbar_bool)
-fig1 = plot_all_trajectories(TrialData,Statusbar=Statusbar_bool,ReturnFig=True)
-fig2 = plot_individual_muscles(TrialData,Statusbar=Statusbar_bool,\
-								SameScale=True,Scale=[-1.2,1.2],ReturnFig=True)
-save_figures(TrialData,[fig1,fig2])
-save_trial_data_prompt(TrialData)
+# fig1 = plot_all_trajectories(TrialData,Statusbar=Statusbar_bool,ReturnFig=True)
+# fig2 = plot_individual_muscles(TrialData,Statusbar=Statusbar_bool,\
+# 								SameScale=True,Scale=[-1.2,1.2],ReturnFig=True)
+fig2 = plot_individual_muscles_for_animation(TrialData,Statusbar=Statusbar_bool,\
+								Scale=[-1.2,1.2],ReturnFig=True)
+# save_figures(TrialData,[fig1,fig2])
+save_figures(TrialData,[fig2])
+# save_trial_data_prompt(TrialData)
 # load_trial_data_prompt()
