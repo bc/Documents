@@ -50,7 +50,7 @@ def statusbar(i,N,**kwargs):
 			+ 'sec, (est. ' + TimeLeft,' sec left)		\r', end='')
 	else:
 		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete           \r',end = '')
-def return_muscle_settings():
+def return_muscle_settings(PreselectedMuscles=None):
 	"""
 	Notes:
 	Coefficients from observation, Ramsay, FVC, Holtzbaur, Pigeon, Kuechle, or Banks.
@@ -429,47 +429,60 @@ def return_muscle_settings():
 							'PL' : PL_Settings,'ECU' : ECU_Settings, \
 							'EDM' : EDM_Settings, 'EDC' : EDC_Settings,\
 							'AN' : AN_Settings}
-	ValidResponse_1 = False
-	while ValidResponse_1 == False:
-		MuscleSelectionType = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMuscle Selection:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Default\n (2) - Custom\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
-		# import ipdb; ipdb.set_trace()
-		print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
-		if MuscleSelectionType not in ['1','2','']:
-			print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
-			ValidResponse_1 = False
-		elif MuscleSelectionType == '' or MuscleSelectionType == '1':
-			for Muscle in ["PRO","AN"]:
-				del(AllMuscleSettings[Muscle])
-			ValidResponse_1 = True
-		elif MuscleSelectionType == '2':
-			ValidResponse_2 = False
-			while ValidResponse_2 == False:
-				MuscleListString = ""
-				for i in range(len(AllAvailableMuscles)):
-					MuscleListString += " (" + str(i+1) + ") - " + AllAvailableMuscles[i] + "\n"
-				MuscleSelectionNumbers = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nSelect Muscle Number(s)\n(separated by commas & groups with hyphens):\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + MuscleListString + "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMuscle Number(s): ")
-				print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
-				MuscleSelectionNumbers = [el.strip() for el in MuscleSelectionNumbers.split(",")]
-				for el in MuscleSelectionNumbers:
-					if "-" in el:
-						temp = el.split("-")
-						MuscleSelectionNumbers.remove(el)
-						[MuscleSelectionNumbers.append(str(i)) \
-										for i in range(int(temp[0]),int(temp[1])+1)]
-				if np.array([el in [str(i+1) for i in range(len(AllAvailableMuscles))] \
-									for el in MuscleSelectionNumbers]).all() == False:
-					print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please check muscle numbers and try again.')
-					ValidResponse_2 = False
-				else:
-					SelectedMuscles = [AllAvailableMuscles[int(el)-1] \
-											for el in MuscleSelectionNumbers]
-					MusclesToBeDeleted = [Muscle for Muscle in AllAvailableMuscles \
-												if Muscle not in SelectedMuscles]
-					for Muscle in MusclesToBeDeleted:
-						del(AllMuscleSettings[Muscle])
-					ValidResponse_2 = True
-			ValidResponse_1 = True
-
+	if PreselectedMuscles==None:
+		ValidResponse_1 = False
+		while ValidResponse_1 == False:
+			MuscleSelectionType = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMuscle Selection:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Default\n (2) - Custom\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
+			# import ipdb; ipdb.set_trace()
+			print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+			if MuscleSelectionType not in ['1','2','']:
+				print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
+				ValidResponse_1 = False
+			elif MuscleSelectionType == '' or MuscleSelectionType == '1':
+				for Muscle in ["PRO","AN"]:
+					del(AllMuscleSettings[Muscle])
+				ValidResponse_1 = True
+			elif MuscleSelectionType == '2':
+				ValidResponse_2 = False
+				while ValidResponse_2 == False:
+					MuscleListString = ""
+					for i in range(len(AllAvailableMuscles)):
+						MuscleListString += " (" + str(i+1) + ") - " + AllAvailableMuscles[i] + "\n"
+					MuscleSelectionNumbers = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nSelect Muscle Number(s)\n(separated by commas & groups with hyphens):\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + MuscleListString + "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMuscle Number(s): ")
+					print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+					MuscleSelectionNumbers = [el.strip() for el in MuscleSelectionNumbers.split(",")]
+					for el in MuscleSelectionNumbers:
+						if "-" in el:
+							temp = el.split("-")
+							MuscleSelectionNumbers.remove(el)
+							[MuscleSelectionNumbers.append(str(i)) \
+											for i in range(int(temp[0]),int(temp[1])+1)]
+					if np.array([el in [str(i+1) for i in range(len(AllAvailableMuscles))] \
+										for el in MuscleSelectionNumbers]).all() == False:
+						print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please check muscle numbers and try again.')
+						ValidResponse_2 = False
+					else:
+						SelectedMuscles = [AllAvailableMuscles[int(el)-1] \
+												for el in MuscleSelectionNumbers]
+						MusclesToBeDeleted = [Muscle for Muscle in AllAvailableMuscles \
+													if Muscle not in SelectedMuscles]
+						for Muscle in MusclesToBeDeleted:
+							del(AllMuscleSettings[Muscle])
+						ValidResponse_2 = True
+				ValidResponse_1 = True
+	else:
+		assert type(PreselectedMuscles)==list and len(PreselectedMuscles)==8, "PreselectedMuscles, when used, must be a list of 8 numbers."
+		assert np.array([type(MuscleNumber)==int for MuscleNumber in PreselectedMuscles]).all(),\
+			"PreselectedMuscles must be a list of muscle numbers (ints)."
+		assert np.array([MuscleNumber in range(1,len(AllAvailableMuscles)+1) \
+			for MuscleNumber in PreselectedMuscles]).all(), \
+				"PreselectedMuscles contains a muscle number outside the available muscles."
+		SelectedMuscles = [AllAvailableMuscles[int(el)-1] \
+								for el in PreselectedMuscles]
+		MusclesToBeDeleted = [Muscle for Muscle in AllAvailableMuscles \
+									if Muscle not in SelectedMuscles]
+		for Muscle in MusclesToBeDeleted:
+			del(AllMuscleSettings[Muscle])
 	# MuscleList = AllMuscleSettings.keys()
 	#
 	# Rᵀ_symbolic = sp.Matrix([[MA_function(AllMuscleSettings[muscle][dof]) for \
@@ -634,7 +647,7 @@ def reach_type_prompt():
 	if DefaultSettings == False:
 		ValidResponse_2 = False
 		while ValidResponse_2 == False:
-			RandomXiResponse = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nFix Starting Point?\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - True\n (2) - False\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
+			RandomXiResponse = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nRandom Starting Point?\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Yes\n (2) - No\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
 			if RandomXiResponse not in ['1','2']:
 				print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
 				ValidResponse_2 = False
@@ -646,7 +659,7 @@ def reach_type_prompt():
 
 		ValidResponse_3 = False
 		while ValidResponse_3 == False:
-			RandomXfResponse = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nFix Ending Point?\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - True\n (2) - False\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
+			RandomXfResponse = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nRandom Ending Point?\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Yes\n (2) - No\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
 			if RandomXfResponse not in ['1','2']:
 				print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
 				ValidResponse_3 = False
@@ -685,7 +698,7 @@ def reach_type_prompt():
 			else:
 				DescriptiveTitle = DescriptiveTitle + "_" + InitialAngleInRadians
 				ValidResponse_5 = True
-	return(DescriptiveTitle,ReachType,RandomXiBool,RandomXfBool)
+	return(DescriptiveTitle,RandomXiBool,RandomXfBool)
 def return_ordered_muscle_list_with_colors(TrialData):
 	import numpy as np
 	import matplotlib.pyplot as plt
@@ -1156,14 +1169,14 @@ def generate_default_path(TrialData):
 		EndpointErrorTheta = 30*(np.pi/180) # Allowable error in initial/final slope, tan(ϑ)
 		MaximumDeviationInY = 0.02 # m
 
-		if TrialData["Randomize Boundary Positions"][0] == False:
+		if TrialData["Randomize Boundary Positions"][0] == True:
 			x_initial = DefaultXi + np.random.normal(0,EndpointErrorSigma) # cm
 			y_initial = DefaultYi + np.random.normal(0,EndpointErrorSigma) # cm
 		else:
 			x_initial = DefaultXi # cm
 			y_initial = DefaultYi # cm
 
-		if TrialData["Randomize Boundary Positions"][1] == False:
+		if TrialData["Randomize Boundary Positions"][1] == True:
 			x_final = DefaultXf + np.random.normal(0,EndpointErrorSigma) # cm
 			y_final = DefaultYf + np.random.normal(0,EndpointErrorSigma) # cm
 		else:
@@ -2199,16 +2212,25 @@ def interpret_descriptive_title(DescriptiveTitle,TrialData):
 			Xf = [MedianPlane+TargetAmplitude/(2**0.5), 0.20 + TargetAmplitude/(2**0.5)]
 			IdealBoundaryPositions = [Xi,Xf]
 	return(ReachType,ReachAngle,IdealBoundaryPositions)
-def create_trial_data(NumberOfTrials=100):
+def create_trial_data(NumberOfTrials=100,DescriptiveTitle=None):
 	"""
 	Returns dict TrialData with NumberOfTrials properly oriented reaching movements.
 	"""
 	import numpy as np
 	import matplotlib.pyplot as plt
-
-	DescriptiveTitle,ReachType,RandomXiBool,RandomXfBool = reach_type_prompt()
-	AllMuscleSettings = return_muscle_settings()
-	Notes = input_notes()
+	if DescriptiveTitle!=None:
+		assert DescriptiveTitle[:17] == "Fixed-start Reach" \
+			or DescriptiveTitle[:18] == "Fixed-target Reach",\
+				"DescriptiveTitle input must be for either a Fixed-start or Fixed-target Reach."
+		assert "_" in DescriptiveTitle, \
+			"DescriptiveTitle must be in the correct format with (ReachType)_(multiple of pi corresponding to location on unit circle - can be negative and/or a fraction)"
+		RandomXiBool, RandomXfBool = True, True
+		AllMuscleSettings = return_muscle_settings(PreselectedMuscles = [1,2,3,4,5,6,8,11])
+		Notes = None
+	else:
+		DescriptiveTitle,RandomXiBool,RandomXfBool = reach_type_prompt()
+		AllMuscleSettings = return_muscle_settings()
+		Notes = input_notes()
 
 	TrialData = {	"All Muscle Settings" : AllMuscleSettings, \
 					"Notes" : Notes, \
@@ -2743,7 +2765,7 @@ def plot_individual_muscles(TrialData,Weighted=False,Statusbar=False,\
 					axes[RowNumber[j],ColumnNumber[j]].spines['top'].set_visible(False)
 					axes[RowNumber[j],ColumnNumber[j]].set_ylim(Scale)
 	if ReturnFig == True: return(fig)
-def parallel_test(TrialData,i,Weighted=False):
+def create_trajectories_in_parallel(TrialData,i,Weighted=False):
 	Path = TrialData["Default Paths"][i]
 	Movement = reaching_movement(Path)
 	X,_,_ = Movement.return_X_values(TrialData)
@@ -2815,40 +2837,15 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 		axes[RowNumber[j],ColumnNumber[j]].set_title(\
 					TrialData["Ordered Muscle List"][MuscleNumbers[j]],\
 							Color = TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
-		# if j<4:
-		# 	axes[RowNumber[j],ColumnNumber[j]].set_title(TrialData["Ordered Muscle List"][j],\
-		# 						Color = TrialData["Ordered Muscle Colors List"][j])
-		# else:
-		# 	axes[RowNumber[j],ColumnNumber[j]].set_title(TrialData["Ordered Muscle List"][j-1],\
-		# 						Color = TrialData["Ordered Muscle Colors List"][j-1])
-	StartTime = time.time()
-	# Inputs = range(len(TrialData["Default Paths"]))
-	# def parallel_test(TrialData,axes,i):
-	# 	import dill
-	# 	Path = TrialData["Default Paths"][i]
-	# 	Movement = reaching_movement(Path)
-	# 	X,_,_ = Movement.return_X_values(TrialData)
-	# 	MuscleVelocities = Movement.return_muscle_velocities(TrialData,Weighted=Weighted)
-	# 	Vm_forward = MuscleVelocities
-	# 	Vm_reverse = -np.array(list(reversed(Vm_forward.T))).T
-	#
-	# 	axes[RowNumber[4],ColumnNumber[4]].plot(X[0,:],X[1,:],c='0.60')
-	# 	for j in MuscleIndices:
-	# 		MuscleNumber = TrialData["Ordered Muscle Numbers"][MuscleNumbers[j]]
-	# 		axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
-	# 				c=TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
-	# 		bounds[MuscleNumbers[j]] = \
-	# 			max([ max(abs(Vm_forward[MuscleNumber])), bounds[MuscleNumbers[j]] ])
-	# NumberOfCores = multiprocessing.cpu_count()
-	# p = multiprocessing.Pool(NumberOfCores)
-	# p.map(parallel_test,Inputs)
-	# Parallel(n_jobs=NumberOfCores)(delayed(parallel_test)(TrialData,axes,i) for i in Inputs)
+
 	Inputs = range(len(TrialData["Default Paths"]))
 	NumberOfCores = multiprocessing.cpu_count()
-	Out = Parallel(n_jobs=NumberOfCores)(delayed(parallel_test)(TrialData,i,Weighted=Weighted) for i in range(len(TrialData["Default Paths"])))
-	AllX = [Out[:][i][0][:] for i in Inputs]
-	AllVm = [Out[:][i][1][:] for i in Inputs]
-	# import ipdb; ipdb.set_trace()
+	Output = Parallel(n_jobs=NumberOfCores)(delayed(create_trajectories_in_parallel)\
+				(TrialData,i,Weighted=Weighted) for i in range(len(TrialData["Default Paths"])))
+	AllX = [Output[:][i][0][:] for i in Inputs]
+	AllVm = [Output[:][i][1][:] for i in Inputs]
+
+	StartTime = time.time()
 	for i in range(len(TrialData["Default Paths"])):
 		axes[RowNumber[4],ColumnNumber[4]].plot(AllX[i][0],AllX[i][1],c='0.60')
 		for j in MuscleIndices:
@@ -2857,52 +2854,9 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 					c=TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
 			bounds[MuscleNumbers[j]] = \
 				max([ max(abs(AllVm[i][MuscleNumber])), bounds[MuscleNumbers[j]] ])
-			# if j<4:
-			# 	MuscleNumber = TrialData["Ordered Muscle Numbers"][j]
-			# 	axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
-			# 			c=TrialData["Ordered Muscle Colors List"][j])
-			# 	bounds[j] = \
-			# 		max([ max(abs(Vm_forward[MuscleNumber])), bounds[j] ])
-			# else:
-			# 	MuscleNumber = TrialData["Ordered Muscle Numbers"][j-1]
-			# 	axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
-			# 			c=TrialData["Ordered Muscle Colors List"][j-1])
-			# 	bounds[j-1] = \
-			# 		max([ max(abs(Vm_forward[MuscleNumber])), bounds[j-1] ])
 		if Statusbar == True:
 			statusbar(i,len(TrialData["Default Paths"]),StartTime=StartTime,\
 							Title = TrialData["Reach Type"])
-	# import ipdb; ipdb.set_trace()
-	# for i in range(len(TrialData["Default Paths"])):
-	# 	Path = TrialData["Default Paths"][i]
-	# 	Movement = reaching_movement(Path)
-	# 	X,_,_ = Movement.return_X_values(TrialData)
-	# 	MuscleVelocities = Movement.return_muscle_velocities(TrialData,Weighted=Weighted)
-	# 	Vm_forward = MuscleVelocities
-	# 	Vm_reverse = -np.array(list(reversed(Vm_forward.T))).T
-	#
-	# 	axes[RowNumber[4],ColumnNumber[4]].plot(X[0,:],X[1,:],c='0.60')
-	# 	for j in MuscleIndices:
-	# 		MuscleNumber = TrialData["Ordered Muscle Numbers"][MuscleNumbers[j]]
-	# 		axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
-	# 				c=TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
-	# 		bounds[MuscleNumbers[j]] = \
-	# 			max([ max(abs(Vm_forward[MuscleNumber])), bounds[MuscleNumbers[j]] ])
-	# 		# if j<4:
-	# 		# 	MuscleNumber = TrialData["Ordered Muscle Numbers"][j]
-	# 		# 	axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
-	# 		# 			c=TrialData["Ordered Muscle Colors List"][j])
-	# 		# 	bounds[j] = \
-	# 		# 		max([ max(abs(Vm_forward[MuscleNumber])), bounds[j] ])
-	# 		# else:
-	# 		# 	MuscleNumber = TrialData["Ordered Muscle Numbers"][j-1]
-	# 		# 	axes[RowNumber[j],ColumnNumber[j]].plot(t.T,Vm_forward[MuscleNumber].T,\
-	# 		# 			c=TrialData["Ordered Muscle Colors List"][j-1])
-	# 		# 	bounds[j-1] = \
-	# 		# 		max([ max(abs(Vm_forward[MuscleNumber])), bounds[j-1] ])
-	# 	if Statusbar == True:
-	# 		statusbar(i,len(TrialData["Default Paths"]),StartTime=StartTime,\
-	# 						Title = TrialData["Reach Type"])
 	print('\n')
 
 	assert type(Scale)==list and len(Scale)==2, "Scale must be list of length 2"
@@ -3053,21 +3007,53 @@ def save_figures(TrialData,figs):
 		[PDFFile.savefig(fig) for fig in figs]
 	PDFFile.close()
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 # NumberOfTrials should be greater than 50 if using statusbar())
 NumberOfTrials = 100
 if NumberOfTrials<50:
 	Statusbar_bool = False
 else:
 	Statusbar_bool = True
-TrialData = create_trial_data(NumberOfTrials=NumberOfTrials)
-# animate_random_trajectory(TrialData)
-# plot_all_on_same_axes(TrialData,Statusbar=Statusbar_bool)
-# fig1 = plot_all_trajectories(TrialData,Statusbar=Statusbar_bool,ReturnFig=True)
-# fig2 = plot_individual_muscles(TrialData,Statusbar=Statusbar_bool,\
-# 								SameScale=True,Scale=[-1.2,1.2],ReturnFig=True)
-fig2 = plot_individual_muscles_for_animation(TrialData,Statusbar=Statusbar_bool,\
-								Scale=[-1.2,1.2],ReturnFig=True)
-# save_figures(TrialData,[fig1,fig2])
-save_figures(TrialData,[fig2])
-# save_trial_data_prompt(TrialData)
-# load_trial_data_prompt()
+
+# TrialData = create_trial_data(NumberOfTrials=NumberOfTrials)
+#
+# # animate_random_trajectory(TrialData)
+# # plot_all_on_same_axes(TrialData,Statusbar=Statusbar_bool)
+# # fig1 = plot_all_trajectories(TrialData,Statusbar=Statusbar_bool,ReturnFig=True)
+# # fig2 = plot_individual_muscles(TrialData,Statusbar=Statusbar_bool,\
+# # 								SameScale=True,Scale=[-1.2,1.2],ReturnFig=True)
+# fig2 = plot_individual_muscles_for_animation(TrialData,Statusbar=Statusbar_bool,\
+# 								Scale=[-1.2,1.2],ReturnFig=True)
+# # save_figures(TrialData,[fig1,fig2])
+# save_figures(TrialData,[fig2])
+# plt.close(fig2)
+# # save_trial_data_prompt(TrialData)
+# # load_trial_data_prompt()
+
+##############################################
+########### For Fixed Target Reach ###########
+##############################################
+
+# PiMultipleStringsList = [	'_-0/32','_-1/32','_-2/32','_-3/32',  \
+# 							'_-4/32','_-5/32','_-6/32','_-7/32',  \
+# 							'_-8/32','_-9/32','_-10/32','_-11/32',  \
+# 							'_-12/32','_-13/32','_-14/32','_-15/32',  \
+# 							'_-16/32','_-17/32','_-18/32','_-19/32',  \
+# 							'_-20/32','_-21/32','_-22/32','_-23/32',  \
+# 							'_-24/32','_-25/32','_-26/32','_-27/32',  \
+# 							'_-28/32','_-29/32']
+
+PiMultipleStringsList = [	'_-0/32',\
+							'_-8/32',\
+							'_-16/32',\
+							'_-24/32']
+
+for i in range(len(PiMultipleStringsList)):
+	DescriptiveTitle = 'Fixed-target Reach' + PiMultipleStringsList[i]
+	TrialData = create_trial_data(NumberOfTrials=NumberOfTrials,DescriptiveTitle=DescriptiveTitle)
+	fig2 = plot_individual_muscles_for_animation(TrialData,Statusbar=Statusbar_bool,\
+									Scale=[-1.2,1.2],ReturnFig=True)
+	save_figures(TrialData,[fig2])
+	plt.close(fig2)
