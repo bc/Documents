@@ -3069,7 +3069,7 @@ PiMultipleStringsList = [	'_0/32','_1/32','_2/32','_3/32',  \
 							'_32/32']
 
 for i in range(len(PiMultipleStringsList)):
-	DescriptiveTitle = 'Fixed-target Reach' + PiMultipleStringsList[i]
+	DescriptiveTitle = 'Fixed-start Reach' + PiMultipleStringsList[i]
 	TrialData = create_trial_data(NumberOfTrials=NumberOfTrials,DescriptiveTitle=DescriptiveTitle)
 	fig2 = plot_individual_muscles_for_animation(TrialData,Statusbar=Statusbar_bool,\
 									Scale=[-1.2,1.2],ReturnFig=True)
