@@ -1338,14 +1338,14 @@ class reaching_movement:
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			~~~~~~~~~~~~~~~~~~ Fixed Start Reach ~~~~~~~~~~~~~~~~~~
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-			Xi = [MedianPlane,0.20]
+			Xi = [MedianPlane,0.25]
 			~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			"""
 			ϕ = TrialData["Reach Angle"]
 			TargetAmplitude = TrialData["Target Amplitude"]
 			x,y = translate_xy(x,y,px=-DefaultDisplacement_x)
 			x,y = rotate_xy(x,y,ϕ)
-			x,y = translate_xy(x,y,px=MedianPlane,py=0.20)
+			x,y = translate_xy(x,y,px=MedianPlane,py=0.25)
 
 			ẋ,ẏ = rotate_xy(ẋ,ẏ,ϕ)
 
@@ -1485,7 +1485,7 @@ class reaching_movement:
 		# 		L2 = New_L2
 		import numpy as np
 		assert TrialData["Reach Type"][:-6].capitalize() in \
-			['Center','Right','Left','Sideways','Fixed-target'], \
+			['Center','Right','Left','Sideways','Fixed-target','Fixed-start'], \
 				"ReachType must be either 'Center','Right','Left', or 'Sideways'."
 		set_link_lengths()
 		X,Ẋ,Ẍ = self.return_X_values(TrialData)
@@ -2169,9 +2169,9 @@ def interpret_descriptive_title(DescriptiveTitle,TrialData):
 		ReachAngle = np.pi*eval(DescriptiveTitle[18:])
 		L1,_ = TrialData["Limb Lengths"]
 		MedianPlane = -L1*(0.129/0.186)
-		Xi = [MedianPlane,0.20]
+		Xi = [MedianPlane,0.25]
 		xf = MedianPlane + TrialData["Target Amplitude"]*np.cos(ReachAngle)
-		yf = 0.20 + TrialData["Target Amplitude"]*np.sin(ReachAngle)
+		yf = 0.25 + TrialData["Target Amplitude"]*np.sin(ReachAngle)
 		Xf = [xf,yf]
 		IdealBoundaryPositions = [Xi,Xf]
 	else:
@@ -2772,7 +2772,7 @@ def create_trajectories_in_parallel(TrialData,i,Weighted=False):
 	MuscleVelocities = Movement.return_muscle_velocities(TrialData,Weighted=Weighted)
 	return(X,MuscleVelocities)
 def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=False,\
-								Scale=[],ReturnFig=False):
+								Scale=[],ReturnFig=False,ReturnError=False,PlotIdeal=False):
 	import numpy as np
 	import matplotlib.pyplot as plt
 	from matplotlib.patches import Ellipse
@@ -2783,6 +2783,20 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 	import dill
 
 	TotalColorsList = TrialData["Ordered Muscle Colors List"]*len(TrialData["Default Paths"])
+
+	if np.ceil(abs(Scale[0]))-abs(Scale[0])>0.5:
+		UpperBound = np.floor(abs(Scale[0]))
+		LowerBound = -UpperBound
+	else:
+		UpperBound = np.floor(abs(Scale[0])) + 0.5
+		LowerBound = -UpperBound
+	YTicks = list(np.linspace(LowerBound,UpperBound,int((UpperBound-LowerBound)/0.5)+1))
+	YTickLabels = []
+	for el in YTicks:
+		if int(el)==el:
+			YTickLabels.append(str(int(el)))
+		else:
+			YTickLabels.append("")
 
 	NumMuscles = len(TrialData["All Muscle Settings"]) + 1
 	assert NumMuscles == 9, "For consistent animation sizes, the same 8 muscles must be used. (1-6,8,11 on Mar 21, 2018)"
@@ -2803,8 +2817,10 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 	bounds = [0]*NumMuscles
 	if TrialData["Reach Type"][:-6] == 'Fixed-target':
 		DescriptiveTitle = "Fixed Final Position\n"
+		yiMin = 0.20
 	else:
 		DescriptiveTitle = "Fixed Initial Position\n"
+		yiMin = 0.25
 	if t_end == 1:
 		MovementDurationString = "Movement Duration : " + str(t_end) \
 								+ " sec\n"
@@ -2822,18 +2838,18 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 	for j in MuscleIndices:
 		axes[RowNumber[j],ColumnNumber[j]].set_xlim(0,t_end)
 		axes[RowNumber[j],ColumnNumber[j]].set_xticks([0,t_end])
-		axes[RowNumber[j],ColumnNumber[j]].set_yticks([-1,-0.5,0,0.5,1])
+		axes[RowNumber[j],ColumnNumber[j]].set_yticks(YTicks)
 
 		if RowNumber[j] == RowNumber[-1] and ColumnNumber[j]==0:
 			axes[RowNumber[j],ColumnNumber[j]].set_xticklabels(['Start','Finish'])
-			axes[RowNumber[j],ColumnNumber[j]].set_yticklabels([str(-np.floor(abs(Scale[0]))),'','0','',str(np.floor(abs(Scale[1])))])
+			axes[RowNumber[j],ColumnNumber[j]].set_yticklabels(YTickLabels)
 			if Weighted == True:
 				axes[RowNumber[j],ColumnNumber[j]].set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
 			else:
 				axes[RowNumber[j],ColumnNumber[j]].set_ylabel('Normalized $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
 		else:
 			axes[RowNumber[j],ColumnNumber[j]].set_xticklabels(['',''])
-			axes[RowNumber[j],ColumnNumber[j]].set_yticklabels(['','','','',''])
+			axes[RowNumber[j],ColumnNumber[j]].set_yticklabels(['']*len(YTicks))
 		axes[RowNumber[j],ColumnNumber[j]].set_title(\
 					TrialData["Ordered Muscle List"][MuscleNumbers[j]],\
 							Color = TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
@@ -2845,11 +2861,22 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 	AllX = [Output[:][i][0][:] for i in Inputs]
 	AllVm = [Output[:][i][1][:] for i in Inputs]
 
+	IdealPath = Spline([0,0],np.array([[[0,0]]]).T,np.array([[0,0]]).T,np.array([[[0,0]]]).T,\
+							0.05,(TrialData["Target Amplitude"]+0.05)/2,\
+								TrialData["Target Amplitude"]+0.05)
+	IdealMovement = reaching_movement(IdealPath)
+	Ideal_X,_,_ = IdealMovement.return_X_values(TrialData)
+	IdealMuscleVelocities = IdealMovement.return_muscle_velocities(TrialData,Weighted=Weighted)
+	AvgError = []
+
 	StartTime = time.time()
 	for i in range(len(TrialData["Default Paths"])):
 		axes[RowNumber[4],ColumnNumber[4]].plot(AllX[i][0],AllX[i][1],c='0.60')
 		for j in MuscleIndices:
 			MuscleNumber = TrialData["Ordered Muscle Numbers"][MuscleNumbers[j]]
+			AvgError.append(abs(AllVm[i][MuscleNumber]\
+								- IdealMuscleVelocities[MuscleNumber,:]).mean())
+			# if MuscleNumber == 3: print(str(AvgError[-1]))
 			axes[RowNumber[j],ColumnNumber[j]].plot(t,AllVm[i][MuscleNumber],\
 					c=TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
 			bounds[MuscleNumbers[j]] = \
@@ -2857,7 +2884,19 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 		if Statusbar == True:
 			statusbar(i,len(TrialData["Default Paths"]),StartTime=StartTime,\
 							Title = TrialData["Reach Type"])
+
+	AvgError = np.array(AvgError).reshape(len(TrialData["Default Paths"]),NumMuscles-1).T
+	CorrectedOrder = np.array([TrialData["Ordered Muscle Numbers"].index(el) \
+									for el in range(NumMuscles-1)])
+	AvgError = AvgError[CorrectedOrder,:]
+	TotalAvgError = np.array([AvgError[i,:].mean() for i in range(NumMuscles-1)])
 	print('\n')
+
+	if PlotIdeal == True:
+		for j in MuscleIndices:
+			MuscleNumber = TrialData["Ordered Muscle Numbers"][MuscleNumbers[j]]
+			axes[RowNumber[j],ColumnNumber[j]].plot(t,IdealMuscleVelocities[MuscleNumber,:],\
+				c='k')
 
 	assert type(Scale)==list and len(Scale)==2, "Scale must be list of length 2"
 	for j in MuscleIndices:
@@ -2872,12 +2911,201 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 	axes[RowNumber[4],ColumnNumber[4]].get_xaxis().set_ticks([])
 	axes[RowNumber[4],ColumnNumber[4]].get_yaxis().set_ticks([])
 	axes[RowNumber[4],ColumnNumber[4]].set_frame_on(True)
-
-	axes[RowNumber[4],ColumnNumber[4]].set_ylim([0.20-0.05,\
-													0.20+TargetAmplitude+0.05])
+	axes[RowNumber[4],ColumnNumber[4]].set_ylim([yiMin-0.05,\
+													yiMin+TargetAmplitude+0.05])
 	axes[RowNumber[4],ColumnNumber[4]].set_xlim([MedianPlane-TargetAmplitude-0.05,\
 													MedianPlane+TargetAmplitude+0.05])
 	axes[RowNumber[4],ColumnNumber[4]].set_aspect('equal')
+	if ReturnFig == True:
+		if ReturnError == True:
+			return(fig,TotalAvgError)
+		else:
+			return(fig)
+	elif ReturnError == True:
+		return(TotalAvgError)
+def plot_total_error(TrialData,TotalTrialError,PiMultipleStringsList,\
+						UpperBound = None,ReturnFig=False,Weighted=False):
+	import numpy as np
+	import matplotlib.pyplot as plt
+	from matplotlib.patches import Ellipse
+	import matplotlib.patches as patches
+	import time
+	from joblib import Parallel, delayed
+	import multiprocessing
+	import dill
+	import matplotlib.patches as patches
+
+	TotalColorsList = TrialData["Ordered Muscle Colors List"]*len(TrialData["Default Paths"])
+	LowerBound = 0
+	if UpperBound == None:
+		UpperBound = 0.05
+	YTicks = list(np.linspace(LowerBound,UpperBound,int((UpperBound-LowerBound)/0.01)+1))
+	YTickLabels = ['0']
+	for i in range(len(YTicks)-2):
+		YTickLabels.append("")
+	YTickLabels.append(str(UpperBound))
+	X = np.arange(0,len(PiMultipleStringsList),1)+1
+	XTicks = list(X)
+	XTickLabels = ['1']
+	for i in range(len(XTicks)-2):
+		if i == (len(XTicks)-2)/2:
+			XTickLabels.append("$\longrightarrow$")
+		elif i == (len(XTicks)-1)/2:
+			XTickLabels.append("$\longrightarrow$")
+		else:
+			XTickLabels.append("")
+	XTickLabels.append(str(int(X[-1])))
+
+	NumMuscles = len(TrialData["All Muscle Settings"]) + 1
+	assert NumMuscles == 9, "For consistent animation sizes, the same 8 muscles must be used. (1-6,8,11 on Mar 21, 2018)"
+	NumRows = 3
+	NumColumns = 3
+
+	ColumnNumber = [el%3 for el in np.arange(0,NumMuscles,1)]
+	RowNumber = [int(el/3) for el in np.arange(0,NumMuscles,1)]
+
+	fig, axes = plt.subplots(NumRows,NumColumns,figsize=(2*NumColumns+2,2*NumRows + 2))
+
+	t_end = TrialData["Movement Duration"]
+	N = 1000
+	t = np.linspace(0,t_end, N + 1)
+	L1,L2 = TrialData["Limb Lengths"]
+	MedianPlane = -L1*(0.129/0.186)
+	TargetAmplitude = TrialData["Target Amplitude"]
+	bounds = [0]*NumMuscles
+	if TrialData["Reach Type"][:-6] == 'Fixed-target':
+		DescriptiveTitle = "Fixed Final Position\n"
+		yiMin = 0.20
+	else:
+		DescriptiveTitle = "Fixed Initial Position\n"
+		yiMin = 0.25
+	if t_end == 1:
+		MovementDurationString = "Movement Duration : " + str(t_end) \
+								+ " sec\n"
+	else:
+		MovementDurationString = "Movement Duration : " + str(t_end) \
+								+ " secs\n"
+	plt.suptitle(DescriptiveTitle + MovementDurationString,Fontsize=20,y=0.975)
+
+	MuscleIndices = list(range(NumMuscles))
+	MuscleIndices.remove(4)
+	MuscleNumbers = list(range(NumMuscles - 1))
+	MuscleNumbers[5:9] = MuscleNumbers[4:8]
+	MuscleNumbers[4] = None
+
+	for j in MuscleIndices:
+		MuscleNumber = TrialData["Ordered Muscle Numbers"][MuscleNumbers[j]]
+		axes[RowNumber[j],ColumnNumber[j]].set_xlim(0,9)
+		axes[RowNumber[j],ColumnNumber[j]].set_xticks(XTicks)
+		axes[RowNumber[j],ColumnNumber[j]].set_yticks(YTicks)
+
+		if RowNumber[j] == RowNumber[-1] and ColumnNumber[j]==0:
+			axes[RowNumber[j],ColumnNumber[j]].set_xticklabels(XTickLabels)
+			axes[RowNumber[j],ColumnNumber[j]].set_yticklabels(YTickLabels)
+			if Weighted == True:
+				axes[RowNumber[j],ColumnNumber[j]].set_ylabel('Afferent-Weighted $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+			else:
+				axes[RowNumber[j],ColumnNumber[j]].set_ylabel('Normalized $\hat{v}_m$\nConcentric $\longleftrightarrow$ Eccentric')
+		else:
+			axes[RowNumber[j],ColumnNumber[j]].set_xticklabels(['']*len(XTicks))
+			axes[RowNumber[j],ColumnNumber[j]].set_yticklabels(['']*len(YTicks))
+		axes[RowNumber[j],ColumnNumber[j]].set_title(\
+					TrialData["Ordered Muscle List"][MuscleNumbers[j]],\
+							Color = TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
+		axes[RowNumber[j],ColumnNumber[j]].plot(X,TotalTrialError[MuscleNumber][:],\
+										c=TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
+
+	for j in MuscleIndices:
+		axes[RowNumber[j],ColumnNumber[j]].spines['right'].set_visible(False)
+		axes[RowNumber[j],ColumnNumber[j]].spines['top'].set_visible(False)
+		axes[RowNumber[j],ColumnNumber[j]].set_ylim([LowerBound,UpperBound])
+
+	axes[RowNumber[4],ColumnNumber[4]].get_xaxis().set_ticks([])
+	axes[RowNumber[4],ColumnNumber[4]].get_yaxis().set_ticks([])
+	axes[RowNumber[4],ColumnNumber[4]].set_frame_on(True)
+	axes[RowNumber[4],ColumnNumber[4]].set_ylim([yiMin-0.15,\
+													yiMin+TargetAmplitude+0.15])
+	axes[RowNumber[4],ColumnNumber[4]].set_xlim([MedianPlane-TargetAmplitude-0.15,\
+													MedianPlane+TargetAmplitude+0.15])
+	axes[RowNumber[4],ColumnNumber[4]].set_aspect('equal')
+
+	PostureLabels = ['1']
+	for i in range(len(XTicks)-2):
+		PostureLabels.append("")
+	PostureLabels.append(str(len(XTicks)))
+
+	if TrialData["Reach Type"] == 'Fixed-target Reach':
+		ReachAngles = [eval(el[1:])*np.pi for el in PiMultipleStringsList]
+		Ideal_Xf = np.array(TrialData["Ideal Boundary Positions"][1])
+		Xi = np.array([0,0])
+		Xf = [np.array([TrialData["Target Amplitude"]*np.cos(theta+np.pi), TrialData['Target Amplitude']*np.sin(theta+np.pi)]) for theta in ReachAngles]
+		TextPosition = [np.array([-0.1*np.cos(theta+np.pi),\
+		 					-0.1*np.sin(theta+np.pi)]) \
+								for theta in ReachAngles]
+		TextPosition = TextPosition - (Xf-Ideal_Xf)
+		Xi = Xi - (Xf-Ideal_Xf)
+		Xf = Ideal_Xf
+		for i in range(len(ReachAngles)):
+			axes[RowNumber[4],ColumnNumber[4]].plot([Xi[i][0],Xf[0]],[Xi[i][1],Xf[1]],'k',lw=2)
+			axes[RowNumber[4],ColumnNumber[4]].plot([Xi[i][0]],[Xi[i][1]],'go',lw=2)
+			axes[RowNumber[4],ColumnNumber[4]].text(TextPosition[i][0],TextPosition[i][1],\
+														PostureLabels[i],fontsize=12,color='g',\
+														horizontalalignment='center',\
+														verticalalignment='center',)
+
+		axes[RowNumber[4],ColumnNumber[4]].plot([Xf[0]],[Xf[1]],'ro',lw=2)
+		ArrowheadAngle = np.pi/6
+		phi = np.linspace(eval(PiMultipleStringsList[2][1:])*np.pi,\
+							eval(PiMultipleStringsList[-3][1:])*np.pi,101)
+		Arc_x = (TrialData["Target Amplitude"] + 0.1)*np.cos(phi) \
+					+ TrialData["Ideal Boundary Positions"][1][0]
+		Arc_y = (TrialData["Target Amplitude"] + 0.1)*np.sin(phi) \
+					+ TrialData["Ideal Boundary Positions"][1][1]
+		axes[RowNumber[4],ColumnNumber[4]].plot(Arc_x[:-2],Arc_y[:-2],'g')
+		P1 = [Arc_x[-1],Arc_y[-1]]
+		P2 = [Arc_x[-1]+0.05*np.cos(np.pi/2+phi[-1]-ArrowheadAngle+2.5*np.pi/180),\
+					Arc_y[-1]+0.05*np.sin(np.pi/2+phi[-1]-ArrowheadAngle+2.5*np.pi/180)]
+		P3 = [Arc_x[-1]+0.05*np.cos(np.pi/2+phi[-1]+ArrowheadAngle+2.5*np.pi/180),\
+					Arc_y[-1]+0.05*np.sin(np.pi/2+phi[-1]+ArrowheadAngle+2.5*np.pi/180)]
+		Arrowhead = Polygon([P1,P2,P3],color='g')
+		axes[RowNumber[4],ColumnNumber[4]].add_patch(Arrowhead)
+
+	elif TrialData["Reach Type"] == 'Fixed-start Reach':
+		ReachAngles = [eval(el[1:])*np.pi for el in PiMultipleStringsList]
+		Ideal_Xi = np.array(TrialData["Ideal Boundary Positions"][0])
+		Xi = np.array([0,0])
+		Xf = [np.array([TrialData["Target Amplitude"]*np.cos(theta), TrialData['Target Amplitude']*np.sin(theta)]) for theta in ReachAngles]
+		TextPosition = [np.array([(0.1+TrialData["Target Amplitude"])*np.cos(theta),\
+		 					(0.1+TrialData["Target Amplitude"])*np.sin(theta)]) \
+								for theta in ReachAngles]
+		TextPosition = TextPosition - (Xi-Ideal_Xi)
+		Xf = Xf - (Xi-Ideal_Xi)
+		Xi = Ideal_Xi
+		for i in range(len(ReachAngles)):
+			axes[RowNumber[4],ColumnNumber[4]].plot([Xi[0],Xf[i][0]],[Xi[1],Xf[i][1]],'k',lw=2)
+			axes[RowNumber[4],ColumnNumber[4]].plot([Xf[i][0]],[Xf[i][1]],'ro',lw=2)
+			axes[RowNumber[4],ColumnNumber[4]].text(TextPosition[i][0],TextPosition[i][1],\
+														PostureLabels[i],fontsize=12,color='r',\
+														horizontalalignment='center',\
+														verticalalignment='center',)
+
+		axes[RowNumber[4],ColumnNumber[4]].plot([Xi[0]],[Xi[1]],'go',lw=2)
+		ArrowheadAngle = np.pi/6
+		phi = np.linspace(eval(PiMultipleStringsList[2][1:])*np.pi,\
+							eval(PiMultipleStringsList[-3][1:])*np.pi,101)
+		Arc_x = (TrialData["Target Amplitude"] + 0.1)*np.cos(phi) \
+					+ TrialData["Ideal Boundary Positions"][0][0]
+		Arc_y = (TrialData["Target Amplitude"] + 0.1)*np.sin(phi) \
+					+ TrialData["Ideal Boundary Positions"][0][1]
+		axes[RowNumber[4],ColumnNumber[4]].plot(Arc_x[:-2],Arc_y[:-2],'r')
+		P1 = [Arc_x[-1],Arc_y[-1]]
+		P2 = [Arc_x[-1]+0.05*np.cos(ArrowheadAngle-np.pi/2+phi[-1]-2.5*np.pi/180),\
+					Arc_y[-1]+0.05*np.sin(ArrowheadAngle-np.pi/2+phi[-1]-2.5*np.pi/180)]
+		P3 = [Arc_x[-1]+0.05*np.cos(ArrowheadAngle+np.pi/2-phi[-1]-2.5*np.pi/180),\
+					Arc_y[-1]-0.05*np.sin(ArrowheadAngle+np.pi/2-phi[-1]-2.5*np.pi/180)]
+		Arrowhead = Polygon([P1,P2,P3],color='r')
+		axes[RowNumber[4],ColumnNumber[4]].add_patch(Arrowhead)
+
 	if ReturnFig == True: return(fig)
 def save_trial_data_prompt(TrialData):
 	import numpy as np
@@ -3032,33 +3260,38 @@ else:
 # # save_trial_data_prompt(TrialData)
 # # load_trial_data_prompt()
 
-##############################################
-########### For Fixed Target Reach ###########
-##############################################
+#############################################
+########## For Fixed Target Reach ###########
+#############################################
 
-PiMultipleStringsList = [	'_-0/32','_-1/32','_-2/32','_-3/32',  \
+PiMultipleStringsList1 = [	'_-0/32','_-1/32','_-2/32','_-3/32',  \
 							'_-4/32','_-5/32','_-6/32','_-7/32',  \
 							'_-8/32','_-9/32','_-10/32','_-11/32',  \
 							'_-12/32','_-13/32','_-14/32','_-15/32',  \
 							'_-16/32','_-17/32','_-18/32','_-19/32',  \
 							'_-20/32','_-21/32','_-22/32','_-23/32',  \
 							'_-24/32','_-25/32','_-26/32','_-27/32',  \
-							'_-28/32','_-29/32']
+							'_-28/32']
 
-for i in range(len(PiMultipleStringsList)):
-	DescriptiveTitle = 'Fixed-target Reach' + PiMultipleStringsList[i]
-	TrialData = create_trial_data(NumberOfTrials=NumberOfTrials,DescriptiveTitle=DescriptiveTitle)
-	fig2 = plot_individual_muscles_for_animation(TrialData,Statusbar=Statusbar_bool,\
-									Scale=[-1.2,1.2],ReturnFig=True)
-	save_figures(TrialData,[fig2])
+TotalTrialError1 = []
+for i in range(len(PiMultipleStringsList1)):
+	DescriptiveTitle = 'Fixed-target Reach' + PiMultipleStringsList1[i]
+	TrialData1 = create_trial_data(NumberOfTrials=NumberOfTrials,DescriptiveTitle=DescriptiveTitle)
+	fig2,TrialError = plot_individual_muscles_for_animation(TrialData1,Statusbar=Statusbar_bool,\
+									Scale=[-1.2,1.2],ReturnFig=True,ReturnError=True,PlotIdeal=True)
+	TotalTrialError1.append(TrialError[np.newaxis,:])
+	save_figures(TrialData1,[fig2])
 	plt.close(fig2)
 
+TotalTrialError1 = np.concatenate(TotalTrialError1,axis=0).T
+ErrorFig1 = plot_total_error(TrialData1,TotalTrialError1,PiMultipleStringsList1,ReturnFig=True)
 
 ##############################################
 ########### For Fixed Start Reach ###########
 ##############################################
 
-PiMultipleStringsList = [	'_0/32','_1/32','_2/32','_3/32',  \
+TotalTrialError2 = []
+PiMultipleStringsList2 = [	'_0/32','_1/32','_2/32','_3/32',  \
 							'_4/32','_5/32','_6/32','_7/32',  \
 							'_8/32','_9/32','_10/32','_11/32',  \
 							'_12/32','_13/32','_14/32','_15/32',  \
@@ -3068,10 +3301,16 @@ PiMultipleStringsList = [	'_0/32','_1/32','_2/32','_3/32',  \
 							'_28/32','_29/32','_30/32','_31/32',\
 							'_32/32']
 
-for i in range(len(PiMultipleStringsList)):
-	DescriptiveTitle = 'Fixed-start Reach' + PiMultipleStringsList[i]
-	TrialData = create_trial_data(NumberOfTrials=NumberOfTrials,DescriptiveTitle=DescriptiveTitle)
-	fig2 = plot_individual_muscles_for_animation(TrialData,Statusbar=Statusbar_bool,\
-									Scale=[-1.2,1.2],ReturnFig=True)
-	save_figures(TrialData,[fig2])
+for i in range(len(PiMultipleStringsList2)):
+	DescriptiveTitle = 'Fixed-start Reach' + PiMultipleStringsList2[i]
+	TrialData2 = create_trial_data(NumberOfTrials=NumberOfTrials,DescriptiveTitle=DescriptiveTitle)
+	fig2,TrialError = plot_individual_muscles_for_animation(TrialData2,Statusbar=Statusbar_bool,\
+									Scale=[-1.2,1.2],ReturnFig=True,ReturnError=True,PlotIdeal=True)
+	TotalTrialError2.append(TrialError[np.newaxis,:])
+	save_figures(TrialData2,[fig2])
 	plt.close(fig2)
+
+TotalTrialError2 = np.concatenate(TotalTrialError2,axis=0).T
+ErrorFig2 = plot_total_error(TrialData2,TotalTrialError2,PiMultipleStringsList2,ReturnFig=True)
+
+plt.show()
