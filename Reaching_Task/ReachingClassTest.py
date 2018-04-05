@@ -2867,16 +2867,16 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 	IdealMovement = reaching_movement(IdealPath)
 	Ideal_X,_,_ = IdealMovement.return_X_values(TrialData)
 	IdealMuscleVelocities = IdealMovement.return_muscle_velocities(TrialData,Weighted=Weighted)
-	AvgError = []
+	MeanAbsoluteError = []
 
 	StartTime = time.time()
 	for i in range(len(TrialData["Default Paths"])):
 		axes[RowNumber[4],ColumnNumber[4]].plot(AllX[i][0],AllX[i][1],c='0.60')
 		for j in MuscleIndices:
 			MuscleNumber = TrialData["Ordered Muscle Numbers"][MuscleNumbers[j]]
-			AvgError.append(abs(AllVm[i][MuscleNumber]\
+			MeanAbsoluteError.append(abs(AllVm[i][MuscleNumber]\
 								- IdealMuscleVelocities[MuscleNumber,:]).mean())
-			# if MuscleNumber == 3: print(str(AvgError[-1]))
+			# if MuscleNumber == 3: print(str(MeanAbsoluteError[-1]))
 			axes[RowNumber[j],ColumnNumber[j]].plot(t,AllVm[i][MuscleNumber],\
 					c=TrialData["Ordered Muscle Colors List"][MuscleNumbers[j]])
 			bounds[MuscleNumbers[j]] = \
@@ -2885,11 +2885,11 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 			statusbar(i,len(TrialData["Default Paths"]),StartTime=StartTime,\
 							Title = TrialData["Reach Type"])
 
-	AvgError = np.array(AvgError).reshape(len(TrialData["Default Paths"]),NumMuscles-1).T
+	MeanAbsoluteError = np.array(MeanAbsoluteError).reshape(len(TrialData["Default Paths"]),NumMuscles-1).T
 	CorrectedOrder = np.array([TrialData["Ordered Muscle Numbers"].index(el) \
 									for el in range(NumMuscles-1)])
-	AvgError = AvgError[CorrectedOrder,:]
-	TotalAvgError = np.array([AvgError[i,:].mean() for i in range(NumMuscles-1)])
+	MeanAbsoluteError = MeanAbsoluteError[CorrectedOrder,:]
+	MeanMAE = np.array([MeanAbsoluteError[i,:].mean() for i in range(NumMuscles-1)])
 	print('\n')
 
 	if PlotIdeal == True:
@@ -2918,11 +2918,11 @@ def plot_individual_muscles_for_animation(TrialData,Weighted=False,Statusbar=Fal
 	axes[RowNumber[4],ColumnNumber[4]].set_aspect('equal')
 	if ReturnFig == True:
 		if ReturnError == True:
-			return(fig,TotalAvgError)
+			return(fig,MeanMAE)
 		else:
 			return(fig)
 	elif ReturnError == True:
-		return(TotalAvgError)
+		return(MeanMAE)
 def plot_total_error(TrialData,TotalTrialError,PiMultipleStringsList,\
 						UpperBound = None,ReturnFig=False,Weighted=False):
 	import numpy as np
