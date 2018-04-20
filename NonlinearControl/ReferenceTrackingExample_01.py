@@ -46,8 +46,8 @@ plt.ylabel("Error")
 
 k1,k2 = 50,50
 m1,m2,M = 1,1,1
-A,w = 0.10,4*np.pi
-b1,b2,b3,b4 = 4,4,4,4
+A,w = 0.10,0.5*np.pi
+b1,b2,b3,b4 = 20,20,20,20
 CocontractionIndex = 2
 
 def dx1(t,X):
@@ -443,6 +443,232 @@ def animate_trajectory(response,Time,x1,x3,x4,u1,u2):
         # if save_as_gif:
         # 	ani.save('test.gif', writer='imagemagick', fps=30)
         plt.show()
+def plot_multiple_PDF_frames(response,Time,x1,x3,x4,u1,u2,FileName=None):
+    assert type(response)==bool, "Input must be either True or False."
+    if FileName != None: assert type(FileName)==str, "FileName must be a string"
+    if response == True:
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Ellipse
+        import matplotlib.patches as patches
+        from scipy import signal
+        from matplotlib.backends.backend_pdf import PdfPages
+        import os.path
+
+        def return_fig(i):
+            fig = plt.figure(figsize=(10,8))
+            ax1 = plt.subplot2grid((3,4),(0,0),colspan=4)
+            ax2 = plt.subplot2grid((3,4),(1,0),colspan=2)
+            ax3 = plt.subplot2grid((3,4),(1,2),colspan=2)
+            ax4 = plt.subplot2grid((3,4),(2,0),colspan=3)
+            ax5 = plt.subplot2grid((3,4),(2,3))
+
+            plt.suptitle("Underdetermined Mass-Spring System",Fontsize=28,y=0.95)
+
+            # Model Drawing
+            IdealBoxScalingFactor = 0.78533496170320571 # Calculated from w = np.pi
+            CurrentTrialScalingFactor = max([max(x3)-min(x1),max(x1)-min(x4)])
+            StraightLength = 0.05*CurrentTrialScalingFactor/IdealBoxScalingFactor
+            RestingLength = max([max(x1)-min(x3),max(x4)-min(x1)])+2*StraightLength\
+                            +0.30*CurrentTrialScalingFactor/IdealBoxScalingFactor
+            CenterBoxHalfWidth = 0.15*CurrentTrialScalingFactor/IdealBoxScalingFactor
+            CenterBoxHalfHeight = 0.2*CurrentTrialScalingFactor/IdealBoxScalingFactor
+            SideBoxHalfWidth = 0.1*CurrentTrialScalingFactor/IdealBoxScalingFactor
+            SideBoxHalfHeight = 0.075*CurrentTrialScalingFactor/IdealBoxScalingFactor
+            ForceScaling = 1*CurrentTrialScalingFactor/IdealBoxScalingFactor
+
+            Spring_array =\
+             SideBoxHalfWidth\
+                *np.abs(signal.sawtooth(5*2*np.pi*np.linspace(0,1,1001)-np.pi/2))\
+                    -(1/2)*SideBoxHalfWidth
+
+            Spring1, =\
+                ax1.plot(np.linspace(x1[i]+CenterBoxHalfWidth+StraightLength,\
+                                        RestingLength+x3[i]-SideBoxHalfWidth-StraightLength,1001),\
+                                            Spring_array,'k')
+            Spring1_left, = \
+                ax1.plot([x1[i]+CenterBoxHalfWidth,x1[i]+CenterBoxHalfWidth+StraightLength],\
+                            [0,0],'k')
+            Spring1_right, = \
+                ax1.plot([RestingLength+x3[i]-SideBoxHalfWidth-StraightLength,\
+                            RestingLength+x3[i]-SideBoxHalfWidth],\
+                                [0,0],'k')
+
+            Spring2, =\
+                ax1.plot(np.linspace(-RestingLength+x4[i]+SideBoxHalfWidth+StraightLength,\
+                                        x1[i]-CenterBoxHalfWidth-StraightLength,1001),\
+                                            Spring_array,'k')
+            Spring2_left, = \
+                ax1.plot([x1[i]-CenterBoxHalfWidth-StraightLength,x1[i]-CenterBoxHalfWidth],\
+                            [0,0],'k')
+            Spring2_right, = \
+                ax1.plot([-RestingLength+x4[i]+SideBoxHalfWidth,\
+                            -RestingLength+x4[i]+SideBoxHalfWidth+StraightLength],\
+                                [0,0],'k')
+            ax1.get_xaxis().set_ticks([])
+            ax1.get_yaxis().set_ticks([])
+            ax1.set_frame_on(True)
+            CenterMass = plt.Rectangle((-CenterBoxHalfWidth + x1[i],-CenterBoxHalfHeight),\
+                                        2*CenterBoxHalfWidth,2*CenterBoxHalfHeight,Color='#4682b4')
+            ax1.add_patch(CenterMass)
+            Mass1 = plt.Rectangle((-SideBoxHalfWidth+RestingLength + x3[i],-SideBoxHalfHeight),\
+                                        2*SideBoxHalfWidth,2*SideBoxHalfHeight,Color='#4682b4')
+            ax1.add_patch(Mass1)
+            Mass2 = plt.Rectangle((-SideBoxHalfWidth-RestingLength + x4[i],-SideBoxHalfHeight),\
+                                        2*SideBoxHalfWidth,2*SideBoxHalfHeight,Color='#4682b4')
+            ax1.add_patch(Mass2)
+
+            PositionArrow, = ax1.plot([x1[i],x1[i]],[0,2*CenterBoxHalfHeight],'k')
+            PositionArrowHead, = ax1.plot([x1[i]],[2*CenterBoxHalfHeight],'k^')
+            PositionArrowTail, = ax1.plot([x1[i]],[0],'ko')
+
+            Scale = ax1.plot([-1.1*A,1.1*A],\
+                                [2.75*CenterBoxHalfHeight,2.75*CenterBoxHalfHeight],\
+                                    '0.60')
+            Ticks = np.linspace(-A,A,5)
+            TickHeights = [0.3*CenterBoxHalfHeight,\
+                            0.15*CenterBoxHalfHeight,\
+                            0.3*CenterBoxHalfHeight,\
+                            0.15*CenterBoxHalfHeight,\
+                            0.3*CenterBoxHalfHeight]
+            [ax1.plot([Ticks[i],Ticks[i]],\
+                    [2.75*CenterBoxHalfHeight-TickHeights[i],2.75*CenterBoxHalfHeight],'0.60') \
+                        for i in range(5)]
+
+            Force1Arrow, = ax1.plot([RestingLength+x3[i]+(5/3)*SideBoxHalfWidth,\
+                                        RestingLength + x3[i]+(5/3)*SideBoxHalfWidth\
+                                            +ForceScaling*u1[i]/(max(u1[5000:]+u2[5000:]))],\
+                                                    [0,0],'g')
+            Force1ArrowHead, = \
+                ax1.plot([RestingLength + x3[i]+(5/3)*SideBoxHalfWidth\
+                            +ForceScaling*u1[i]/(max(u1[5000:]+u2[5000:]))],[0],'g>')
+            Force2Arrow, =\
+                ax1.plot([x4[i]-RestingLength-(5/3)*SideBoxHalfWidth\
+                            -ForceScaling*u2[i]/(max(u1[5000:]+u2[5000:])),\
+                                x4[i]-RestingLength-(5/3)*SideBoxHalfWidth],[0,0],'r')
+            Force2ArrowHead, = \
+                ax1.plot([x4[i]-RestingLength-(5/3)*SideBoxHalfWidth\
+                            -ForceScaling*u2[i]/(max(u1[5000:]+u2[5000:]))],[0],'r<')
+
+            LowerBound = (np.array(x4[5001:])-RestingLength-(5/3)*SideBoxHalfWidth\
+                            -ForceScaling*np.array(u2[5000:])/(max(u1[5000:]+u2[5000:]))).min()
+            UpperBound = (RestingLength + np.array(x3[5001:])+(5/3)*SideBoxHalfWidth\
+                            +ForceScaling*np.array(u1[5000:])/(max(u1[5000:]+u2[5000:]))).max()
+            Bound = 1.05*np.array([-LowerBound,UpperBound]).max()
+            ax1.set_xlim([-Bound,Bound])
+            ax1.set_ylim([-1.5*CenterBoxHalfHeight,3.25*CenterBoxHalfHeight])
+            ax1.set_aspect('equal')
+
+            #Force 1
+
+            Force1, = ax3.plot(Time[:i],u1[:i],color = 'g')
+            ax3.set_xlim(0,Time[-1])
+            ax3.set_xticks(list(np.linspace(0,Time[-1],5)))
+            ax3.set_xticklabels([str(0),'','','',str(Time[-1])])
+            ax3.set_ylim(0,1.15*max(u1[5000:]+u2[5000:]))
+            if np.linspace(0,np.floor(1.15*max(u1[5000:]+u2[5000:])),\
+                            int(np.floor(1.15*max(u1[5000:]+u2[5000:])))+1).shape[0] < 5:
+                ax3.set_yticks(list(np.linspace(0,np.floor(1.15*max(u1[5000:]+u2[5000:])),\
+                                int(np.floor(1.15*max(u1[5000:]+u2[5000:])))+1)))
+                ax3.set_yticklabels([""]*(int(np.floor(1.15*max(u1[5000:]+u2[5000:])))+1))
+            else:
+                NumTicks = np.floor(1.15*max(u1[5000:]+u2[5000:]))
+                MaxTick = NumTicks - NumTicks%5
+                TickStep = MaxTick/5
+                Ticks = list(np.linspace(0,TickStep*5,6))
+                ax3.set_yticks(Ticks)
+                ax3.set_yticklabels([""]*len(Ticks))
+            # ax3.set_yticklabels([str(int(el)) for el in \
+            #                         list(np.linspace(0,\
+            #                             np.ceil(max(u1[int(len(u1)/2):])*1.1) - \
+            #                                 np.ceil(max(u1[int(len(u1)/2):])*1.1)%3,4))],\
+            #                                     fontsize=12)
+            ax3.spines['right'].set_visible(False)
+            ax3.spines['top'].set_visible(False)
+            ax3.set_title("Force 1",fontsize=16,fontweight = 4,color = 'g',y = 0.95)
+            # ax3.set_xlabel("Time (s)")
+
+            #Force 2
+
+            Force2, = ax2.plot(Time[:i],u2[:i],color = 'r')
+            ax2.set_xlim(0,Time[-1])
+            ax2.set_xticks(list(np.linspace(0,Time[-1],5)))
+            ax2.set_xticklabels([str(0),'','','',str(Time[-1])])
+            ax2.set_ylim(0,1.15*max(u1[5000:]+u2[5000:]))
+            ax2.set_yticks(list(np.linspace(0,np.floor(1.15*max(u1[5000:]+u2[5000:])),\
+                            int(np.floor(1.15*max(u1[5000:]+u2[5000:])))+1)))
+            ax2.set_yticklabels([str(int(el)) for el in \
+                                    list(np.linspace(0,np.floor(1.15*max(u1[5000:]+u2[5000:])),\
+                                        int(np.floor(1.15*max(u1[5000:]+u2[5000:])))+1))],\
+                                            fontsize=12)
+            if np.linspace(0,np.floor(1.15*max(u1[5000:]+u2[5000:])),\
+                            int(np.floor(1.15*max(u1[5000:]+u2[5000:])))+1).shape[0] < 5:
+                ax2.set_yticks(list(np.linspace(0,np.floor(1.15*max(u1[5000:]+u2[5000:])),\
+                                int(np.floor(1.15*max(u1[5000:]+u2[5000:])))+1)))
+                ax2.set_yticklabels([str(int(el)) for el in \
+                                        list(np.linspace(0,np.floor(1.15*max(u1[5000:]+u2[5000:])),\
+                                            int(np.floor(1.15*max(u1[5000:]+u2[5000:])))+1))],\
+                                                fontsize=12)
+            else:
+                NumTicks = np.floor(1.15*max(u1[5000:]+u2[5000:]))
+                MaxTick = NumTicks - NumTicks%5
+                TickStep = MaxTick/5
+                Ticks = list(np.linspace(0,TickStep*5,6))
+                ax2.set_yticks(Ticks)
+                ax2.set_yticklabels([str(tick) for tick in Ticks])
+            ax2.spines['right'].set_visible(False)
+            ax2.spines['top'].set_visible(False)
+            ax2.set_title("Force 2",fontsize=16,fontweight = 4,color = 'r',y = 0.95)
+            # ax2.set_xlabel("Time (s)")
+
+            # Trajectory
+
+            Predicted, = ax4.plot(Time,r(Time),'0.60',linestyle='--')
+            Actual, = ax4.plot(Time[:i],x1[:i],'b')
+            ax4.set_xlim(0,Time[-1])
+            ax4.set_xticks(list(np.linspace(0,Time[-1],5)))
+            ax4.set_xticklabels([str(0),'','','',str(Time[-1])])
+            ax4.set_ylim([-1.25*A,1.25*A])
+            ax4.set_yticks([-A,0,A])
+            ax4.set_xlabel("Time (s)")
+            ax4.set_ylabel("Position of Center Mass (m)")
+            ax4.spines['right'].set_visible(False)
+            ax4.spines['top'].set_visible(False)
+
+            # Error
+            ErrorArray = x1-r(Time)
+            Error, = ax5.plot(Time[:i],ErrorArray[:i],'k')
+            ax5.set_xlim(0,Time[-1])
+            ax5.set_xticks(list(np.linspace(0,Time[-1],5)))
+            ax5.set_xticklabels([str(0),'','','',str(Time[-1])])
+            ax5.set_ylim([ErrorArray.min() - 0.1*(max(ErrorArray)-min(ErrorArray)),\
+                            ErrorArray.max() + 0.1*(max(ErrorArray)-min(ErrorArray))])
+            ax5.set_xlabel("Time (s)")
+            ax5.set_ylabel("Error (m)")
+            ax5.yaxis.set_label_position("right")
+            ax5.yaxis.tick_right()
+            ax5.spines['left'].set_visible(False)
+            ax5.spines['top'].set_visible(False)
+
+            return(fig)
+        i = 1
+        if FileName == None:
+            FileName = "ReferenceTrackingTest.pdf"
+        else:
+            FileName = FileName + ".pdf"
+        if os.path.exists(FileName) == True:
+            while os.path.exists(FileName) == True:
+                i += 1
+                FileName = FileName[:-4]
+                FileName = FileName	+ "_" + "{:0>2d}".format(i) +".pdf"
+        PDFFile = PdfPages(FileName)
+
+        for i in np.linspace(0,len(Time)-1,201)[:-1]:
+            t_i = int(i)
+            fig = return_fig(t_i)
+            PDFFile.savefig(fig)
+            plt.close("all")
+        PDFFile.close()
 
 N = 10001
 Time = np.linspace(0,10,N)
@@ -492,4 +718,5 @@ plt.ylabel("Error")
 # plt.show()
 
 plt.close('all')
+plot_multiple_PDF_frames(False,Time,x1,x3,x4,u1,u2)
 animate_trajectory(True,Time,x1,x3,x4,u1,u2)

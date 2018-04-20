@@ -2180,7 +2180,7 @@ def interpret_descriptive_title(DescriptiveTitle,TrialData):
 			ReachAngle = None
 			L1,_ = TrialData["Limb Lengths"]
 			MedianPlane = -L1*(0.129/0.186)
-			TargetAmplitude = TrialData["target Amplitude"]
+			TargetAmplitude = TrialData["Target Amplitude"]
 			Xi = [-MedianPlane-TargetAmplitude/2,0.1+TargetAmplitude/2]
 			Xf = [-MedianPlane+TargetAmplitude/2,0.1+TargetAmplitude/2]
 			IdealBoundaryPositions = [Xi,Xf]
@@ -2189,7 +2189,7 @@ def interpret_descriptive_title(DescriptiveTitle,TrialData):
 			ReachAngle = np.pi/2
 			L1,_ = TrialData["Limb Lengths"]
 			MedianPlane = -L1*(0.129/0.186)
-			TargetAmplitude = TrialData["target Amplitude"]
+			TargetAmplitude = TrialData["Target Amplitude"]
 			Xi = [MedianPlane,0.20]
 			Xf = [MedianPlane,0.20 + TargetAmplitude]
 			IdealBoundaryPositions = [Xi,Xf]
@@ -2198,7 +2198,7 @@ def interpret_descriptive_title(DescriptiveTitle,TrialData):
 			ReachAngle = 3*np.pi/4
 			L1,_ = TrialData["Limb Lengths"]
 			MedianPlane = -L1*(0.129/0.186)
-			TargetAmplitude = TrialData["target Amplitude"]
+			TargetAmplitude = TrialData["Target Amplitude"]
 			Xi = [MedianPlane,0.20]
 			Xf = [MedianPlane-TargetAmplitude/(2**0.5), 0.20 + TargetAmplitude/(2**0.5)]
 			IdealBoundaryPositions = [Xi,Xf]
@@ -2207,7 +2207,7 @@ def interpret_descriptive_title(DescriptiveTitle,TrialData):
 			ReachAngle = np.pi/4
 			L1,_ = TrialData["Limb Lengths"]
 			MedianPlane = -L1*(0.129/0.186)
-			TargetAmplitude = TrialData["target Amplitude"]
+			TargetAmplitude = TrialData["Target Amplitude"]
 			Xi = [MedianPlane,0.20]
 			Xf = [MedianPlane+TargetAmplitude/(2**0.5), 0.20 + TargetAmplitude/(2**0.5)]
 			IdealBoundaryPositions = [Xi,Xf]
@@ -3245,13 +3245,13 @@ if NumberOfTrials<50:
 else:
 	Statusbar_bool = True
 
-# TrialData = create_trial_data(NumberOfTrials=NumberOfTrials)
-#
-# # animate_random_trajectory(TrialData)
-# # plot_all_on_same_axes(TrialData,Statusbar=Statusbar_bool)
-# # fig1 = plot_all_trajectories(TrialData,Statusbar=Statusbar_bool,ReturnFig=True)
-# # fig2 = plot_individual_muscles(TrialData,Statusbar=Statusbar_bool,\
-# # 								SameScale=True,Scale=[-1.2,1.2],ReturnFig=True)
+TrialData = create_trial_data(NumberOfTrials=NumberOfTrials)
+
+animate_random_trajectory(TrialData)
+# plot_all_on_same_axes(TrialData,Statusbar=Statusbar_bool)
+# fig1 = plot_all_trajectories(TrialData,Statusbar=Statusbar_bool,ReturnFig=True)
+# fig2 = plot_individual_muscles(TrialData,Statusbar=Statusbar_bool,\
+# 								SameScale=True,Scale=[-1.2,1.2],ReturnFig=True)
 # fig2 = plot_individual_muscles_for_animation(TrialData,Statusbar=Statusbar_bool,\
 # 								Scale=[-1.2,1.2],ReturnFig=True)
 # # save_figures(TrialData,[fig1,fig2])
@@ -3259,58 +3259,58 @@ else:
 # plt.close(fig2)
 # # save_trial_data_prompt(TrialData)
 # # load_trial_data_prompt()
-
-#############################################
-########## For Fixed Target Reach ###########
-#############################################
-
-PiMultipleStringsList1 = [	'_-0/32','_-1/32','_-2/32','_-3/32',  \
-							'_-4/32','_-5/32','_-6/32','_-7/32',  \
-							'_-8/32','_-9/32','_-10/32','_-11/32',  \
-							'_-12/32','_-13/32','_-14/32','_-15/32',  \
-							'_-16/32','_-17/32','_-18/32','_-19/32',  \
-							'_-20/32','_-21/32','_-22/32','_-23/32',  \
-							'_-24/32','_-25/32','_-26/32','_-27/32',  \
-							'_-28/32']
-
-TotalTrialError1 = []
-for i in range(len(PiMultipleStringsList1)):
-	DescriptiveTitle = 'Fixed-target Reach' + PiMultipleStringsList1[i]
-	TrialData1 = create_trial_data(NumberOfTrials=NumberOfTrials,DescriptiveTitle=DescriptiveTitle)
-	fig2,TrialError = plot_individual_muscles_for_animation(TrialData1,Statusbar=Statusbar_bool,\
-									Scale=[-1.2,1.2],ReturnFig=True,ReturnError=True,PlotIdeal=True)
-	TotalTrialError1.append(TrialError[np.newaxis,:])
-	save_figures(TrialData1,[fig2])
-	plt.close(fig2)
-
-TotalTrialError1 = np.concatenate(TotalTrialError1,axis=0).T
-ErrorFig1 = plot_total_error(TrialData1,TotalTrialError1,PiMultipleStringsList1,ReturnFig=True)
-
-##############################################
-########### For Fixed Start Reach ###########
-##############################################
-
-TotalTrialError2 = []
-PiMultipleStringsList2 = [	'_0/32','_1/32','_2/32','_3/32',  \
-							'_4/32','_5/32','_6/32','_7/32',  \
-							'_8/32','_9/32','_10/32','_11/32',  \
-							'_12/32','_13/32','_14/32','_15/32',  \
-							'_16/32','_17/32','_18/32','_19/32',  \
-							'_20/32','_21/32','_22/32','_23/32',  \
-							'_24/32','_25/32','_26/32','_27/32',  \
-							'_28/32','_29/32','_30/32','_31/32',\
-							'_32/32']
-
-for i in range(len(PiMultipleStringsList2)):
-	DescriptiveTitle = 'Fixed-start Reach' + PiMultipleStringsList2[i]
-	TrialData2 = create_trial_data(NumberOfTrials=NumberOfTrials,DescriptiveTitle=DescriptiveTitle)
-	fig2,TrialError = plot_individual_muscles_for_animation(TrialData2,Statusbar=Statusbar_bool,\
-									Scale=[-1.2,1.2],ReturnFig=True,ReturnError=True,PlotIdeal=True)
-	TotalTrialError2.append(TrialError[np.newaxis,:])
-	save_figures(TrialData2,[fig2])
-	plt.close(fig2)
-
-TotalTrialError2 = np.concatenate(TotalTrialError2,axis=0).T
-ErrorFig2 = plot_total_error(TrialData2,TotalTrialError2,PiMultipleStringsList2,ReturnFig=True)
-
-plt.show()
+#
+# #############################################
+# ########## For Fixed Target Reach ###########
+# #############################################
+#
+# PiMultipleStringsList1 = [	'_-0/32','_-1/32','_-2/32','_-3/32',  \
+# 							'_-4/32','_-5/32','_-6/32','_-7/32',  \
+# 							'_-8/32','_-9/32','_-10/32','_-11/32',  \
+# 							'_-12/32','_-13/32','_-14/32','_-15/32',  \
+# 							'_-16/32','_-17/32','_-18/32','_-19/32',  \
+# 							'_-20/32','_-21/32','_-22/32','_-23/32',  \
+# 							'_-24/32','_-25/32','_-26/32','_-27/32',  \
+# 							'_-28/32']
+#
+# TotalTrialError1 = []
+# for i in range(len(PiMultipleStringsList1)):
+# 	DescriptiveTitle = 'Fixed-target Reach' + PiMultipleStringsList1[i]
+# 	TrialData1 = create_trial_data(NumberOfTrials=NumberOfTrials,DescriptiveTitle=DescriptiveTitle)
+# 	fig2,TrialError = plot_individual_muscles_for_animation(TrialData1,Statusbar=Statusbar_bool,\
+# 									Scale=[-1.2,1.2],ReturnFig=True,ReturnError=True,PlotIdeal=True)
+# 	TotalTrialError1.append(TrialError[np.newaxis,:])
+# 	save_figures(TrialData1,[fig2])
+# 	plt.close(fig2)
+#
+# TotalTrialError1 = np.concatenate(TotalTrialError1,axis=0).T
+# ErrorFig1 = plot_total_error(TrialData1,TotalTrialError1,PiMultipleStringsList1,ReturnFig=True)
+#
+# ##############################################
+# ########### For Fixed Start Reach ###########
+# ##############################################
+#
+# TotalTrialError2 = []
+# PiMultipleStringsList2 = [	'_0/32','_1/32','_2/32','_3/32',  \
+# 							'_4/32','_5/32','_6/32','_7/32',  \
+# 							'_8/32','_9/32','_10/32','_11/32',  \
+# 							'_12/32','_13/32','_14/32','_15/32',  \
+# 							'_16/32','_17/32','_18/32','_19/32',  \
+# 							'_20/32','_21/32','_22/32','_23/32',  \
+# 							'_24/32','_25/32','_26/32','_27/32',  \
+# 							'_28/32','_29/32','_30/32','_31/32',\
+# 							'_32/32']
+#
+# for i in range(len(PiMultipleStringsList2)):
+# 	DescriptiveTitle = 'Fixed-start Reach' + PiMultipleStringsList2[i]
+# 	TrialData2 = create_trial_data(NumberOfTrials=NumberOfTrials,DescriptiveTitle=DescriptiveTitle)
+# 	fig2,TrialError = plot_individual_muscles_for_animation(TrialData2,Statusbar=Statusbar_bool,\
+# 									Scale=[-1.2,1.2],ReturnFig=True,ReturnError=True,PlotIdeal=True)
+# 	TotalTrialError2.append(TrialError[np.newaxis,:])
+# 	save_figures(TrialData2,[fig2])
+# 	plt.close(fig2)
+#
+# TotalTrialError2 = np.concatenate(TotalTrialError2,axis=0).T
+# ErrorFig2 = plot_total_error(TrialData2,TotalTrialError2,PiMultipleStringsList2,ReturnFig=True)
+#
+# plt.show()
