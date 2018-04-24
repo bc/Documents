@@ -675,7 +675,7 @@ Time = np.linspace(0,10,N)
 x1,x2,x3,x4,x5,x6 = [A],[-1],[0],[0],[0],[0]
 u1,u2 = [],[]
 
-AddNoise = False
+AddNoise = True
 if AddNoise == True:
     np.random.seed(seed=None)
     NoiseArray = np.random.normal(loc=0.0,scale=0.2,size=(2,len(Time)))
