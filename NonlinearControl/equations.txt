@@ -1,0 +1,47 @@
+dx1 = lambda X: X[1]
+dx2 = lambda X: c1*np.cos(X[0]) + c2*g1(X)*X[2] - c2*g2(X)*X[3]
+d2x2 = lambda X: -c1*np.sin(X[0])*dx1(X) + c2*dg1(X)*dx1(X)*X[2] + c2*g1(X)*dx3(X)\
+					- c2*dg2(X)*dx1(X)*X[3] - c2*g2(X)*dx4(X)
+dx3 = lambda X: g3(X)*g5(X) - c3*g3(X)*X[6]
+dx4 = lambda X: g4(X)*g6(X) - c4*g4(X)*X[7]
+dx5 = lambda X: X[6]
+dx6 = lambda X: X[7]
+dx7 = lambda X,U: c5*X[2] - c6*g7(X)*U[0] - c6*g8(X) - c7*X[6] \
+	c8*X[6]**2/X[4]
+dx8 = lambda X,U: c9*X[3] - c10*g10(X)*U[1] - c10*g9(X) - c11*X[7] \
+	c12*X[7]**2/X[5]
+
+
+g1 = lambda X: lambdify([θ_EFE],r1.subs([(θ_PS,np.pi/2)]))(X[0]) #
+dg1 = lambda X: lambdify([θ_EFE],dr1.subs([(θ_PS,np.pi/2)]))(X[0])
+d2g1 = lambda X: lambdify([θ_EFE],d2r1.subs([(θ_PS,np.pi/2)]))(X[0])
+g2 = lambda X: lambdify([θ_EFE],r2.subs([(θ_PS,np.pi/2)]))(X[0]) #
+dg2 = lambda X: lambdify([θ_EFE],dr2.subs([(θ_PS,np.pi/2)]))(X[0])
+d2g2 = lambda X: lambdify([θ_EFE],d2r2.subs([(θ_PS,np.pi/2)]))(X[0])
+g3 = lambda X: cT*(1-np.exp(-X[2]/(cT*kT))) #
+dg3 = lambda X: np.exp(-X[2]/(cT*kT))/kT
+g4 = lambda X: cT*(1-np.exp(-X[3]/(cT*kT))) #
+dg4 = lambda X: np.exp(-X[3]/(cT*kT))/kT
+g5 = lambda X: np.sign(-dg1(X)*X[1])*X[1]*np.sqrt(dg1(X)**2 + g1(X)**2) # Should be g4
+dg5 = lambda X:\
+	np.sign(-dg1(X)*X[1])*(dx2(X)*np.sqrt(dg1(X)**2 + g1(X)**2) +\
+		(X[1]**2*dg1(X)*(d2g1(X) + g1(X)))/np.sqrt(dg1(X)**2 + g1(X)**2))
+g6 = lambda X: np.sign(-dg2(X[0])*X[1])*X[1]*np.sqrt(dg2(X[0])**2 + g2(X[0])**2) # Should be g5
+dg6 = lambda X: \
+	np.sign(-dg2(X)*X[1])*(dx2(X)*np.sqrt(dg2(X)**2+ g2(X)**2) +\
+		(X[1]**2*dg2(X)*(d2g2(X) + g2(X)))/np.sqrt(dg2(X)**2 + g2(X)**2))
+g7 = lambda X: \
+	35*PCSA1\
+		*np.exp(-abs(((X[4]/lo1)**β-1)/ω)**ρ)\
+			*np.piecewise(X[6],[X[6]<=0, X[6]>0],\
+				[lambda X[6]: (V_max - X[6]/lo1)/(V_max + (cv0 + cv1*(X[4]/lo1)*(X[6]/lo1))),\
+				lambda X[6]: (bv-(av0 + av1*(X[4]/lo1) + av2*(X[4]/lo1)**2)*(X[6]/lo1))/(bv + (X[6]/lo1))]) \
+					# Should be g6
+g8 = lambda X: c_1*k_1*np.log(np.exp(((X[4]/lo1)-Lr1)/k_1) + 1) + η*(X[6]/lo1) # Should be g7
+g9 = lambda X: c_1*k_1*np.log(np.exp(((X[5]/lo2)-Lr1)/k_1) + 1) + η*(X[7]/lo2)
+g10 = lambda X: \
+	35*PCSA2\
+		*np.exp(-abs(((X[5]/lo2)**β-1)/ω)**ρ)\
+			*np.piecewise(X[7],[X[7]<=0, X[7]>0],\
+				[lambda X[7]: (V_max - X[7]/lo2)/(V_max + (cv0 + cv1*(X[5]/lo2)*(X[7]/lo2))),\
+				lambda X[7]: (bv-(av0 + av1*(X[5]/lo2) + av2*(X[5]/lo2)**2)*(X[7]/lo2))/(bv + (X[7]/lo2))]) \
