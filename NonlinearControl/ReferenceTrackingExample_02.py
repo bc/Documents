@@ -284,8 +284,8 @@ k1,k2,k3,k4 = 100,100,100,100
 MaxStep_Tension = 0.01 # percentage of positive maximum.
 Tension_Bounds = [[0,F_MAX1],[0,0.10*F_MAX2]]
 
-MaxStep_MuscleVelocity = 0.1 # percentage of positive maximum.
-MuscleVelocity_Bounds =[[-2*lo1,2*lo1],[-2*lo2,2*lo2]]
+MaxStep_MuscleVelocity = 5 # percentage of positive maximum.
+MuscleVelocity_Bounds =[[-2*lo1,2*lo1],[-0.2*lo2,0.2*lo2]]
 
 
 """
@@ -439,7 +439,6 @@ def return_constraint_variables_muscle_velocity_driven(t,X):
 	Coefficient2 = c2*c4*G2(X)*G5(X)
 	Constraint = A3(t,X)
 	return(Coefficient1,Coefficient2,Constraint)
-
 def return_U_tension_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	import random
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_tension_driven(t,X)
@@ -527,28 +526,44 @@ def return_U_tension_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
 	return([u1,u2])
-
 def return_U_muscle_velocity_driven(t,X,U,dt,MaxStep,Bounds,Noise):
+	"""
+	Enforcing a hyperbolic domain constraint to allow for realistic lengthening/shortenting relationships.
+	Input2 = (lo1*0.001)*(lo2*0.001)/Input1 = lo1*lo2/(10^6*Input1)
+	"""
+
 	import random
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t,X)
 	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
 	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
 	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
 	if Constraint1 != 0:
-		assert Coefficient1!=0 and Coefficient2!=0, "Error with Coefficients. Shouldn't be zero with nonzero constraint."
+		assert Coefficient1!=0 or Coefficient2!=0, "Error with Coefficients. Shouldn't be zero with nonzero constraint."
 	else:
-		assert Coefficient1!=0 and Coefficient2!=0, "Error with Constraint. 0 = 0 implies all inputs valid."
+		assert Coefficient1!=0 or Coefficient2!=0, "Error with Constraint. 0 = 0 implies all inputs valid."
 
 	if abs(Coefficient1) <= 1e-7:
 		LowerBound = Bounds[0][0]
 		UpperBound = Bounds[0][1]
+		if Constraint1/Coefficient2 > 0:
+			LowerBound = Bounds[0][0]
+			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+		else:
+			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+			UpperBound = Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 	elif abs(Coefficient2) <= 1e-7:
 		LowerBound = Constraint1/Coefficient1
 		UpperBound = Constraint1/Coefficient1
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
+		if Constraint1/Coefficient1 < 0:
+			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+			UpperBound = Bounds[1][1]
+		else:
+			LowerBound = Bounds[1][0]
+			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+		FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 	elif np.sign(-Coefficient1) == np.sign(Coefficient2): # DIFFERENT SIGNS
 		if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
 			LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
@@ -630,6 +645,47 @@ def return_U_muscle_velocity_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	u2 = FeasibleInput2[next_index]
 	return([u1,u2])
 
+def plot_MA_values(Time,x1):
+	import matplotlib.pyplot as plt
+	import numpy as np
+
+	fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2,figsize=(8,6))
+	plt.subplots_adjust(hspace=0.1,bottom=0.1)
+
+	plt.suptitle("Moment arm equations")
+	ax1.plot(np.linspace(0,np.pi*(160/180),1001),\
+				np.array(list(map(lambda x1: G1([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
+				'0.70')
+	ax1.plot(np.linspace(min(x1),max(x1),101),\
+				np.array(list(map(lambda x1: G1([x1]),np.linspace(min(x1),max(x1),101)))),\
+				'g',lw=3)
+	ax1.set_xticks([0,np.pi/4,np.pi/2,3*np.pi/4,np.pi])
+	ax1.set_xticklabels([""]*len(ax1.get_xticks()))
+	ax1.set_ylabel("Moment Arm for\n Muscle 1 (m)")
+
+	ax2.plot(Time,np.array(list(map(lambda x1: G1([x1]),x1))),'g')
+	ax2.set_ylim(ax1.get_ylim())
+	ax2.set_yticks(ax1.get_yticks())
+	ax2.set_yticklabels([""]*len(ax1.get_yticks()))
+	ax2.set_xticklabels([""]*len(ax2.get_xticks()))
+
+	ax3.plot(np.linspace(0,np.pi*(160/180),1001),\
+				np.array(list(map(lambda x1: G2([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
+				'0.70')
+	ax3.plot(np.linspace(min(x1),max(x1),101),\
+				np.array(list(map(lambda x1: G2([x1]),np.linspace(min(x1),max(x1),101)))),\
+				'r',lw=3)
+	ax3.set_xticks([0,np.pi/4,np.pi/2,3*np.pi/4,np.pi])
+	ax3.set_xticklabels([r"$0$",r"$\frac{\pi}{4}$",r"$\frac{\pi}{2}$",r"$\frac{3\pi}{4}$",r"$\pi$"])
+	ax3.set_xlabel("Joint Angle (rads)")
+	ax3.set_ylabel("Moment Arm for\n Muscle 2 (m)")
+
+	ax4.plot(Time,np.array(list(map(lambda x1: G2([x1]),x1))),'r')
+	ax4.set_ylim(ax3.get_ylim())
+	ax4.set_yticks(ax3.get_yticks())
+	ax4.set_yticklabels([""]*len(ax3.get_yticks()))
+	ax4.set_xlabel("Time (s)")
+	return(fig,[ax1,ax2,ax3,ax4])
 def animate_test_2(response,t,x1,x2,x3,x4,u1,u2,dt,Bounds):
 	assert type(response)==bool, "Input must be either True or False."
 
@@ -637,6 +693,7 @@ def animate_test_2(response,t,x1,x2,x3,x4,u1,u2,dt,Bounds):
 		import numpy as np
 		import matplotlib.pyplot as plt
 		import matplotlib.animation as animation
+		import time
 
 		fig = plt.figure(figsize=(10,8))
 		ax1 = plt.gca()
@@ -646,10 +703,93 @@ def animate_test_2(response,t,x1,x2,x3,x4,u1,u2,dt,Bounds):
 		ax1.set_title(DescriptiveTitle,Fontsize=20,y=0.975)
 
 		#Hyperbolic Constraint
-		Input1 = np.linspace(Bounds[0][0],Bounds[0][1],1000001)
+		Input1 = list(np.linspace(Bounds[0][0],Bounds[0][1],1000001))
+		Input1.remove(0)
+		Input1 = np.array(Input1)
 		ax1.plot(Input1,lo1*lo2*0.001**2/Input1,'r',lw=2)
+		Input2 = list(np.linspace(Bounds[0][0],Bounds[0][1],1000001))
+		Input2.remove(0)
+		Input2 = np.array(Input2)
+		ax1.plot(lo1*lo2*0.001**2/Input2,Input2,'r',lw=2)
 		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],[x1[0],x2[0],x3[0],x4[0]])
-		cline, = plt.plot(Input1,-Coefficient1*Input1/Coefficient2 + Constraint1/Coefficient2,'b',lw=2)
+		if abs(Coefficient1) <= 1e-7:
+			LowerBound = Bounds[0][0]
+			UpperBound = Bounds[0][1]
+			if Constraint1/Coefficient2 > 0:
+				LowerBound = Bounds[0][0]
+				UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+			else:
+				LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+				UpperBound = Bounds[0][1]
+			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+		elif abs(Coefficient2) <= 1e-7:
+			LowerBound = Constraint1/Coefficient1
+			UpperBound = Constraint1/Coefficient1
+			FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+			if Constraint1/Coefficient1 < 0:
+				LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+				UpperBound = Bounds[1][1]
+			else:
+				LowerBound = Bounds[1][0]
+				UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+			FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		elif np.sign(-Coefficient1) == np.sign(Coefficient2): # DIFFERENT SIGNS
+			if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
+				LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
+			else:
+				LowerBound = Bounds[0][0]
+
+			if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 > Bounds[1][1]:
+				UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
+			else:
+				UpperBound = Bounds[0][1]
+			assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+			HyperbolicBounds = np.sort([(Constraint1 - \
+											np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+												/(2*Coefficient1), \
+									 	(Constraint1 + \
+											np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+												/(2*Coefficient1)])
+			LowerBound = max([LowerBound,HyperbolicBounds[0]])
+			UpperBound = min([UpperBound,HyperbolicBounds[1]])
+			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+									for el in FeasibleInput1])
+		else: # np.sign(-Coefficient1) != np.sign(Coefficient2) SAME SIGN
+			if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 > Bounds[1][1]:
+				LowerBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
+			else:
+				LowerBound = Bounds[0][0]
+
+			if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 < Bounds[1][0]:
+				UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
+			else:
+				UpperBound = Bounds[0][1]
+			assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+			if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
+				HyperbolicBounds = np.sort([(Constraint1 - \
+												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+													/(2*Coefficient1), \
+										 	(Constraint1 + \
+												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+													/(2*Coefficient1)])
+
+				assert LowerBound < HyperbolicBounds[0] or HyperbolicBounds[1] < UpperBound, "No feasible solutions."
+
+				FeasibleInput1 = []
+				while len(FeasibleInput1)<1000:
+					Random1 = (UpperBound-LowerBound)*np.random.rand() + LowerBound
+					if Random1<HyperbolicBounds[0] or Random1>HyperbolicBounds[1]: FeasibleInput1.append(Random1)
+				FeasinbleInput1 = np.array(FeasibleInput1)
+				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+										for el in FeasibleInput1])
+			else:
+				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+										for el in FeasibleInput1])
+		cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
+		TimeText = plt.text(0.1,0.1,"t = " + str(t[0]),fontsize=16)
 		chosenpoint, = plt.plot(u1[0],u2[0],c='k',marker='o')
 		ax1.set_xlim(Bounds[0])
 		ax1.set_ylim(Bounds[1])
@@ -659,25 +799,388 @@ def animate_test_2(response,t,x1,x2,x3,x4,u1,u2,dt,Bounds):
 
 		def animate(i):
 			Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[i],[x1[i],x2[i],x3[i],x4[i]])
-			cline.set_ydata(-Coefficient1*Input1/Coefficient2 + Constraint1/Coefficient2)
+			if abs(Coefficient1) <= 1e-7:
+				LowerBound = Bounds[0][0]
+				UpperBound = Bounds[0][1]
+				if Constraint1/Coefficient2 > 0:
+					LowerBound = Bounds[0][0]
+					UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+				else:
+					LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+					UpperBound = Bounds[0][1]
+				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+				FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+			elif abs(Coefficient2) <= 1e-7:
+				LowerBound = Constraint1/Coefficient1
+				UpperBound = Constraint1/Coefficient1
+				FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+				if Constraint1/Coefficient1 < 0:
+					LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+					UpperBound = Bounds[1][1]
+				else:
+					LowerBound = Bounds[1][0]
+					UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+				FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			elif np.sign(-Coefficient1) == np.sign(Coefficient2): # DIFFERENT SIGNS
+				if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
+					LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
+				else:
+					LowerBound = Bounds[0][0]
+
+				if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 > Bounds[1][1]:
+					UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
+				else:
+					UpperBound = Bounds[0][1]
+				assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+				HyperbolicBounds = np.sort([(Constraint1 - \
+												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+													/(2*Coefficient1), \
+										 	(Constraint1 + \
+												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+													/(2*Coefficient1)])
+				LowerBound = max([LowerBound,HyperbolicBounds[0]])
+				UpperBound = min([UpperBound,HyperbolicBounds[1]])
+				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+										for el in FeasibleInput1])
+			else: # np.sign(-Coefficient1) != np.sign(Coefficient2) SAME SIGN
+				if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 > Bounds[1][1]:
+					LowerBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
+				else:
+					LowerBound = Bounds[0][0]
+
+				if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 < Bounds[1][0]:
+					UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
+				else:
+					UpperBound = Bounds[0][1]
+				assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+				if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
+					HyperbolicBounds = np.sort([(Constraint1 - \
+													np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+														/(2*Coefficient1), \
+											 	(Constraint1 + \
+													np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+														/(2*Coefficient1)])
+
+					assert LowerBound < HyperbolicBounds[0] or HyperbolicBounds[1] < UpperBound, "No feasible solutions."
+
+					FeasibleInput1 = []
+					while len(FeasibleInput1)<1000:
+						Random1 = (UpperBound-LowerBound)*np.random.rand() + LowerBound
+						if Random1<HyperbolicBounds[0] or Random1>HyperbolicBounds[1]: FeasibleInput1.append(Random1)
+					FeasinbleInput1 = np.array(FeasibleInput1)
+					FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+											for el in FeasibleInput1])
+				else:
+					FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+					FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+											for el in FeasibleInput1])
+			cline.set_xdata(FeasibleInput1)
+			cline.set_ydata(FeasibleInput2)
 			chosenpoint.set_xdata(u1[i])
 			chosenpoint.set_ydata(u2[i])
-			return cline,chosenpoint,
+			TimeText.set_text("t = " + str(t[i]))
+			return cline,chosenpoint,TimeText,
 
 
 		# Init only required for blitting to give a clean slate.
 		def init():
 			ax1.plot(Input1,lo1*lo2*0.001**2/Input1,'r',lw=2)
 			Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],[x1[0],x2[0],x3[0],x4[0]])
-			cline, = plt.plot(Input1,-Coefficient1*Input1/Coefficient2 + Constraint1/Coefficient2,'b',lw=2)
+			if abs(Coefficient1) <= 1e-7:
+				LowerBound = Bounds[0][0]
+				UpperBound = Bounds[0][1]
+				if Constraint1/Coefficient2 > 0:
+					LowerBound = Bounds[0][0]
+					UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+				else:
+					LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+					UpperBound = Bounds[0][1]
+				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+				FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+			elif abs(Coefficient2) <= 1e-7:
+				LowerBound = Constraint1/Coefficient1
+				UpperBound = Constraint1/Coefficient1
+				FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+				if Constraint1/Coefficient1 < 0:
+					LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+					UpperBound = Bounds[1][1]
+				else:
+					LowerBound = Bounds[1][0]
+					UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+				FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			elif np.sign(-Coefficient1) == np.sign(Coefficient2): # DIFFERENT SIGNS
+				if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
+					LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
+				else:
+					LowerBound = Bounds[0][0]
+
+				if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 > Bounds[1][1]:
+					UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
+				else:
+					UpperBound = Bounds[0][1]
+				assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+				HyperbolicBounds = np.sort([(Constraint1 - \
+												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+													/(2*Coefficient1), \
+										 	(Constraint1 + \
+												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+													/(2*Coefficient1)])
+				LowerBound = max([LowerBound,HyperbolicBounds[0]])
+				UpperBound = min([UpperBound,HyperbolicBounds[1]])
+				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+										for el in FeasibleInput1])
+			else: # np.sign(-Coefficient1) != np.sign(Coefficient2) SAME SIGN
+				if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 > Bounds[1][1]:
+					LowerBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
+				else:
+					LowerBound = Bounds[0][0]
+
+				if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 < Bounds[1][0]:
+					UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
+				else:
+					UpperBound = Bounds[0][1]
+				assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+				if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
+					HyperbolicBounds = np.sort([(Constraint1 - \
+													np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+														/(2*Coefficient1), \
+											 	(Constraint1 + \
+													np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+														/(2*Coefficient1)])
+
+					assert LowerBound < HyperbolicBounds[0] or HyperbolicBounds[1] < UpperBound, "No feasible solutions."
+
+					FeasibleInput1 = []
+					while len(FeasibleInput1)<1000:
+						Random1 = (UpperBound-LowerBound)*np.random.rand() + LowerBound
+						if Random1<HyperbolicBounds[0] or Random1>HyperbolicBounds[1]: FeasibleInput1.append(Random1)
+					FeasinbleInput1 = np.array(FeasibleInput1)
+					FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+											for el in FeasibleInput1])
+				else:
+					FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+					FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+											for el in FeasibleInput1])
+			cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
 			cline.set_visible(False)
 			chosenpoint, = plt.plot(u1[0],u2[0],c='k',marker='o')
 			chosenpoint.set_visible(False)
-			return cline,chosenpoint,
+			TimeText = plt.text(0.75,0.75,"t = " + str(t[0]),fontsize=16)
+			TimeText.set_visible(False)
+			return cline,chosenpoint,TimeText,
 
 		ani = animation.FuncAnimation(fig, animate, np.arange(1, len(t),1), init_func=init,interval=1, blit=False)
 		plt.show()
+def plot_individual_constraint_versus_time_test_2(t,x1,x2,x3,x4,Return = False):
+	import numpy as np
+	import matplotlib.pyplot as plt
 
+	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
+	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
+	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
+
+	"""
+	A⋅u₁ + B⋅u₂ = C
+	"""
+
+	A,B,C = [],[],[]
+	for i in range(len(x1)):
+		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[i],[x1[i],x2[i],x3[i],x4[i]])
+		A.append(Coefficient1)
+		B.append(Coefficient2)
+		C.append(Constraint1)
+
+	ax1.plot(t[:len(x1)],A,'r',lw=2)
+	ax1.spines['right'].set_visible(False)
+	ax1.spines['top'].set_visible(False)
+	ax1.set_ylabel(r"$1^{st}$ Coefficient")
+	ax1.set_xlabel("Time (s)")
+
+	ax2.plot(t[:len(x1)],B,'b',lw=2)
+	ax2.spines['right'].set_visible(False)
+	ax2.spines['top'].set_visible(False)
+	ax2.set_ylabel(r"$2^{nd}$ Coefficient")
+	ax2.set_xticks(ax1.get_xticks())
+	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	ax3.plot(t[:len(x1)],C,'k',lw=2)
+	ax3.spines['right'].set_visible(False)
+	ax3.spines['top'].set_visible(False)
+	ax3.set_ylabel("Constraint")
+	ax3.set_xticks(ax1.get_xticks())
+	ax3.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	if Return == True:
+		return(fig)
+	else:
+		plt.show()
+def plot_individual_coefficient2_versus_time_test_2(t,x1,x2,x3,x4,Return = False):
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
+	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
+	plt.suptitle(r"Plotting $2^{nd}$ Coefficient vs. Time",Fontsize=20,y=0.975)
+
+	"""
+	B = c2⋅c4⋅G2(X)⋅G5(X)
+	"""
+
+	g2,g5,B = [],[],[]
+	for i in range(len(x1)):
+		_,Coefficient2,_ = return_constraint_variables_muscle_velocity_driven(t[i],[x1[i],x2[i],x3[i],x4[i]])
+		B.append(Coefficient2)
+		g2.append(G2([x1[i],x2[i],x3[i],x4[i]]))
+		g5.append(G5([x1[i],x2[i],x3[i],x4[i]]))
+
+	ax1.plot(t[:len(x1)],g2,'b--',lw=2)
+	ax1.spines['right'].set_visible(False)
+	ax1.spines['top'].set_visible(False)
+	ax1.set_ylabel(r"$g_{2}(\vec{x}(t))$")
+	ax1.set_xlabel("Time (s)")
+
+	ax2.plot(t[:len(x1)],g5,'b:',lw=2)
+	ax2.spines['right'].set_visible(False)
+	ax2.spines['top'].set_visible(False)
+	ax2.set_ylabel(r"$g_{5}(\vec{x}(t))$")
+	ax2.set_xticks(ax1.get_xticks())
+	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	ax3.plot(t[:len(x1)],B,'b',lw=2)
+	ax3.spines['right'].set_visible(False)
+	ax3.spines['top'].set_visible(False)
+	ax3.set_ylabel(r"$2^{nd}$ Coefficient")
+	ax3.set_xticks(ax1.get_xticks())
+	ax3.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	if Return == True:
+		return(fig)
+	else:
+		plt.show()
+def plot_individual_coefficient1_versus_time_test_2(t,x1,x2,x3,x4,Return = False):
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
+	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
+	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
+	plt.suptitle(r"Plotting $1^{st}$ Coefficient vs. Time",Fontsize=20,y=0.975)
+
+	"""
+	A = c2⋅c3⋅G1(X)⋅G3(X)
+	"""
+
+	g1,g3,B = [],[],[]
+	for i in range(len(x1)):
+		Coefficient1,_,_ = return_constraint_variables_muscle_velocity_driven(t[i],[x1[i],x2[i],x3[i],x4[i]])
+		B.append(Coefficient1)
+		g1.append(G1([x1[i],x2[i],x3[i],x4[i]]))
+		g3.append(G3([x1[i],x2[i],x3[i],x4[i]]))
+
+	ax1.plot(t[:len(x1)],g1,'r--',lw=2)
+	ax1.spines['right'].set_visible(False)
+	ax1.spines['top'].set_visible(False)
+	ax1.set_ylabel(r"$g_{2}(\vec{x}(t))$")
+	ax1.set_xlabel("Time (s)")
+
+	ax2.plot(t[:len(x1)],g3,'r:',lw=2)
+	ax2.spines['right'].set_visible(False)
+	ax2.spines['top'].set_visible(False)
+	ax2.set_ylabel(r"$g_{5}(\vec{x}(t))$")
+	ax2.set_xticks(ax1.get_xticks())
+	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	ax3.plot(t[:len(x1)],B,'r',lw=2)
+	ax3.spines['right'].set_visible(False)
+	ax3.spines['top'].set_visible(False)
+	ax3.set_ylabel(r"$2^{nd}$ Coefficient")
+	ax3.set_xticks(ax1.get_xticks())
+	ax3.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	if Return == True:
+		return(fig)
+	else:
+		plt.show()
+def plot_states(t,X,Return=False):
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	NumStates = np.shape(X)[0]
+	NumRows = int(np.ceil(NumStates/5))
+	if NumStates < 5:
+		NumColumns = NumStates
+	else:
+		NumColumns = 5
+
+	ColumnNumber = [el%5 for el in np.arange(0,NumStates,1)]
+	RowNumber = [int(el/5) for el in np.arange(0,NumStates,1)]
+
+	DescriptiveTitle = "Plotting States vs. Time"
+	fig, axes = plt.subplots(NumRows,NumColumns,figsize=(3*NumColumns,2*NumRows + 2))
+	plt.subplots_adjust(top=0.85,hspace=0.4,bottom=0.15,left=0.075,right=0.975)
+	plt.suptitle(r"Plotting $1^{st}$ Coefficient vs. Time",Fontsize=20,y=0.975)
+	if NumStates <=5:
+		for j in range(NumStates):
+			axes[ColumnNumber[j]].spines['right'].set_visible(False)
+			axes[ColumnNumber[j]].spines['top'].set_visible(False)
+			axes[ColumnNumber[j]].plot(t[:np.shape(X)[1]],X[j])
+			if ColumnNumber[j]!=0:
+				axes[ColumnNumber[j]].set_xticklabels(\
+									[""]*len(axes[ColumnNumber[j]].get_xticks()))
+			else:
+				axes[ColumnNumber[j]].set_xlabel("Time (s)")
+			axes[ColumnNumber[j]].set_title(r"$x_{" + str(j+1) + "}$")
+
+	else:
+		for j in range(NumStates):
+			axes[RowNumber[j],ColumnNumber[j]].spines['right'].set_visible(False)
+			axes[RowNumber[j],ColumnNumber[j]].spines['top'].set_visible(False)
+			axes[RowNumber[j],ColumnNumber[j]].plot(t[:np.shape(X)[1]],X[j])
+			if not(RowNumber[j] == RowNumber[-1] and ColumnNumber[j]==0):
+				axes[RowNumber[j],ColumnNumber[j]].set_xticklabels(\
+									[""]*len(axes[RowNumber[j],ColumnNumber[j]].get_xticks()))
+			else:
+				axes[RowNumber[j],ColumnNumber[j]].set_xlabel("Time (s)")
+			axes[RowNumber[j],ColumnNumber[j]].set_title(r"$x_{" + str(j+1) + "}$")
+		if NumStates%5!=0:
+			[fig.delaxes(axes[RowNumber[-1],el]) for el in range(ColumnNumber[-1]+1,5)]
+
+	if Return == True:
+		return(fig)
+	else:
+		plt.show()
+def plot_inputs(t,u1,u2,Return=False):
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	DescriptiveTitle = "Plotting Inputs vs. Time"
+	fig, (ax1,ax2) = plt.subplots(1,2,figsize=(8,5))
+	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
+	plt.suptitle("Plotting Inputs vs. Time",Fontsize=20,y=0.975)
+
+	ax1.plot(t[:len(u1)],u1,'g--',lw=2)
+	ax1.plot([-1,t[len(u1)]+1],[0,0],'k--',lw=0.5)
+	ax1.set_xlim([t[0],t[len(u1)]])
+	ax1.spines['right'].set_visible(False)
+	ax1.spines['top'].set_visible(False)
+	ax1.set_ylabel(r"$u_1$")
+	ax1.set_xlabel("Time (s)")
+
+	ax2.plot(t[:len(u2)],u2,'g',lw=2)
+	ax2.plot([-1,t[len(u2)]+1],[0,0],'k--',lw=0.5)
+	ax2.set_xlim([t[0],t[len(u1)]])
+	ax2.spines['right'].set_visible(False)
+	ax2.spines['top'].set_visible(False)
+	ax2.set_ylabel(r"$u_2$")
+	ax2.set_xticks(ax1.get_xticks())
+	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	if Return == True:
+		return(fig)
+	else:
+		plt.show()
 x1_1,x2_1 = [Base],[Amp*Freq]
 u1_1,u2_1 = [100],[10]
 
@@ -722,48 +1225,6 @@ for t in Time[1:]:
 	update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray)
 	update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray)
 	statusbar(int(t/dt),len(Time),StartTime=StartTime,Title="T Driven Pendulum")
-
-def plot_MA_values(Time,x1):
-	import matplotlib.pyplot as plt
-	import numpy as np
-
-	fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2,figsize=(8,6))
-	plt.subplots_adjust(hspace=0.1,bottom=0.1)
-
-	plt.suptitle("Moment arm equations")
-	ax1.plot(np.linspace(0,np.pi*(160/180),1001),\
-				np.array(list(map(lambda x1: G1([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
-				'0.70')
-	ax1.plot(np.linspace(min(x1),max(x1),101),\
-				np.array(list(map(lambda x1: G1([x1]),np.linspace(min(x1),max(x1),101)))),\
-				'g',lw=3)
-	ax1.set_xticks([0,np.pi/4,np.pi/2,3*np.pi/4,np.pi])
-	ax1.set_xticklabels([""]*len(ax1.get_xticks()))
-	ax1.set_ylabel("Moment Arm for\n Muscle 1 (m)")
-
-	ax2.plot(Time,np.array(list(map(lambda x1: G1([x1]),x1))),'g')
-	ax2.set_ylim(ax1.get_ylim())
-	ax2.set_yticks(ax1.get_yticks())
-	ax2.set_yticklabels([""]*len(ax1.get_yticks()))
-	ax2.set_xticklabels([""]*len(ax2.get_xticks()))
-
-	ax3.plot(np.linspace(0,np.pi*(160/180),1001),\
-				np.array(list(map(lambda x1: G2([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
-				'0.70')
-	ax3.plot(np.linspace(min(x1),max(x1),101),\
-				np.array(list(map(lambda x1: G2([x1]),np.linspace(min(x1),max(x1),101)))),\
-				'r',lw=3)
-	ax3.set_xticks([0,np.pi/4,np.pi/2,3*np.pi/4,np.pi])
-	ax3.set_xticklabels([r"$0$",r"$\frac{\pi}{4}$",r"$\frac{\pi}{2}$",r"$\frac{3\pi}{4}$",r"$\pi$"])
-	ax3.set_xlabel("Joint Angle (rads)")
-	ax3.set_ylabel("Moment Arm for\n Muscle 2 (m)")
-
-	ax4.plot(Time,np.array(list(map(lambda x1: G2([x1]),x1))),'r')
-	ax4.set_ylim(ax3.get_ylim())
-	ax4.set_yticks(ax3.get_yticks())
-	ax4.set_yticklabels([""]*len(ax3.get_yticks()))
-	ax4.set_xlabel("Time (s)")
-	return(fig,[ax1,ax2,ax3,ax4])
 
 fig1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time,x1_1)
 fig2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time,x1_2)
