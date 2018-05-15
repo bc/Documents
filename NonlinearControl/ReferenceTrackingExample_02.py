@@ -265,8 +265,8 @@ lo1 = AllMuscleSettings["BIC"]["Optimal Muscle Length"]/1000
 lo2 = AllMuscleSettings["TRI"]["Optimal Muscle Length"]/1000
 
 ######### NEED OPTIMAL TENDON LENGTHS FOR BIC/TRI #########
-lTo1 = (0.2)*AllMuscleSettings["BIC"]["Optimal Muscle Length"]/1000
-lTo2 = (0.2)*AllMuscleSettings["TRI"]["Optimal Muscle Length"]/1000
+lTo1 = (1)*AllMuscleSettings["BIC"]["Optimal Muscle Length"]/1000
+lTo2 = (1)*AllMuscleSettings["TRI"]["Optimal Muscle Length"]/1000
 ###########################################################
 
 [[r1,r2],[dr1,dr2],_]= return_MA_matrix_functions(AllMuscleSettings)
@@ -279,7 +279,7 @@ Amp = 7.5*np.pi/180
 Base = 90*np.pi/180
 Freq = 2*np.pi
 
-k1,k2,k3,k4 = 100,100,100,100
+k1,k2,k3,k4 = 100,100,10,100
 
 MaxStep_Tension = 0.01 # percentage of positive maximum.
 Tension_Bounds = [[0,F_MAX1],[0,0.10*F_MAX2]]
@@ -310,27 +310,27 @@ g_{6} &= \text{sgn}\left(-r_2(\theta)\right)\cdot\dot{\theta}\cdot\sqrt{\left(\f
 
 '''
 
-R1 = lambdify([θ_EFE],r1.subs([(θ_PS,np.pi/2)]))
-R2 = lambdify([θ_EFE],r2.subs([(θ_PS,np.pi/2)]))
-dR1_dθ = lambdify([θ_EFE],dr1.subs([(θ_PS,np.pi/2)]))
-dR2_dθ = lambdify([θ_EFE],dr2.subs([(θ_PS,np.pi/2)]))
+r1 = lambdify([θ_EFE],r1.subs([(θ_PS,np.pi/2)]))
+r2 = lambdify([θ_EFE],r2.subs([(θ_PS,np.pi/2)]))
+dr1_dθ = lambdify([θ_EFE],dr1.subs([(θ_PS,np.pi/2)]))
+dr2_dθ = lambdify([θ_EFE],dr2.subs([(θ_PS,np.pi/2)]))
 
-def G1(X):
-	return(R1(X[0])) #
-def dG1(X):
-	return(dR1_dθ(X[0]))
-def G2(X):
-	return(R2(X[0])) #
-def dG2(X):
-	return(dR2_dθ(X[0]))
-def G3(X):
+def R1(X):
+	return(r1(X[0])) #
+def dR1_dx1(X):
+	return(dr1_dθ(X[0]))
+def R2(X):
+	return(r2(X[0])) #
+def dR2_dx1(X):
+	return(dr2_dθ(X[0]))
+def KT_1(X):
 	return((F_MAX1*cT/lTo1)*(1-np.exp(-X[2]/(F_MAX1*cT*kT)))) # NOT NORMALIZED (in N/m)
-def G4(X):
-	return(np.sign(-G1(X))*X[1]*np.sqrt(dG1(X)**2 + G1(X)**2)) # NOT NORMALIZED (in m/s)
-def G5(X):
+def v_MTU1(X):
+	return(np.sign(-R1(X))*X[1]*np.sqrt(dR1_dx1(X)**2 + R1(X)**2)) # NOT NORMALIZED (in m/s)
+def KT_2(X):
 	return((F_MAX2*cT/lTo2)*(1-np.exp(-X[3]/(F_MAX2*cT*kT)))) # NOT NORMALIZED (in N/m)
-def G6(X):
-	return(np.sign(-G2(X))*X[1]*np.sqrt(dG2(X)**2 + G2(X)**2)) # NOT NORMALIZED (in m/s)
+def v_MTU2(X):
+	return(np.sign(-R2(X))*X[1]*np.sqrt(dR2_dx1(X)**2 + R2(X)**2)) # NOT NORMALIZED (in m/s)
 
 """
 ################################
@@ -338,7 +338,7 @@ def G6(X):
 ################################
 
 \dot{x}_1 &= x_{2} \\
-\dot{x}_2 &= c_{1}\sin(x_{1}) + c_{2}g_{1}u_{1} - c_{2}g_{2}u_{2} \\
+\dot{x}_2 &= c_{1}\sin(x_{1}) + c_{2}R_{1}u_{1} - c_{2}R_{2}u_{2} \\
 u_1 &= T_{1} \\
 u_2 &= T_{2} \\
 
@@ -347,9 +347,9 @@ u_2 &= T_{2} \\
 ################################
 
 \dot{x}_1 &= x_{2} \\
-\dot{x}_2 &= c_{1}\sin(x_{1}) + c_{2}g_{1}x_{3} - c_{2}g_{2}x_{4} \\
-\dot{x}_3 &= g_{3}(g_{4} - c_{3}u_1) \\
-\dot{x}_4 &= g_{5}(g_{6} - c_{4}u_2) \\
+\dot{x}_2 &= c_{1}\sin(x_{1}) + c_{2}R_{1}x_{3} - c_{2}R_{2}x_{4} \\
+\dot{x}_3 &= K_{T,1}(v_{MTU,1} - c_{3}u_1) \\
+\dot{x}_4 &= K_{T,2}(v_{MTU,2} - c_{4}u_2) \\
 u_1 &= \dot{l}_{m,1} \\
 u_2 &= \dot{l}_{m,2} \\
 
@@ -359,19 +359,19 @@ def dX1_dt(X):
 	return(X[1])
 def dX2_dt(X,U=None):
 	if U==None:
-		return(c1*np.sin(X[0]) + c2*G1(X)*X[2] + c2*G2(X)*X[3])
+		return(c1*np.sin(X[0]) + c2*R1(X)*X[2] + c2*R2(X)*X[3])
 	else:
-		return(c1*np.sin(X[0]) + c2*G1(X)*U[0] + c2*G2(X)*U[1])
+		return(c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1])
 def dX3_dt(X,U=None):
 	if U == None:
-		return(G3(X)*(G4(X) - c3*X[6]))
+		return(KT_1(X)*(v_MTU1(X) - c3*X[6]))
 	else:
-		return(G3(X)*(G4(X) - c3*U[0]))
+		return(KT_1(X)*(v_MTU1(X) - c3*U[0]))
 def dX4_dt(X,U=None):
 	if U == None:
-		return(G5(X)*(G6(X) - c4*X[7]))
+		return(KT_2(X)*(v_MTU2(X) - c4*X[7]))
 	else:
-		return(G5(X)*(G6(X) - c4*U[1]))
+		return(KT_2(X)*(v_MTU2(X) - c4*U[1]))
 
 r = lambda t: Amp*np.sin(Freq*t) + Base
 dr = lambda t: Amp*Freq*np.cos(Freq*t)
@@ -391,12 +391,12 @@ def return_constraint_variables_tension_driven(t,X):
 		return(X[1] - A1(t,X))
 	"""
 	def dZ2(t,X,U):
-		return(c1*np.sin(X[0]) + c2*G1(X)*U[0] + c2*G2(X)*U[1] - dA1(t,X))
+		return(c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1] - dA1(t,X))
 	"""
 	def A2(t,X):
 		return(Z1(t,X) + dA1(t,X) - c1*np.sin(X[0]) - k2*Z2(t,X))
-	Coefficient1 = c2*G1(X)
-	Coefficient2 = c2*G2(X)
+	Coefficient1 = c2*R1(X)
+	Coefficient2 = c2*R2(X)
 	Constraint = A2(t,X)
 	return(Coefficient1,Coefficient2,Constraint)
 def return_constraint_variables_muscle_velocity_driven(t,X):
@@ -421,22 +421,22 @@ def return_constraint_variables_muscle_velocity_driven(t,X):
 	def dA2(t,X):
 		return(dZ1(t,X) + d2A1(t,X) - c1*np.cos(X[0])*dX1_dt(X) - k2*dZ2(t,X))
 	def Z3(t,X):
-		return(c2*G1(X)*X[2] + c2*G2(X)*X[3] - A2(t,X))
+		return(c2*R1(X)*X[2] + c2*R2(X)*X[3] - A2(t,X))
 	def dZ3(t,X):
-		g1 = G1(X)
-		g2 = G2(X)
-		g3 = G3(X)
-		g5 = G5(X)
-		return(c2*dG1(X)*X[1]*X[2] + c2*dG2(X)*X[1]*X[3] \
-						+ c2*g1*g3*G4(X) - c2*c3*g1*g3*U[0] \
-							+ c2*g2*g5*G6(X) - c2*c4*g2*g5*U[1] \
+		g1 = R1(X)
+		g2 = R2(X)
+		g3 = KT_1(X)
+		g5 = KT_2(X)
+		return(c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
+						+ c2*g1*g3*v_MTU1(X) - c2*c3*g1*g3*U[0] \
+							+ c2*g2*g5*v_MTU2(X) - c2*c4*g2*g5*U[1] \
 								- dA2(t,X))
 	def A3(t,X):
 		return(Z2(t,X) - dA2(t,X) + k3*Z3(t,X) \
-		+ c2*dG1(X)*X[1]*X[2] + 	c2*dG2(X)*X[1]*X[3] \
-				+ c2*G1(X)*G3(X)*G4(X) + c2*G2(X)*G5(X)*G6(X))
-	Coefficient1 = c2*c3*G1(X)*G3(X)
-	Coefficient2 = c2*c4*G2(X)*G5(X)
+		+ c2*dR1_dx1(X)*X[1]*X[2] + 	c2*dR2_dx1(X)*X[1]*X[3] \
+				+ c2*R1(X)*KT_1(X)*v_MTU1(X) + c2*R2(X)*KT_2(X)*v_MTU2(X))
+	Coefficient1 = c2*c3*R1(X)*KT_1(X)
+	Coefficient2 = c2*c4*R2(X)*KT_2(X)
 	Constraint = A3(t,X)
 	return(Coefficient1,Coefficient2,Constraint)
 def return_U_tension_driven(t,X,U,dt,MaxStep,Bounds,Noise):
@@ -644,7 +644,6 @@ def return_U_muscle_velocity_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
 	return([u1,u2])
-
 def plot_MA_values(Time,x1):
 	import matplotlib.pyplot as plt
 	import numpy as np
@@ -654,33 +653,33 @@ def plot_MA_values(Time,x1):
 
 	plt.suptitle("Moment arm equations")
 	ax1.plot(np.linspace(0,np.pi*(160/180),1001),\
-				np.array(list(map(lambda x1: G1([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
+				np.array(list(map(lambda x1: R1([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
 				'0.70')
 	ax1.plot(np.linspace(min(x1),max(x1),101),\
-				np.array(list(map(lambda x1: G1([x1]),np.linspace(min(x1),max(x1),101)))),\
+				np.array(list(map(lambda x1: R1([x1]),np.linspace(min(x1),max(x1),101)))),\
 				'g',lw=3)
 	ax1.set_xticks([0,np.pi/4,np.pi/2,3*np.pi/4,np.pi])
 	ax1.set_xticklabels([""]*len(ax1.get_xticks()))
 	ax1.set_ylabel("Moment Arm for\n Muscle 1 (m)")
 
-	ax2.plot(Time,np.array(list(map(lambda x1: G1([x1]),x1))),'g')
+	ax2.plot(Time,np.array(list(map(lambda x1: R1([x1]),x1))),'g')
 	ax2.set_ylim(ax1.get_ylim())
 	ax2.set_yticks(ax1.get_yticks())
 	ax2.set_yticklabels([""]*len(ax1.get_yticks()))
 	ax2.set_xticklabels([""]*len(ax2.get_xticks()))
 
 	ax3.plot(np.linspace(0,np.pi*(160/180),1001),\
-				np.array(list(map(lambda x1: G2([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
+				np.array(list(map(lambda x1: R2([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
 				'0.70')
 	ax3.plot(np.linspace(min(x1),max(x1),101),\
-				np.array(list(map(lambda x1: G2([x1]),np.linspace(min(x1),max(x1),101)))),\
+				np.array(list(map(lambda x1: R2([x1]),np.linspace(min(x1),max(x1),101)))),\
 				'r',lw=3)
 	ax3.set_xticks([0,np.pi/4,np.pi/2,3*np.pi/4,np.pi])
 	ax3.set_xticklabels([r"$0$",r"$\frac{\pi}{4}$",r"$\frac{\pi}{2}$",r"$\frac{3\pi}{4}$",r"$\pi$"])
 	ax3.set_xlabel("Joint Angle (rads)")
 	ax3.set_ylabel("Moment Arm for\n Muscle 2 (m)")
 
-	ax4.plot(Time,np.array(list(map(lambda x1: G2([x1]),x1))),'r')
+	ax4.plot(Time,np.array(list(map(lambda x1: R2([x1]),x1))),'r')
 	ax4.set_ylim(ax3.get_ylim())
 	ax4.set_yticks(ax3.get_yticks())
 	ax4.set_yticklabels([""]*len(ax3.get_yticks()))
@@ -1025,23 +1024,23 @@ def plot_individual_coefficient2_versus_time_test_2(t,x1,x2,x3,x4,Return = False
 	plt.suptitle(r"Plotting $2^{nd}$ Coefficient vs. Time",Fontsize=20,y=0.975)
 
 	"""
-	B = c2⋅c4⋅G2(X)⋅G5(X)
+	B = c2⋅c4⋅R2(X)⋅KT_2(X)
 	"""
 
-	g2,g5,B = [],[],[]
+	r2,kt_2,B = [],[],[]
 	for i in range(len(x1)):
 		_,Coefficient2,_ = return_constraint_variables_muscle_velocity_driven(t[i],[x1[i],x2[i],x3[i],x4[i]])
 		B.append(Coefficient2)
-		g2.append(G2([x1[i],x2[i],x3[i],x4[i]]))
-		g5.append(G5([x1[i],x2[i],x3[i],x4[i]]))
+		r2.append(R2([x1[i],x2[i],x3[i],x4[i]]))
+		kt_2.append(G5([x1[i],x2[i],x3[i],x4[i]]))
 
-	ax1.plot(t[:len(x1)],g2,'b--',lw=2)
+	ax1.plot(t[:len(x1)],r2,'b--',lw=2)
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_ylabel(r"$g_{2}(\vec{x}(t))$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(x1)],g5,'b:',lw=2)
+	ax2.plot(t[:len(x1)],kt_2,'b:',lw=2)
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
 	ax2.set_ylabel(r"$g_{5}(\vec{x}(t))$")
@@ -1069,23 +1068,23 @@ def plot_individual_coefficient1_versus_time_test_2(t,x1,x2,x3,x4,Return = False
 	plt.suptitle(r"Plotting $1^{st}$ Coefficient vs. Time",Fontsize=20,y=0.975)
 
 	"""
-	A = c2⋅c3⋅G1(X)⋅G3(X)
+	A = c2⋅c3⋅R1(X)⋅KT_1(X)
 	"""
 
-	g1,g3,B = [],[],[]
+	r1,kt_1,B = [],[],[]
 	for i in range(len(x1)):
 		Coefficient1,_,_ = return_constraint_variables_muscle_velocity_driven(t[i],[x1[i],x2[i],x3[i],x4[i]])
 		B.append(Coefficient1)
-		g1.append(G1([x1[i],x2[i],x3[i],x4[i]]))
-		g3.append(G3([x1[i],x2[i],x3[i],x4[i]]))
+		r1.append(R1([x1[i],x2[i],x3[i],x4[i]]))
+		kt_1.append(KT_1([x1[i],x2[i],x3[i],x4[i]]))
 
-	ax1.plot(t[:len(x1)],g1,'r--',lw=2)
+	ax1.plot(t[:len(x1)],r1,'r--',lw=2)
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_ylabel(r"$g_{2}(\vec{x}(t))$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(x1)],g3,'r:',lw=2)
+	ax2.plot(t[:len(x1)],kt_1,'r:',lw=2)
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
 	ax2.set_ylabel(r"$g_{5}(\vec{x}(t))$")
@@ -1224,7 +1223,7 @@ StartTime = time.time()
 for t in Time[1:]:
 	update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray)
 	update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray)
-	statusbar(int(t/dt),len(Time),StartTime=StartTime,Title="T Driven Pendulum")
+	statusbar(int(t/dt),len(Time),StartTime=StartTime,Title="Forced-Pendulum")
 
 fig1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time,x1_1)
 fig2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time,x1_2)
