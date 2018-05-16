@@ -246,6 +246,21 @@ x_4 &= T_{2} \\
 u_1 &= l_{m,1} \\
 u_2 &= l_{m,2} \\
 
+################################
+###### Activation Driven #######
+################################
+
+x_1 &= \theta \\
+x_2 &= \dot{\theta} \\
+x_3 &= T_{1} \\
+x_4 &= T_{2} \\
+x_5 &= l_{m,1} \\
+x_6 &= l_{m,2} \\
+x_7 &= v_{m,1} \\
+x_8 &= v_{m,2} \\
+u_1 &= \alpha_1 \\
+u_2 &= \alpha_2 \\
+
 """
 
 N = 20001
@@ -256,11 +271,37 @@ AllMuscleSettings = return_muscle_settings()
 
 g,L = 9.80, 0.45 #m/s², m
 M = 2 # kg
+
 α1 = 0 # 10*np.pi/180 # rads
 α2 = 0 # 10*np.pi/180 # rads
+
+m1 = 1 # kg
+m2 = 1 # kg
+
+bm1 = 1 # kg/s
+bm2 = 1 # kg/s
+
 cT = 27.8
 kT = 0.0047
 LrT = 0.964
+
+β = 1.55
+ω = 0.75
+ρ = 2.12
+
+V_max = -9.15
+cv0 = -5.78
+cv1 = 9.18
+av0 = -1.53
+av1 = 0
+av2 = 0
+bv = 0.69
+
+c_1 = 23.0
+k_1 = 0.046
+Lr1 = 1.17
+η = 0.01
+
 lo1 = AllMuscleSettings["BIC"]["Optimal Muscle Length"]/1000
 lo2 = AllMuscleSettings["TRI"]["Optimal Muscle Length"]/1000
 
@@ -269,7 +310,7 @@ lTo1 = (1)*AllMuscleSettings["BIC"]["Optimal Muscle Length"]/1000
 lTo2 = (1)*AllMuscleSettings["TRI"]["Optimal Muscle Length"]/1000
 ###########################################################
 
-[[r1,r2],[dr1,dr2],_]= return_MA_matrix_functions(AllMuscleSettings)
+[[r1,r2],[dr1,dr2],[d2r1,d2r2]]= return_MA_matrix_functions(AllMuscleSettings)
 PCSA1 = 30**2*np.pi # mm²
 PCSA2 = 30**2*np.pi # mm²
 F_MAX1 = 0.25*PCSA1
@@ -287,10 +328,22 @@ Tension_Bounds = [[0,F_MAX1],[0,0.10*F_MAX2]]
 MaxStep_MuscleVelocity = 5 # percentage of positive maximum.
 MuscleVelocity_Bounds =[[-2*lo1,2*lo1],[-0.2*lo2,0.2*lo2]]
 
+MaxStep_Activation = 0.1 # percentage of positive maximum (1)
+Activation_Bounds = [[0,1],[0,1]]
 
 """
 c_{1} &= -\frac{3g}{2L} \\
 c_{2} &= \frac{3}{ML^2} \\
+c_{3} &= \cos(\rho_1) \\
+c_{4} &= \cos(\rho_2)
+c_{5} &= \frac{\cos(\alpha_{1})}{m_1} \\
+c_{6} &= \frac{\cos^2(\alpha_{1})}{m_1} \\
+c_{7} &= \frac{b_{m,1}\cos^2(\alpha_{1})}{m_1} \\
+c_{8} &= \tan^2(\alpha_{1}) \\
+c_{9} &= \frac{\cos(\alpha_{2})}{m_2} \\
+c_{10} &= \frac{\cos^2(\alpha_{2})}{m_2} \\
+c_{11} &= \frac{b_{m,2}\cos^2(\alpha_{2})}{m_2} \\
+c_{12} &= \tan^2(\alpha_{2}) \\
 
 """
 
@@ -298,39 +351,65 @@ c1 = -(3*g)/(2*L)
 c2 = 3/(M*L**2)
 c3 = np.cos(α1)
 c4 = np.cos(α2)
-
+c5 = np.cos(α1)/m1
+c6 = F_MAX1*np.cos(α1)**2/m1
+c7 = F_MAX1*bm1*np.cos(α1)**2/(m1*lo1)
+c8 = np.tan(α1)**2
+c9 = np.cos(α2)/m2
+c10 = F_MAX2*np.cos(α2)**2/m2
+c11 = F_MAX2*bm2*np.cos(α2)**2/(m2*lo2)
+c12 = np.tan(α2)**2
 
 '''
-g_{1} &= r_{1}\left(\theta,\theta_{PS}=\frac{\pi}{2}\right) \\
-g_{2} &= r_{2}\left(\theta,\theta_{PS}=\frac{\pi}{2}\right)  \\
-g_{3} &= \frac{F_{\text{MAX},1}c^{T}}{l_{T,o,1}}\left(1 - \exp{\left(\frac{-T_1}{F_{\text{MAX},1}c^{T}k^{T}}\right)}\right) \hspace{1em} \text{(Variable stiffness coefficient from Zajac (1989) ODE for tendon force)} \\
-g_{4} &= \text{sgn}\left(-r_1(\theta)\right)\cdot\dot{\theta}\cdot\sqrt{\left(\frac{\partial r_1}{\partial\theta}\right)^2 + r_1^2(\theta)} \\
-g_{5} &= \frac{F_{\text{MAX},2}c^{T}}{l_{T,o,2}}\left(1 - \exp{\left(\frac{-T_2}{F_{\text{MAX},2}c^{T}k^{T}}\right)}\right) \hspace{1em} \text{(Variable stiffness coefficient from Zajac (1989) ODE for tendon force)} \\
-g_{6} &= \text{sgn}\left(-r_2(\theta)\right)\cdot\dot{\theta}\cdot\sqrt{\left(\frac{\partial r_2}{\partial\theta}\right)^2 + r_2^2(\theta)} \\
-
+R_{1} &= r_{1}\left(\theta,\theta_{PS}=\frac{\pi}{2}\right) \\
+R_{2} &= r_{2}\left(\theta,\theta_{PS}=\frac{\pi}{2}\right)  \\
+K_{T,1} &= \frac{F_{max,1}c^{T}}{l_{T,o,1}}\left(1 - \exp{\left(\frac{-T_1}{F_{max,1}c^{T}k^{T}}\right)}\right) \hspace{1em} \text{(Variable stiffness coefficient from Zajac (1989) ODE for tendon force)} \\
+v_{MTU,1} &= \text{sgn}\left(-r_1(\theta)\right)\cdot\dot{\theta}\cdot\sqrt{\left(\frac{\partial r_1}{\partial\theta}\right)^2 + r_1^2(\theta)} \\
+K_{T,2} &= \frac{F_{max,2}c^{T}}{l_{T,o,2}}\left(1 - \exp{\left(\frac{-T_2}{F_{max,2}c^{T}k^{T}}\right)}\right) \hspace{1em} \text{(Variable stiffness coefficient from Zajac (1989) ODE for tendon force)} \\
+v_{MTU,2} &= \text{sgn}\left(-r_2(\theta)\right)\cdot\dot{\theta}\cdot\sqrt{\left(\frac{\partial r_2}{\partial\theta}\right)^2 + r_2^2(\theta)} \\
+F_{LV,1} &= f_{L,1}(l_{m,1}) \cdot f_{V,1}(l_{m,1},v_{m,1}) \\
+F_{LV,2} &= f_{L,2}(l_{m,2}) \cdot f_{V,2}(l_{m,2},v_{m,2}) \\
 '''
 
 r1 = lambdify([θ_EFE],r1.subs([(θ_PS,np.pi/2)]))
 r2 = lambdify([θ_EFE],r2.subs([(θ_PS,np.pi/2)]))
 dr1_dθ = lambdify([θ_EFE],dr1.subs([(θ_PS,np.pi/2)]))
 dr2_dθ = lambdify([θ_EFE],dr2.subs([(θ_PS,np.pi/2)]))
+d2r1_dθ2 = lambdify([θ_EFE],d2r1.subs([(θ_PS,np.pi/2)]))
+d2r2_dθ2 = lambdify([θ_EFE],d2r2.subs([(θ_PS,np.pi/2)]))
+# FL = lambda l,lo: 1
+# FV = lambda l,v,lo: 1
+FL = lambda l,lo: np.exp(-abs(((l/lo)**β-1)/ω)**ρ)
+FV = lambda l,v,lo: np.piecewise(v,[v<=0, v>0],\
+	[lambda v: (V_max - v/lo)/(V_max + (cv0 + cv1*(l/lo))*(v/lo)),\
+	lambda v: (bv-(av0 + av1*(l/lo) + av2*(l/lo)**2)*(v/lo))/(bv + (v/lo))])
 
 def R1(X):
 	return(r1(X[0])) #
 def dR1_dx1(X):
 	return(dr1_dθ(X[0]))
+def d2R1_dx12(X):
+	return(d2r1_dθ2(X[0]))
 def R2(X):
 	return(r2(X[0])) #
 def dR2_dx1(X):
 	return(dr2_dθ(X[0]))
+def d2R2_dx12(X):
+	return(d2r2_dθ2(X[0]))
 def KT_1(X):
 	return((F_MAX1*cT/lTo1)*(1-np.exp(-X[2]/(F_MAX1*cT*kT)))) # NOT NORMALIZED (in N/m)
+def dKT_1_dx3(X):
+	return(1/(kT*lTo1)*np.exp(-X[2]/(F_MAX1*cT*kT))) # NOT NORMALIZED (in N/m)
 def v_MTU1(X):
 	return(np.sign(-R1(X))*X[1]*np.sqrt(dR1_dx1(X)**2 + R1(X)**2)) # NOT NORMALIZED (in m/s)
 def KT_2(X):
 	return((F_MAX2*cT/lTo2)*(1-np.exp(-X[3]/(F_MAX2*cT*kT)))) # NOT NORMALIZED (in N/m)
 def v_MTU2(X):
 	return(np.sign(-R2(X))*X[1]*np.sqrt(dR2_dx1(X)**2 + R2(X)**2)) # NOT NORMALIZED (in m/s)
+def FLV_1(X):
+	return(FL(X[4],lo1)*FV(X[4],X[6],lo1))
+def FLV_2(X):
+	return(FL(X[5],lo2)*FV(X[5],X[7],lo2))
 
 """
 ################################
