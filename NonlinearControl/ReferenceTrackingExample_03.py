@@ -347,7 +347,7 @@ def d2G2(X):
 def G3(X):
 	return((cT*F_MAX1/lo1)*(1-np.exp(-X[2]/(cT*kT)))) # Maybe its negative because of theta sign convention
 def dG3(X):
-	return(F_MAX1*np.exp(-X[2]/(cT*kT))/(kT*lo1))
+	return(np.exp(-X[2]/(cT*kT))/(kT*lo1))
 def G4(X):
 	return(np.sign(-G1(X))*X[1]*np.sqrt(dG1(X)**2 + G1(X)**2)/lo1) # Should be G5
 def dG4_dt(X):
@@ -356,7 +356,7 @@ def dG4_dt(X):
 def G5(X):
 	return((cT*F_MAX2/lo2)*(1-np.exp(-X[3]/(cT*kT))))
 def dG5(X):
-	return(F_MAX2*np.exp(-X[3]/(cT*kT))/(kT*lo2))
+	return(np.exp(-X[3]/(cT*kT))/(kT*lo2))
 def G6(X):
 	return(np.sign(-G2(X))*X[1]*np.sqrt(dG2(X)**2 + G2(X)**2)/lo2) # Should be G4
 def dG6_dt(X):
