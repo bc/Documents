@@ -4,11 +4,584 @@ import matplotlib.pyplot as plt
 import sympy as sy
 from sympy.utilities import lambdify
 import time
+# class muscle_settings:
+# 	"""
+# 	Initiate a class variable muscle_settings that has all available muscle settings, as well as their sources.
+#
+# 	pp_func()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	Takes in X array and outputs the piecewise polynomial associated with this spline.
+#
+# 	pp_deriv()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	Takes in X array and outputs the piecewise polynomial associated with the spline's derivative.
+#
+# 	pp_2deriv()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	Takes in X array and outputs the piecewise polynomial associated with the spline's second derivative.
+#
+# 	find_max_and_min()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	Takes in the min and max values for both x and y and will find the maximum y values of the piecewise
+# 	polynomial. To do this, first we find the extrema point (find_extrema) by inputing the x values that
+# 	set the derivate of the piecewise polynomial equal to zero (quadratic formula). Next we ensure that
+# 	the zero values are in fact real (is_real). We then filter out the zeros that are not in the
+# 	appropriate domains (is_in_appropriate_domain). To see if these values are maximum or minimum, we
+# 	plug them back into the second derivative of the appropriate piecewise polynomial (second_deriv_is_neg()
+# 	and second_deriv_is_pos(), respectively). Finally we determine the y value of these extrema by using
+# 	the class function self.pp_func().
+#
+# 	is_initial_slope_positive()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	This takes in X and will check to make sure that for the first 2500 entries in X, that the derivative
+# 	of the piecewise polynomial (pp_deriv()) will be positive. Make sure that X is at least 2500 in length.
+#
+# 	is_within_bounds()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	This checks to see if the maximum maximum value and the minimum mininum value calculated above will fall between y_min and y_max. This makes use of self.find_max_and_min()
+#
+# 	print_func()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	This function uses pprint() to return a printout of the piecewise polynomial f(x).
+#
+# 	return_parameterized_X()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	This function will return the parameterized x(t) and y(t) that follows path S along the curve y=f(x) subject to some tangential velocity profile dS/dt. This utilizes scipy.integrate.odeint to solve the time derivative to the path length function S = ∫(dx_dt)√(1 + f'(x)²)dt.
+#
+# 	return_parameterized_dX()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	This function takes in x(t) and returns dx/dt and dy/dt derived from the relationship of arc length S, its time derivative dS/dt, and the path f(x(t)) and its derivative with respect to x.
+#
+# 	return_parameterized_d2X()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	This function takes in x(t) and dx/dt and returns d²x/dt² and d²y/dt² derived from the relationship of arc length S, its first and second time derivatives, dS/dt and d²S/dt², respectively, and the path f(x(t)) and its first and second derivatives with respect to x.
+#
+# 	find_path_length()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	Calculates the path length of the curve y=f(x) from S = ∫(dx_dt)√(1 + f'(x)²)dt. This is needed in order to describe the minimum jerk criterion tangential velocity equation, dS/dt.
+#
+# 	dS_dt()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	Returns the minimum jerk criterion tangential velocity equation, dS/dt, given by:
+#
+# 							dS/dt = S*(30t² - 60t³ + 30t⁴)
+#
+# 	Where S is found from S = self.find_path_length()
+#
+# 	d2S_dt2()
+# 	~~~~~~~~~~~~~~~~~~~
+#
+# 	Returns the minimum jerk criterion for acceleration along the path S, d²S/dt², given by:
+#
+# 							d²S/dt² = S*(60t - 180t² + 120t³)
+#
+# 	where S is found from S = self.find_path_length()
+#
+# 	"""
+# 	PC_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : [50.80,0,0,0,0,0],\
+# 			'Source' : 'Pigeon', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' :  295.6, \
+# 		'Actual No' : 450, \
+# 		'Corrected No' : 389.7, \
+# 		'Relative Abundance' : 1.2,\
+# 		'Optimal Muscle Length' : 150, \
+# 		'PCSA' : (36.20,'Garner & Pandy; 2003','sq cm'), \
+# 		'Maximum Isometric Force': (1175.01,'Garner & Pandy; 2003','N')
+# 		'Group' : 'flexor'}
+# 	def __init__(self,ShoulderSettings,b,c,d,x_initial,x_break,x_final):
+# 		assert len(ShoulderSettings) == 4, "Shoulder settings should be length 4"
+# 		assert ShoulderSettings[1] in [""]
+# 		self.ShoulderSettings = {\
+# 			'MA Coefficients' : ShoulderSettings[0],\
+# 			'Source' : ShoulderSettings[1], \
+# 			'Equation Number' : ShoulderSettings[2], \
+# 			'Threshold' : ShoulderSettings[3], \
+# 			'dof' : 'Shoulder'}
+# 		self.b = b
+# 		self.c = c
+# 		self.d = d
+# 		self.x_initial = x_initial
+# 		self.x_break = x_break
+# 		self.xlim = [x_initial,x_final]
+# 		#self.all_values = {'A': a, 'B' : b, 'C' : c, 'D' : d, 'init' : x_initial, 'break' : x_break}
+# 	def pp_func(self,X):
+# 		import numpy as np
+# 		result = np.piecewise(X,[X <= self.x_break, X > self.x_break], \
+# 			[lambda X: self.a[0] + self.b[0,0,0]*(X-self.x_initial) + self.c[0,0]*(X-self.x_initial)**2 + self.d[0,0,0]*(X-self.x_initial)**3, \
+# 			lambda X: self.a[1] + self.b[1,0,0]*(X-self.x_break) + self.c[1,0]*(X-self.x_break)**2 + self.d[1,0,0]*(X-self.x_break)**3])
+# 		return(result)
+#
+#
+# def return_muscle_settings(PreselectedMuscles=None):
+# 	"""
+# 	Notes:
+# 	Coefficients from observation, Ramsay, FVC, Holtzbaur, Pigeon, Kuechle, or Banks. Optimal Muscle Length given in mm. Optimal tendon/muscle lengths and PCSA were taken from Garner and Pandy (2003)
+#
+# 	BRA (Brachialis) EFE MA for Ramsay has R² = 0.990 whereas Pigeon has R² = 0.9988. Curve appears to be a better fit, as it experiences its smallest MA when Elbow angle = 0. Coefficients and equation number/type are listed below to test either implementation.
+#
+# 	src = 'Ramsay', eq = 1, Coefficients = [16.1991,-16.1463,24.5512,-6.3335,0], threshold = None
+# 	src = 'Pigeon', dof = 'elbow', eq = None, Coefficients = Pigeon_coeff_conversion([5.5492,2.3080,2.3425,-2.0530,0,0]), threshold = None
+#
+# 	BRD (Brachioradialis) for Ramsay has R² = 0.988 whereas Pigeon has R² = 0.9989. Pigeon, however, only takes elbow angle into account, whereas Ramsay takes in variable PS angles. Coefficients and equation number/type are listed below to test either implementation.
+#
+# 	src = 'Ramsay', eq = 2, Coefficients = [15.2564,-11.8355,2.8129,-5.7781,44.8143,0,2.9032,0,0,-13.4956,0,-0.3940,0,0,0,0]
+# 	src = 'Pigeon', dof = 'elbow', eq = None, Coefficients = Pigeon_coeff_conversion([19.490,1.6681,10.084,-6.5171,0,0])
+#
+# 	FCR EFE MA is not listed in Ramsay but Pigeon has a quadratic function with R² = 0.9975. Pigeon only takes elbow angle into account. Coefficients and equation number/type are listed below to test either implementation. EFE MA was estimated to be constant and 10 mm for this muscle. If you use Pigeon, make sure to only accept positive moment arm values, as this model fails outside the ROM. One option is to set the MA to the constant value (i.e., MA[theta>140°] = MA[140°])
+#
+# 	src = 'est', eq = 'constant', Coefficients = [10], clip = None
+# 	src = 'Pigeon', dof = 'elbow', eq = None, Coefficients = Pigeon_coeff_conversion([0.9351,0.5375,-0.3627,0,0,0]),threshold = 2.86
+#
+# 	ECRL EFE MA for Ramsay has R² = 0.978 whereas Pigeon has R² = 0.9986. Pigeon, however, only takes elbow angle into account, whereas Ramsay takes in variable PS angles. Additionally, Pigeon only considers elbow angles between 0 and 140 degrees and exhibits a decrease in MA as elbow angle approaches the upper bound of the ROM. This should (intiutively speaking) make the extensors MA largest, but Pigeon exhibits a drop off that may make it less favorable for movements at the boundary of the ROM. Coefficients and equation number/type are listed below to test either implementation.
+#
+# 	src = 'Ramsay', eq = 2, Coefficients = [-7.7034,16.3913,7.4361,-1.7566,0,-1.3336,0,0.0742,0,0,0,0,0,0,0,0]
+# 	src = 'Pigeon', dof = 'elbow', eq = None, Coefficients = Pigeon_coeff_conversion([4.7304,1.2590,4.4347,-3.0229,0,0])
+#
+# 	ECU EFE MA is not listed in Ramsay but Pigeon has a quadratic function with R² = 0.9966. Pigeon only takes elbow angle into account. Coefficients and equation number/type are listed below to test either implementation. EFE MA was estimated to be constant and -10 mm for this muscle. If you use Pigeon, make sure to only accept negative moment arm values, as this model fails outside the ROM. One option is to set the MA to the constant value (i.e., MA[theta>140°] = MA[140°])
+#
+# 	src = 'est', eq = 'constant', Coefficients = [-10]
+# 	src = 'Pigeon', dof = 'elbow', eq = None, Coefficients = Pigeon_coeff_conversion([-2.1826,-1.7386,1.1491,0,0,0])
+#
+# 	BIC EFE MA for Ramsay has R² = 0.985 whereas Pigeon has R² = 0.9918. Pigeon, however, only takes elbow angle into account, whereas Ramsay takes in variable PS angles. It appears that because Pigeon uses an average of fully pronated and fully supinated MAs, the BIC moment arm is similar but subject to variation as the level of PS is changed. Coefficients and equation number/type are listed below to test either implementation. (NOTE: BIC becomes slightly negative when q2 > 3.021. If trajectory has elbow angles exceding this value, enter a threshold of 3.021 into the model.)
+#
+# 	Additionally, the SFE MA for the BIC is held constant in Pigeon at 29.21 mm while it was estimated as 15 mm.
+#
+# 	src = 'Ramsay', eq = 2, Coefficients = [8.4533,36.6147,2.4777,-19.432,2.0571,0,13.6502,0,0,-5.6172,0,-2.0854,0,0,0,0], threshold = 3.021
+# 	src = 'Pigeon', dof = 'elbow', eq = None, Coefficients = Pigeon_coeff_conversion([14.660,4.5322,1.8047,-2.9883,0,0]), threshold = 2.9326
+#
+# 	TRI EFE MA for Ramsay has R² = 0.997 whereas Pigeon has R² = 0.9904. Pigeon appears to really fail when the elbow angle is greater than 140°. For this reason, Ramsay should be used. However the approach of fixing the MA for values greater than 140° can be adopted for completeness. Coefficients and equation number/type are listed below to test either implementation.
+#
+# 	Additionally, the SFE MA for the TRI is held constant in Pigeon at -25.40 mm while it was estimated as -15 mm.
+#
+# 	src = 'Ramsay', eq = 1, Coefficients = [-24.5454,-8.8691,9.3509,-1.7518,0]
+# 	src = 'Pigeon', dof = 'elbow', eq = None, Coefficients = Pigeon_coeff_conversion([-23.287,-3.0284,12.886,-19.092,13.277,-3.5171])
+#
+# 	DELTa SFE MA is listed as 33.02 mm in Pigeon and estimated as 19 mm. Using Pigeon Coefficients convention, Kuechle (1997) has the DELTp MA for [-140,90] as Pigeon_coeff_conversion([ 1.34293189,  0.20316226, -0.02339031,  0.27807828,  0.,  0.]). This will yield a piecewise function that creates jumps with the new velocity formulation. Instead, we are going to try Pigeon_coeff_conversion([ 1.27928795,  0.20480346,  0.08917734,  0.32207214, -0.23928223,  0.]) so that the function is within range and continuous during the ROM. Threshold (pi/2) has been removed for this new MA function.
+#
+# 	DELTp SFE MA is listed as -78.74 mm in Pigeon. Using Pigeon Coefficients convention, Kuechle (1997) has the DELTp MA for [-140,90] as Pigeon_coeff_conversion([ 2.28547177,  0.39721238, -0.33900829, -0.36146546,  0.,  0.]). This will yield a piecewise function that creates jumps with the new velocity formulation. Instead, we are going to try Pigeon_coeff_conversion([-2.38165173, -0.4486164 ,  0.58655808,  0.65003255, -0.82736695,0.20812998]) so that the function is within range and continuous during the ROM. Threshold (pi/2) has been removed for this new MA function.
+#
+# 	PC (Clavicle attachment of Pectoralis) SFE MA is listed as 50.80 mm in Pigeon. APPROX OPTIMAL MUSCLE LENGTH! NEED TO FIND ACTUAL NUMBER. We used the Banks numbers for mass, afferent number, corrected number and relative abundance as the stretch will likely affect the whole muscle.
+#
+# 	CB SFE MA was estimated in Holzbaur (2005) as 20 mm while Bassett (1990) estimates from 7 cadavers the MA to be 36 mm.
+# 	"""
+# 	import sympy as sp
+# 	from sympy.utilities import lambdify
+# 	import numpy as np
+# 	from numpy import pi
+#
+# 	global q1,q2,q_PS
+# 	q1,q2,q_PS = sp.symbols('q1'),sp.symbols('q2'),sp.symbols('q_PS')
+#
+# 	# Coefficients from observation, Ramsay, Pigeon, FVC, Holtzbaur, or Banks.
+# 	# Moment arms are in mm. Mass is in grams. threshold is in radians.
+#
+# 	def Pigeon_coeff_conversion(Coefficients):
+# 		"""
+# 		Takes in Coefficient values from Pigeon (1996) -- which take in angles in degrees -- and coverts them into the properly scaled coefficients for radians, additionally scaled by the magnitude listed in the paper.
+#
+# 		Note that the coefficients listed in Pigeon (1996) are given in decending order (i.e., c₅,c₄,c₃,c₂,c₁,c₀). However to maintain continuity with the equations given in Ramsay (2009), we list coefficients in order of increasing power (i.e., c₀,c₁,c₂,c₃,c₄,c₅).
+# 		"""
+# 		import numpy as np
+# 		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
+# 		assert type(Coefficients)==list, 'Coefficients must be a 6 element list.'
+# 		Rad_Conversion = np.multiply(Coefficients,\
+# 				np.array([1,(180/np.pi),(180/np.pi)**2,(180/np.pi)**3,(180/np.pi)**4,(180/np.pi)**5],dtype = 'float64'))
+# 		new_Coefficients =\
+# 			np.multiply(Rad_Conversion,np.array([1,1e-1,1e-3,1e-5,1e-7,1e-9],dtype='float64'))
+# 		return(new_Coefficients)
+#
+# 	PC_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : [50.80,0,0,0,0,0],\
+# 			'Source' : 'Pigeon', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' :  295.6, \
+# 		'Actual No' : 450, \
+# 		'Corrected No' : 389.7, \
+# 		'Relative Abundance' : 1.2,\
+# 		'Optimal Muscle Length' : 150, \
+# 		'PCSA' : (36.20,'Garner & Pandy; 2003','sq cm'), \
+# 		'Maximum Isometric Force': (1175.01,'Garner & Pandy; 2003','N')
+# 		'Group' : 'flexor'}
+# 	DELTa_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : Pigeon_coeff_conversion([ 12.7928795,  2.0480346,  0.8917734,  3.2207214, -2.3928223,  0.        ]),\
+# 			'Source' : 'Pigeon', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 355.7/3, \
+# 		'Actual No' : 182/3, \
+# 		'Corrected No' : 426.3/3, \
+# 		'Relative Abundance' : 0.43,\
+# 		'Optimal Muscle Length' : 98,\
+# 		'Group' : 'flexor'}
+# 	CB_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 20, \
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 39.8, \
+# 		'Actual No' : 123, \
+# 		'Corrected No' : 147.3, \
+# 		'Relative Abundance' : 0.83,\
+# 		'Optimal Muscle Length' : 93,\
+# 		'Group' : 'flexor'}
+# 	DELTp_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : Pigeon_coeff_conversion([-23.8165173, -4.486164 ,  5.8655808,  6.5003255, -8.2736695,2.0812998]), \
+# 			'Source' : 'Pigeon', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 355.7/3, \
+# 		'Actual No' : 182/3, \
+# 		'Corrected No' : 426.3/3, \
+# 		'Relative Abundance' : 0.43,\
+# 		'Optimal Muscle Length' : 137,\
+# 		'Group' : 'extensor'}
+# 	BIC_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : [29.21,0,0,0,0,0],\
+# 			'Source' : 'Pigeon', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : [8.4533,36.6147,2.4777,-19.432,2.0571,0,13.6502,0,0,-5.6172,0,-2.0854,0,0,0,0],\
+# 			'Source' : 'Ramsay', 'Equation Number' : 2, 'Threshold' : 3.021, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 163.8,\
+# 		'Actual No' : 320,\
+# 		'Corrected No' : 292.6,\
+# 		'Relative Abundance' : 1.1,\
+# 		'Optimal Muscle Length' : 116,\
+# 		'Group' : 'flexor'}
+# 	TRI_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : [-25.40,0,0,0,0,0], \
+# 			'Source' : 'Pigeon', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : [-24.5454,-8.8691,9.3509,-1.7518,0],\
+# 			'Source' : 'Ramsay', 'Equation Number' : 1, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : (94.2+138.4+92.5), \
+# 		'Actual No' : (200+222+98),\
+# 		'Corrected No' : (223.7+269.6+221.8),\
+# 		'Relative Abundance' : (0.89+0.82+0.44)/3,\
+# 		'Optimal Muscle Length' : 134,\
+# 		'Group' : 'extensor'}
+# 	BRA_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : [16.1991,-16.1463,24.5512,-6.3335,0],\
+# 			'Source' : 'Ramsay', 'Equation Number' : 1, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 141,\
+# 		'Actual No' : 256,\
+# 		'Corrected No' : 272.1,\
+# 		'Relative Abundance' : 0.94,\
+# 		'Optimal Muscle Length' : 86,\
+# 		'Group' : 'flexor'}
+# 	BRD_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0, \
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : 	[15.2564,-11.8355,2.8129,-5.7781,44.8143,0,2.9032,0,0,-13.4956,0,-0.3940,0,0,0,0],\
+# 			'Source' : 'Ramsay', 'Equation Number' : 2, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 64.7,\
+# 		'Actual No' : 70,\
+# 		'Corrected No' : 190.2,\
+# 		'Relative Abundance' : 0.37,\
+# 		'Optimal Muscle Length' : 173,\
+# 		'Group' : 'flexor'}
+# 	PRO_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : 	[11.0405,-1.0079,0.3933,-10.4824,-12.1639,-0.4369,36.9174,3.5232,-10.4223,21.2604,-37.2444,10.2666,-11.0060,14.5974,-3.9919,1.7526,-2.0089,0.5460],\
+# 			'Source' : 'Ramsay', 'Equation Number' : 3,'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 38.8, \
+# 		'Actual No' : 187.6, \
+# 		'Corrected No' : 185.5, \
+# 		'Relative Abundance' : 1.3,\
+# 		'Optimal Muscle Length' : 49,\
+# 		'Group' : 'flexor'}
+# 	FCR_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0, \
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : Pigeon_coeff_conversion([0.9351,0.5375,-0.3627,0,0,0]),\
+# 			'Source' : 'Pigeon', 'Equation Number' : None, 'Threshold' : 2.86, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 28.7, \
+# 		'Actual No' : 129, \
+# 		'Corrected No' : 125.7, \
+# 		'Relative Abundance' : 1.0,\
+# 		'Optimal Muscle Length' : 63,\
+# 		'Group' : 'flexor'}
+# 	ECRB_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : [-11.256,17.8548,1.6398,-0.5073,-2.8827,0,-0.0942,0,0,0,0,0,0,0,0,0],\
+# 			'Source' : 'Ramsay', 'Equation Number' : 2, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 32.1, \
+# 		'Actual No' : 102, \
+# 		'Corrected No' : 132.7, \
+# 		'Relative Abundance' : 0.77,\
+# 		'Optimal Muscle Length' : 59,\
+# 		'Group' : 'flexor'}
+# 	ECRL_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : Pigeon_coeff_conversion([4.7304,1.2590,4.4347,-3.0229,0,0]),\
+# 			'Source' : 'Pigeon', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 44.3, \
+# 		'Actual No' : 74, \
+# 		'Corrected No' : 155.2, \
+# 		'Relative Abundance' : 0.48,\
+# 		'Optimal Muscle Length' : 81,\
+# 		'Group' : 'flexor'}
+# 	FCU_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : 5,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 36.5,\
+# 		'Actual No' : 175,\
+# 		'Corrected No' : 141.2,\
+# 		'Relative Abundance' : 1.2,\
+# 		'Optimal Muscle Length' : 51,\
+# 		'Group' : 'flexor'}
+# 	FDS_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : 5,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 95.2,\
+# 		'Actual No' : 356,\
+# 		'Corrected No' : 224.9,\
+# 		'Relative Abundance' : 1.6,\
+# 		'Optimal Muscle Length' : 84,\
+# 		'Group' : 'flexor'}
+# 	PL_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+#
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : 10,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : None, \
+# 		'Actual No' : None, \
+# 		'Corrected No' : None, \
+# 		'Relative Abundance' : None,\
+# 		'Optimal Muscle Length' : 64,\
+# 		'Group' : 'flexor'}
+# 	ECU_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : Pigeon_coeff_conversion([-2.1826,-1.7386,1.1491,0,0,0]),\
+# 			'Source' : 'Pigeon', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 25.2,\
+# 		'Actual No' : 157,\
+# 		'Corrected No' : 118,\
+# 		'Relative Abundance' : 1.3,\
+# 		'Optimal Muscle Length' : 62,\
+# 		'Group' : 'extensor'}
+# 	EDM_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0, \
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : -5, \
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 6.2, \
+# 		'Actual No' : 53, \
+# 		'Corrected No' : 59.8, \
+# 		'Relative Abundance' : 0.89,\
+# 		'Optimal Muscle Length' : 68,\
+# 		'Group' : 'extensor'}
+# 	EDC_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0, \
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : -5,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : 42.8, \
+# 		'Actual No' : 219, \
+# 		'Corrected No' : 152.6, \
+# 		'Relative Abundance' : 1.4,\
+# 		'Optimal Muscle Length' : 70,\
+# 		'Group' : 'extensor'}
+# 	AN_Settings = {\
+# 		'Shoulder' : {\
+# 			'MA Coefficients' : 0,\
+# 			'Source' : 'Est', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Shoulder'}, \
+# 		'Elbow' : {\
+# 			'MA Coefficients' : Pigeon_coeff_conversion([-5.3450,-2.2841e-1,8.4297e-3,-14.329e-5,10.448e-7,-2.736e-9]),\
+# 			'Source' : 'Pigeon', 'Equation Number' : None, 'Threshold' : None, \
+# 			'dof' : 'Elbow'}, \
+# 		'Mass' : None, \
+# 		'Actual No' : None, \
+# 		'Corrected No' : None, \
+# 		'Relative Abundance' : None,\
+# 		'Optimal Muscle Length' : None,\
+# 		'Group' : 'extensor'}
+#
+# 	AllAvailableMuscles =[	"PC", "DELTa", "CB", "DELTp", "BIC", \
+# 							"TRI", "BRA", "BRD", "PRO", "FCR",\
+# 	 						"ECRB", "ECRL", "FCU", "FDS", "PL",\
+# 	  						"ECU", "EDM", "EDC", "AN"]
+# 	AllMuscleSettings = {	'PC': PC_Settings, 'DELTa' : DELTa_Settings, \
+# 							'CB' : CB_Settings, 'DELTp' : DELTp_Settings,\
+# 							'BIC' : BIC_Settings, 'TRI' : TRI_Settings, \
+# 							'BRA' : BRA_Settings, 'BRD' : BRD_Settings, \
+# 							'PRO' : PRO_Settings, 'FCR' : FCR_Settings, \
+# 							'ECRB' : ECRB_Settings, 'ECRL' : ECRL_Settings, \
+# 							'FCU' : FCU_Settings, 'FDS' : FDS_Settings, \
+# 							'PL' : PL_Settings,'ECU' : ECU_Settings, \
+# 							'EDM' : EDM_Settings, 'EDC' : EDC_Settings,\
+# 							'AN' : AN_Settings}
+# 	if PreselectedMuscles==None:
+# 		ValidResponse_1 = False
+# 		while ValidResponse_1 == False:
+# 			MuscleSelectionType = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMuscle Selection:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Default\n (2) - Custom\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
+# 			# import ipdb; ipdb.set_trace()
+# 			print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+# 			if MuscleSelectionType not in ['1','2','']:
+# 				print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please try again.')
+# 				ValidResponse_1 = False
+# 			elif MuscleSelectionType == '' or MuscleSelectionType == '1':
+# 				for Muscle in ["PRO","AN"]:
+# 					del(AllMuscleSettings[Muscle])
+# 				ValidResponse_1 = True
+# 			elif MuscleSelectionType == '2':
+# 				ValidResponse_2 = False
+# 				while ValidResponse_2 == False:
+# 					MuscleListString = ""
+# 					for i in range(len(AllAvailableMuscles)):
+# 						MuscleListString += " (" + str(i+1) + ") - " + AllAvailableMuscles[i] + "\n"
+# 					MuscleSelectionNumbers = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nSelect Muscle Number(s)\n(separated by commas & groups with hyphens):\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + MuscleListString + "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMuscle Number(s): ")
+# 					print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+# 					MuscleSelectionNumbers = [el.strip() for el in MuscleSelectionNumbers.split(",")]
+# 					for el in MuscleSelectionNumbers:
+# 						if "-" in el:
+# 							temp = el.split("-")
+# 							MuscleSelectionNumbers.remove(el)
+# 							[MuscleSelectionNumbers.append(str(i)) \
+# 											for i in range(int(temp[0]),int(temp[1])+1)]
+# 					if np.array([el in [str(i+1) for i in range(len(AllAvailableMuscles))] \
+# 										for el in MuscleSelectionNumbers]).all() == False:
+# 						print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nInvalid Response! Please check muscle numbers and try again.')
+# 						ValidResponse_2 = False
+# 					else:
+# 						SelectedMuscles = [AllAvailableMuscles[int(el)-1] \
+# 												for el in MuscleSelectionNumbers]
+# 						MusclesToBeDeleted = [Muscle for Muscle in AllAvailableMuscles \
+# 													if Muscle not in SelectedMuscles]
+# 						for Muscle in MusclesToBeDeleted:
+# 							del(AllMuscleSettings[Muscle])
+# 						ValidResponse_2 = True
+# 				ValidResponse_1 = True
+# 	else:
+# 		assert type(PreselectedMuscles)==list and len(PreselectedMuscles)==8, "PreselectedMuscles, when used, must be a list of 8 numbers."
+# 		assert np.array([type(MuscleNumber)==int for MuscleNumber in PreselectedMuscles]).all(),\
+# 			"PreselectedMuscles must be a list of muscle numbers (ints)."
+# 		assert np.array([MuscleNumber in range(1,len(AllAvailableMuscles)+1) \
+# 			for MuscleNumber in PreselectedMuscles]).all(), \
+# 				"PreselectedMuscles contains a muscle number outside the available muscles."
+# 		SelectedMuscles = [AllAvailableMuscles[int(el)-1] \
+# 								for el in PreselectedMuscles]
+# 		MusclesToBeDeleted = [Muscle for Muscle in AllAvailableMuscles \
+# 									if Muscle not in SelectedMuscles]
+# 		for Muscle in MusclesToBeDeleted:
+# 			del(AllMuscleSettings[Muscle])
+# 	# MuscleList = AllMuscleSettings.keys()
+# 	#
+# 	# Rᵀ_symbolic = sp.Matrix([[MA_function(AllMuscleSettings[muscle][dof]) for \
+# 	# 				dof in ['Shoulder','Elbow']] for muscle in MuscleList])
+# 	# Ṙᵀ_symbolic = sp.Matrix(np.concatenate((sp.diff(Rᵀ_symbolic[:,0],q1),\
+# 	# 											sp.diff(Rᵀ_symbolic[:,1],q2)),axis=1))
+# 	#
+# 	# Rᵀ_func = lambdify([q1,q2,q_PS],Rᵀ_symbolic)
+# 	# Ṙᵀ_func = lambdify([q1,q2,q_PS],Ṙᵀ_symbolic)
+# 	# # returns an (n,m) matrix when n is the number of muscles and m is the number of DOFS. We chose to return R.T because this is commonly utilized in muscle velocity calculations.
+# 	return(AllMuscleSettings)
 
 def return_muscle_settings():
 	"""
 	Notes:
-	Coefficients from observation, Ramsay, FVC, Holtzbaur, Pigeon, Kuechle, or Banks. Optimal Muscle Length given in mm.
+	Coefficients from observation, Ramsay, FVC, Holtzbaur, Pigeon, Kuechle, or Banks. Optimal Muscle Length given in mm. Optimal tendon/muscle lengths and PCSA were taken from Garner and Pandy (2003)
 
 	BIC EFE MA for Ramsay has R² = 0.985 whereas Pigeon has R² = 0.9918. Pigeon, however, only takes elbow angle into account, whereas Ramsay takes in variable PS angles. It appears that because Pigeon uses an average of fully pronated and fully supinated MAs, the BIC moment arm is similar but subject to variation as the level of PS is changed. Coefficients and equation number/type are listed below to test either implementation. (NOTE: BIC becomes slightly negative when x1 > 3.021. If trajectory has elbow angles exceding this value, enter a threshold of 3.021 into the model.)
 
@@ -278,8 +851,11 @@ M = 2 # kg
 m1 = 1 # kg
 m2 = 1 # kg
 
-bm1 = 1 # kg/s
-bm2 = 1 # kg/s
+"""
+There was some debate regarding damping terms. No explicit value was given. Loeb simplifies the equation by utilizing the F_{PE_{2,i}} damping term (η) instead, as this is added to B_{m,i}*(v_{m,i}/l_{o,i}) anyways. This η is very small (0.01), so the damping is not significant. Might need to do sensitivity analysis on these two values (currently set to zero) (06/16/2018).
+"""
+bm1 = 0 # kg/s
+bm2 = 0 # kg/s
 
 cT = 27.8
 kT = 0.0047
@@ -311,10 +887,12 @@ lTo2 = (1)*AllMuscleSettings["TRI"]["Optimal Muscle Length"]/1000
 ###########################################################
 
 [[r1,r2],[dr1,dr2],[d2r1,d2r2]]= return_MA_matrix_functions(AllMuscleSettings)
-PCSA1 = 30**2*np.pi # mm²
-PCSA2 = 30**2*np.pi # mm²
-F_MAX1 = 0.25*PCSA1
-F_MAX2 = 0.25*PCSA2
+PCSA1 = 25.90 # cm² (Garner & Pandy; 2003)
+PCSA2 = 76.30 # cm² (Garner & Pandy; 2003)
+SpecificTension = 330 #kPa (Garner & Pandy; 2003)
+kPa_To_N = 0.1
+F_MAX1 = 849.29 # (Garner & Pandy; 2003) ~ PCSA1*SpecificTension*kPa_To_N (in N)
+F_MAX2 = 2332.92 # (Garner & Pandy; 2003) ~ PCSA2*SpecificTension*kPa_To_N (in N)
 
 Amp = 7.5*np.pi/180
 Base = 90*np.pi/180
