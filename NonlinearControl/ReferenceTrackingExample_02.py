@@ -6,6 +6,13 @@ from sympy.utilities import lambdify
 import time
 from collections import namedtuple
 
+def return_primary_source(Settings):
+	import numpy as np
+	assert Settings["Primary Source"]!=None, "No sources were found for this setting."
+	TotalSources = Settings["Sources"]
+	PrimarySource = Settings["Primary Source"]
+	assert PrimarySource in [settings.Source for settings in TotalSources], "Error! Primary Source is not referenced."
+	return(TotalSources[np.where([settings.Source == PrimarySource for settings in TotalSources])[0][0]])
 def return_muscle_settings(PreselectedMuscles=None):
 	"""
 	Notes:
@@ -21,9 +28,9 @@ def return_muscle_settings(PreselectedMuscles=None):
 
 	# Coefficients from observation, Ramsay; 2009, Pigeon, FVC, Holtzbaur, or Banks.
 
-	MA_Settings = namedtuple("MA_Settings",["Coefficients","Units","Equation_Number","Threshold","DOF","Source"])
+	MA_Settings = namedtuple("MA_Settings",["Values","Source","Units","Equation_Number","Threshold","DOF"])
 	Spindle_Settings = namedtuple("Spindle_Settings",["ActualNumber",'CorrectedNumber','RelativeAbundance',"Source"])
-
+	Input_Source = namedtuple("Source_Settings"["Values","Source","Units"])
 	def Pigeon_coeff_conversion(Coefficients):
 		"""
 		Takes in Coefficient values from Pigeon (1996) -- which take in angles in degrees -- and coverts them into the properly scaled coefficients for radians, additionally scaled by the magnitude listed in the paper.
@@ -40,131 +47,526 @@ def return_muscle_settings(PreselectedMuscles=None):
 		return(new_Coefficients)
 
 	PC_Settings = {\
-		'Shoulder MA' : {"Primary Source" : "Pigeon; 1996",\
-		 					"Sources" : [MA_Settings([50.80,0,0,0,0,0], "mm", None, None, "Shoulder", 'Pigeon; 1996')]}, \
-		'Elbow MA' : {"Primary Source" : "Est", \
-		 					"Sources" : [MA_Settings(0, "m", None, None, 'Elbow', "Est")]}, \
+		'Notes' : [\
+						'This is the *clavicular* portion of the pectoralis major.',\
+						'Banks and Garner & Pandy are parameter values for the entire muscle. Pigeon and Holzbaur have the values for the clavicular portion only.',\
+						'Holzbaur parameters for shoulder are for frontal plane (ABD/ADD) only! This explains the relatively small values for some measures.'\
+					],\
+		'Shoulder MA' : {	"Primary Source" : "Pigeon; 1996",\
+		 					"Sources" : \
+								[\
+									MA_Settings([50.80,0,0,0,0,0], 'Pigeon; 1996', "mm", None, None, "Shoulder"),\
+									MA_Settings([2,0,0,0,0,0], 'Holzbaur; 2005', "mm", None, None, "Shoulder")\
+								]}, \
+		'Elbow MA' : {	"Primary Source" : "Est", \
+		 				"Sources" : \
+							[\
+								MA_Settings(0, "m", None, None, 'Elbow', "Est")\
+							]}, \
 		'Spindle' : Spindle_Settings(450,389.7,1.2,"Banks; 2006"),\
-		'Mass' : ( 295.6, "Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "", "Sources" : [150]}, \
-		'PCSA' : (36.20,'Garner & Pandy; 2003','sq cm'), \
-		'Maximum Isometric Force': (1175.01,'Garner & Pandy; 2003','N')}
+		'Mass' : {	"Primary Source" : "Banks; 2006", \
+					"Sources" : \
+						[\
+							Input_Source(295.6, "Banks; 2006", 'g')\
+						]},\
+		'Optimal Muscle Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(14.4, 'Holzbaur; 2005', 'cm'),\
+											Input_Source(150, 'Est', 'mm')\
+										]}, \
+		'Optimal Tendon Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(0.3, 'Holzbaur; 2005', 'cm')\
+										]}, \
+		'Pennation Angle' : {	"Primary Source" : "Holzbaur; 2005", \
+								"Sources" : \
+									[\
+										Input_Source(17, 'Holzbaur; 2005', 'degrees')\
+									]}, \
+		'PCSA' : {	"Primary Source" : "Garner & Pandy; 2003", \
+					'Sources' : \
+						[\
+							Input_Source(36.20,'Garner & Pandy; 2003','sq cm'),\
+							Input_Source(2.6,'Holzbaur; 2005','sq cm')\
+						]}, \
+		'Maximum Isometric Force': {	"Primary Source" : "Garner & Pandy; 2003", \
+										'Sources': \
+											[\
+												Input_Source(1175.01,'Garner & Pandy; 2003','N'),\
+												Input_Source(364.4,'Holzbaur; 2005','N')\
+											]}\
+		}
 
-	"""
-	DELTa SFE MA is listed as 33.02 mm in Pigeon and estimated as 19 mm. Using Pigeon Coefficients convention, Kuechle (1997) has the DELTp MA for [-140,90] as Pigeon_coeff_conversion([ 13.4293189,  2.0316226, -0.2339031,  2.7807828,  0.,  0.]). This will yield a piecewise function that creates jumps with the new velocity formulation. Instead, we are going to try Pigeon_coeff_conversion([ 12.7928795,  2.0480346,  0.8917734,  3.2207214, -2.3928223,  0.]) so that the function is within range and continuous during the ROM. Threshold (pi/2) has been removed for this new MA function.
-	"""
 	DELTa_Settings = {\
-		'Shoulder MA' : {"Primary Source" : "Kuechle; 1997",\
-		 					"Sources" : [MA_Settings(Pigeon_coeff_conversion([12.7928795,  2.0480346,  0.8917734,  3.2207214, -2.3928223,  0.]), "mm", None, None, 'Shoulder', 'Kuechle; 1997'),\
-							MA_Settings([33.02,0,0,0,0,0], "mm", None, None, 'Shoulder', 'Pigeon; 1996'),\
-							MA_Settings(19, "mm", None, None, 'Shoulder', 'Est')]}, \
-		'Elbow MA' : {"Primary Source" : "Est", \
-		 					"Sources" : [MA_Settings(0,"m", None, None, 'Elbow', "Est")]}, \
+		'Notes' : [\
+					"SFE MA is listed as 33.02 mm in Pigeon and estimated as 19 mm. Using Pigeon Coefficients convention, Kuechle (1997) has the DELTp MA for [-140,90] as Pigeon_coeff_conversion([ 13.4293189,  2.0316226, -0.2339031,  2.7807828,  0.,  0.]). This will yield a piecewise function that creates jumps with the new velocity formulation. Instead, we are going to try Pigeon_coeff_conversion([ 12.7928795,  2.0480346,  0.8917734,  3.2207214, -2.3928223,  0.]) so that the function is within range and continuous during the ROM. Threshold (pi/2) has been removed for this new MA function.",\
+					"Garner & Pandy have much larger PCSA and Peak Force Values but only consider the entire Deltoid.",\
+					"Holzbaur parameters for shoulder are for frontal plane (ABD/ADD) only! This explains the relatively small values for some measures.",\
+					"Banks only had mass and spindle settings for the entire deltoid. As a result the parameters are divided by 3 as an estimate of the individual muscles. Will need to do sensitivity analysis as a result."\
+					], \
+		'Shoulder MA' : {	"Primary Source" : "Kuechle; 1997",\
+		 					"Sources" : \
+								[\
+									MA_Settings(Pigeon_coeff_conversion([12.7928795,  2.0480346,  0.8917734,  3.2207214, -2.3928223,  0.]), 'Kuechle; 1997', "mm", None, None, 'Shoulder'),\
+									MA_Settings([33.02,0,0,0,0,0], 'Pigeon; 1996', "mm", None, None, 'Shoulder'),\
+									MA_Settings([1.9,0,0,0,0,0], 'Holzbaur; 2005', "cm", None, None, 'Shoulder'),\
+									MA_Settings(19, "Est", "mm", None, None, 'Shoulder')\
+								]}, \
+		'Elbow MA' : {	"Primary Source" : "Est", \
+		 				"Sources" : \
+							[\
+								MA_Settings(0, "Est", "m", None, None, 'Elbow')\
+							]}, \
 		'Spindle' : Spindle_Settings(182/3,426.3/3,0.43,"Banks; 2006"),\
-		'Mass' : (355.7/3, "Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(9.8, 'Holzbaur; 2005', 'cm')]}}
+		'Mass' : {	"Primary Source" : "Banks; 2006", \
+					"Sources" : \
+						[\
+							Input_Source(355.7/3, "Banks; 2006", 'g')\
+						]},\
+		'Optimal Muscle Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(9.8, 'Holzbaur; 2005', 'cm')\
+										]},\
+		'Optimal Tendon Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(9.3, 'Holzbaur; 2005', 'cm')\
+										]}, \
+		'Pennation Angle' : {	"Primary Source" : "Holzbaur; 2005", \
+								"Sources" : \
+									[\
+										Input_Source(22, 'Holzbaur; 2005', 'degrees')\
+									]}, \
+		'PCSA' : {	"Primary Source" : "Holzbaur; 2005", \
+					'Sources' : \
+						[\
+							Input_Source(82.98,'Garner & Pandy; 2003','sq cm'),\
+							Input_Source(8.2,'Holzbaur; 2005','sq cm')\
+						]}, \
+		'Maximum Isometric Force': {	"Primary Source" : "Holzbaur; 2005", \
+										'Sources': \
+											[\
+												Input_Source(2044.65,'Garner & Pandy; 2003','N'),\
+												Input_Source(1142.6,'Holzbaur; 2005','N')\
+											]}\
+		}
 
 	CB_Settings = {\
-		'Shoulder MA' : {"Primary Source" : "Holzbaur; 2005",\
-		 					"Sources" : [MA_Settings(20, "mm", None, None, "Shoulder", "Holzbaur; 2005")]}, \
-		'Elbow MA' : {"Primary Source" : "Est", \
-		 					"Sources" : [MA_Settings(0, "m", None, None, 'Elbow', "Est")]}, \
+		'Notes' : [\
+						"Holzbaur parameters for shoulder are for frontal plane (ABD/ADD) only! This explains the relatively small values for some measures. MA is negative as a result.",\
+						"Garner & Pandy values for muscle length, PCSA, and peak force are very different from those reported in Wood (1989), Veeger (1991), Bassett (1990), Chen (1988), Keating (1993), Veeger (1997), An (1981), and Cutts (1991)." \
+					],\
+		'Shoulder MA' : {	"Primary Source" : "Est",\
+		 					"Sources" : \
+								[\
+									MA_Settings(20, "Est", "mm", None, None, "Shoulder"),\
+									MA_Settings([-20,0,0,0,0,0], "Holzbaur; 2005", "mm", None, None, "Shoulder")\
+								]}, \
+		'Elbow MA' : {	"Primary Source" : "Est", \
+		 				"Sources" : \
+							[\
+								MA_Settings(0, "Est", "m", None, None, 'Elbow')\
+							]}, \
 		'Spindle' : Spindle_Settings(123,147.3,0.83,"Banks; 2006"),\
-		'Mass' : (39.8, "Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(9.3, 'Holzbaur; 2005', 'cm')]}}
+		'Mass' : {	"Primary Source" : 'Banks; 2006',\
+					'Sources' : \
+						[\
+							Input_Source(39.8, "Banks; 2006", 'g')\
+						]},\
+		'Optimal Muscle Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(9.3, 'Holzbaur; 2005', 'cm'),\
+											Input_Source(17.60, 'Garner & Pandy; 2003', 'cm')\
+										]},\
+		'Optimal Tendon Length' : {	"Primary Source" : 'Holzbaur; 2005', \
+									"Sources" : \
+										[\
+											Input_Source(9.7, 'Holzbaur; 2005', 'cm'),\
+											Input_Source(4.23, 'Garner & Pandy; 2003', 'cm')\
+										]}, \
+		'Pennation Angle' : {	"Primary Source" : "Holzbaur; 2005", \
+								"Sources" : \
+									[\
+										Input_Source(27, "Holzbaur; 2005", 'deg')\
+									]}, \
+		'PCSA' : {	"Primary Source" : "Holzbaur; 2005", \
+					'Sources' : \
+						[\
+							Input_Source(1.7,"Holzbaur; 2005","sq cm"),\
+							Input_Source(4.55,"Garner & Pandy; 2003","sq cm")\
+						]}, \
+		'Maximum Isometric Force': {	"Primary Source" : "Holzbaur; 2005", \
+										'Sources': \
+											[\
+												Input_Source(242.5, "Holzbaur; 2005", "N"),\
+												Input_Source(150.02, "Garner & Pandy; 2003", "N")\
+											]}\
+		}
 
-	"""
-	DELTp SFE MA is listed as -78.74 mm in Pigeon. Using Pigeon Coefficients convention, Kuechle (1997) has the DELTp MA for [-140,90] as Pigeon_coeff_conversion([ 22.8547177,  3.9721238, -3.3900829, -3.6146546,  0.,  0.]). This will yield a piecewise function that creates jumps with the new velocity formulation. Instead, we are going to try Pigeon_coeff_conversion([-23.8165173, -4.486164 ,  5.8655808,  6.5003255, -8.2736695,2.0812998]) so that the function is within range and continuous during the ROM. Threshold (pi/2) has been removed for this new MA function.
-	"""
 	DELTp_Settings = {\
-		'Shoulder MA' : {"Primary Source" : "Kuechle; 1997",\
-		 					"Sources" : [MA_Settings(Pigeon_coeff_conversion([-23.8165173, -4.486164 ,  5.8655808,  6.5003255, -8.2736695,2.0812998]), "mm", None, None, "Shoulder",'Kuechle; 1997'),\
-							MA_Settings([-78.74,0,0,0,0,0], "mm", None, None, "Shoulder", 'Pigeon; 1996')]}, \
-		'Elbow MA' : {"Primary Source" : "Est", \
-		 					"Sources" : [MA_Settings(0, "m", None, None, 'Elbow', "Est")]}, \
+		'Notes' : [\
+						"DELTp SFE MA is listed as -78.74 mm in Pigeon. Using Pigeon Coefficients convention, Kuechle (1997) has the DELTp MA for [-140,90] as Pigeon_coeff_conversion([ 22.8547177,  3.9721238, -3.3900829, -3.6146546,  0.,  0.]). This will yield a piecewise function that creates jumps with the new velocity formulation. Instead, we are going to try Pigeon_coeff_conversion([-23.8165173, -4.486164 ,  5.8655808,  6.5003255, -8.2736695,2.0812998]) so that the function is within range and continuous during the ROM. Threshold (pi/2) has been removed for this new MA function.",\
+						"Holzbaur parameters for shoulder are for frontal plane (ABD/ADD) only! This explains the relatively small values for some measures. MA is negative as a result.",\
+						"Garner & Pandy values for muscle length, PCSA, and peak force are very different from those reported in Wood (1989), Veeger (1991), Bassett (1990), Chen (1988), Keating (1993), Veeger (1997), An (1981), and Cutts (1991). Also, they do no distinguish between ant, mid, post.",\
+						"Holzbaur parameters for shoulder are for frontal plane (ABD/ADD) only! This explains the relatively small values for some measures.",\
+						"Banks only had mass and spindle settings for the entire deltoid. As a result the parameters are divided by 3 as an estimate of the individual muscles. Will need to do sensitivity analysis as a result."\
+					],\
+		'Shoulder MA' : {	"Primary Source" : "Kuechle; 1997",\
+		 					"Sources" : \
+								[\
+									MA_Settings(Pigeon_coeff_conversion([-23.8165173, -4.486164 ,  5.8655808,  6.5003255, -8.2736695,2.0812998]), 'Kuechle; 1997', "mm", None, None, "Shoulder"),\
+									MA_Settings([-78.74,0,0,0,0,0], 'Pigeon; 1996', "mm", None, None, "Shoulder"),\
+									MA_Settings([-8,0,0,0,0,0], 'Holzbaur; 2005', "mm", None, None, "Shoulder")
+								]}, \
+		'Elbow MA' : {	"Primary Source" : "Est", \
+		 				"Sources" : \
+							[\
+								MA_Settings(0, "Est", "m", None, None, 'Elbow')\
+							]}, \
 		'Spindle' : Spindle_Settings(182/3,426.3/3,0.43,"Banks; 2006"),\
-		'Mass' : (355.7/3, "Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(13.7, 'Holzbaur; 2005', 'cm')]}}
+		'Mass' : {	"Primary Source" : "Banks; 2006", \
+					"Sources" : \
+						[\
+							Input_Source(355.7/3, "Banks; 2006", 'g')\
+						]},\
+		'Optimal Muscle Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(13.7, 'Holzbaur; 2005', 'cm'),\
+											Input_Source(12.8, 'Garner & Pandy; 2003', 'cm')\
+										]},\
+		'Optimal Tendon Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(3.8, "Holzbaur; 2005", "cm"),\
+											Input_Source(5.38, 'Garner & Pandy; 2003', 'cm')\
+										]}, \
+		'Pennation Angle' : {	"Primary Source" : "Holzbaur; 2005", \
+								"Sources" : \
+									[\
+										Input_Source(18, "Holzbaur; 2005", 'deg')\
+									]}, \
+		'PCSA' : {	"Primary Source" : "Holzbaur; 2005", \
+					'Sources' : \
+						[\
+							Input_Source(1.9, "Holzbaur; 2005", 'sq cm'),\
+							Input_Source(81.98,"Garner & Pandy; 2003","sq cm")\
+						]}, \
+		'Maximum Isometric Force': {	"Primary Source" : "Holzbaur; 2005", \
+										'Sources': \
+											[\
+												Input_Source(259.9,"Holzbaur; 2005","N"),\
+												Input_Source(2044.65,"Garner & Pandy; 2003","N")\
+											]}\
+		}}
 
-	"""
-	BIC EFE MA for Ramsay; 2009 has R² = 0.985 whereas Pigeon has R² = 0.9918. Pigeon, however, only takes elbow angle into account, whereas Ramsay; 2009 takes in variable PS angles. It appears that because Pigeon uses an average of fully pronated and fully supinated MAs, the BIC moment arm is similar but subject to variation as the level of PS is changed. (NOTE: BIC becomes slightly negative when q2 > 3.021. If trajectory has elbow angles exceding this value, enter a threshold of 3.021 into the model.)
-
-	Note: Only using the long head for optimal length, see Holzbaur (2005) for additional head parameters.
-	"""
 	BIC_Settings = {\
-		'Shoulder MA' : {"Primary Source" : "Pigeon; 1996",\
-		 					"Sources" : [MA_Settings([29.21,0,0,0,0,0], "mm", None, None, "Shoulder", 'Pigeon; 1996'),\
-							MA_Settings(15, "mm", None, None, "Shoulder", 'Est')]}, \
-		'Elbow MA' : {"Primary Source" : "Ramsay; 2009", \
-		 					"Sources" : [MA_Settings([8.4533,36.6147,2.4777,-19.432,2.0571,0,13.6502,0,0,-5.6172,0,-2.0854,0,0,0,0], "mm", 2, 3.021, 'Elbow', 'Ramsay; 2009'),\
-							MA_Settings(Pigeon_coeff_conversion([14.660,4.5322,1.8047,-2.9883,0,0]), "mm", None, 2.9326, 'Elbow', 'Pigeon; 1996')]}, \
+		'Notes' : [\
+					"BIC EFE MA for Ramsay; 2009 has R² = 0.985 whereas Pigeon has R² = 0.9918. Pigeon, however, only takes elbow angle into account, whereas Ramsay; 2009 takes in variable PS angles. It appears that because Pigeon uses an average of fully pronated and fully supinated MAs, the BIC moment arm is similar but subject to variation as the level of PS is changed. (NOTE: BIC becomes slightly negative when q2 > 3.021. If trajectory has elbow angles exceding this value, enter a threshold of 3.021 into the model.)",\
+					"Note: Only using the long head for optimal length, see Holzbaur (2005) for additional head parameters. Adding when logical."
+					],\
+		'Shoulder MA' : {	"Primary Source" : "Pigeon; 1996",\
+		 					"Sources" : \
+								[\
+									MA_Settings([29.21,0,0,0,0,0], 'Pigeon; 1996', "mm", None, None, "Shoulder"),\
+									MA_Settings(15, 'Est', "mm", None, None, "Shoulder")\
+								]}, \
+		'Elbow MA' : {	"Primary Source" : "Ramsay; 2009", \
+	 					"Sources" : \
+							[\
+								MA_Settings([8.4533,36.6147,2.4777,-19.432,2.0571,0,13.6502,0,0,-5.6172,0,-2.0854,0,0,0,0], 'Ramsay; 2009', "mm", 2, 3.021, 'Elbow'),\
+								MA_Settings(Pigeon_coeff_conversion([14.660,4.5322,1.8047,-2.9883,0,0]), 'Pigeon; 1996', "mm", None, 2.9326, 'Elbow'),\
+								MA_Settings([36,0,0,0,0,0], 'Holzbaur; 2005', "mm", None, None, "Elbow")
+							]}, \
 		'Spindle' : Spindle_Settings(320,292.6,1.1,"Banks; 2006"),\
-		'Mass' : (163.8,"Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(11.6, 'Holzbaur; 2005', 'cm')]}}
+		'Mass' : {	"Primary Source" : "Banks; 2006", \
+					"Sources" : \
+						[\
+							Input_Source(163.8,"Banks; 2006", 'g')\
+						]},\
+		'Optimal Muscle Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(11.6, 'Holzbaur; 2005', 'cm'),\
+											Input_Source(14.22, "Garner & Pandy; 2003", "cm")
+										]},\
+		'Optimal Tendon Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(27.2, "Holzbaur; 2005", "cm"),\
+											Input_Source(22.98, "Garner & Pandy; 2003", "cm")
+										]}, \
+		'Pennation Angle' : {	"Primary Source" : "Holzbaur; 2005", \
+								"Sources" : \
+									[\
+										Input_Source(0, "Holzbaur; 2005", 'deg')\
+									]}, \
+		'PCSA' : {	"Primary Source" : "Holzbaur; 2005", \
+					'Sources' : \
+						[\
+							Input_Source((4.5+3.1), "Holzbaur; 2005", "sq cm"),\
+							Input_Source(25.90, "Garner & Pandy; 2003", "sq cm")
+						]}, \
+		'Maximum Isometric Force': {	"Primary Source" : "Holzbaur; 2005", \
+										'Sources': \
+											[\
+												Input_Source((624.3+435.6), "Holzbaur; 2005", "N"),\
+												Input_Source(849.29, "Garner & Pandy; 2003", "N")
+											]}\
+		}}
 
-	"""
-	TRI EFE MA for Ramsay; 2009 has R² = 0.997 whereas Pigeon has R² = 0.9904. Pigeon appears to really fail when the elbow angle is greater than 140°. For this reason, Ramsay; 2009 should be used. However the approach of fixing the MA for values greater than 140° can be adopted for completeness. Coefficients and equation number/type are listed below to test either implementation.
-
-	Note: Only using the long head for optimal length, see Holzbaur (2005) for additional head parameters.
-	"""
 	TRI_Settings = {\
-		'Shoulder MA' : {"Primary Source" : "Pigeon; 1996",\
-		 					"Sources" : [MA_Settings([-25.40,0,0,0,0,0], "mm", None, None, "Shoulder", 'Pigeon; 1996'),\
-							MA_Settings(-15, "mm", None, None, "Shoulder", 'Est')]}, \
-		'Elbow MA' : {"Primary Source" : "Ramsay; 2009", \
-		 					"Sources" : [MA_Settings([-24.5454,-8.8691,9.3509,-1.7518,0], 'mm', 1, None, 'Elbow', 'Ramsay; 2009'),\
-							MA_Settings(Pigeon_coeff_conversion([-23.287,-3.0284,12.886,-19.092,13.277,-3.5171]), 'mm', None, None, 'Elbow', 'Pigeon; 1996')]}, \
+		'Notes' : [\
+					"TRI EFE MA for Ramsay; 2009 has R² = 0.997 whereas Pigeon has R² = 0.9904. Pigeon appears to really fail when the elbow angle is greater than 140°. For this reason, Ramsay; 2009 should be used. However the approach of fixing the MA for values greater than 140° can be adopted for completeness. Coefficients and equation number/type are listed below to test either implementation.",\
+					"Note: Only using the long head for optimal length, see Holzbaur (2005) for additional head parameters.",\
+					"Banks had the parameters for each head of the triceps, values were added.",\
+					"Holzbaur settings only utilizes the long head of the TRI."\
+					],
+		'Shoulder MA' : {	"Primary Source" : "Pigeon; 1996",\
+		 					"Sources" : \
+								[\
+									MA_Settings([-25.40,0,0,0,0,0], 'Pigeon; 1996', "mm", None, None, "Shoulder"),\
+									MA_Settings(-15, 'Est', "mm", None, None, "Shoulder")\
+								]}, \
+		'Elbow MA' : {	"Primary Source" : "Ramsay; 2009", \
+	 					"Sources" : \
+							[\
+								MA_Settings([-24.5454,-8.8691,9.3509,-1.7518,0], 'Ramsay; 2009', 'mm', 1, None, 'Elbow'),\
+								MA_Settings(Pigeon_coeff_conversion([-23.287,-3.0284,12.886,-19.092,13.277,-3.5171]), 'Pigeon; 1996', 'mm', None, None, 'Elbow'),\
+								MA_Settings([-21,0,0,0,0,0], 'Holzbaur; 2005', 'mm', None, None, 'Elbow')
+							]}, \
 		'Spindle' : Spindle_Settings((200+222+98),(223.7+269.6+221.8),(0.89+0.82+0.44)/3,"Banks; 2006"),\
-		'Mass' : ((94.2+138.4+92.5), "Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(13.4, 'Holzbaur; 2005', 'cm')]}}
+		'Mass' : {	"Primary Source" : "Banks; 2006",\
+					"Sources" : \
+						[\
+							Input_Source((94.2+138.4+92.5), "Banks; 2006", 'g')\
+						]},\
+		'Optimal Muscle Length' : {	"Primary Source" : "Holzbaur; 2005",\
+		 							"Sources" : \
+										[\
+											Input_Source(13.4, 'Holzbaur; 2005', 'cm'),\
+											Input_Source(8.77, 'Garner & Pandy; 2003', 'cm')\
+										]},\
+		'Optimal Tendon Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(14.3, "Holzbaur; 2005", 'cm'),\
+											Input_Source(19.05, 'Garner & Pandy; 2003', 'cm')\
+										]}, \
+		'Pennation Angle' : {	"Primary Source" : "Holzbaur; 2005", \
+								"Sources" : \
+									[\
+										Input_Source(12, "Holzbaur; 2005", 'deg')\
+									]}, \
+		'PCSA' : {	"Primary Source" : "Holzbaur; 2005", \
+					'Sources' : \
+						[\
+							Input_Source((5.7+4.5+4.5),"Holzbaur; 2005",'sq cm'),\
+							Input_Source(76.30, 'Garner & Pandy; 2003', 'sq cm')\
+						]}, \
+		'Maximum Isometric Force': {	"Primary Source" : "Holzbaur; 2005", \
+										'Sources': \
+											[\
+												Input_Source((798.5+624.3+624.3),"Holzbaur; 2005",'N'),\
+												Input_Source(2332.92, 'Garner & Pandy; 2003', 'N')\
+											]}\
+		}}
 
-	"""
-	BRA (Brachialis) EFE MA for Ramsay; 2009 has R² = 0.990 whereas Pigeon has R² = 0.9988. Curve appears to be a better fit, as it experiences its smallest MA when Elbow angle = 0. Coefficients and equation number/type are listed below to test either implementation.
-	"""
 	BRA_Settings = {\
-		'Shoulder MA' : {"Primary Source" : "Est",\
-		 					"Sources" : [MA_Settings(0, 'm', None, None, 'Shoulder', 'Est')]}, \
-		'Elbow MA' : {"Primary Source" : "Ramsay; 2009", \
-		 					"Sources" : [MA_Settings([16.1991,-16.1463,24.5512,-6.3335,0], 'mm', 1, None, 'Elbow', 'Ramsay; 2009'),\
-							MA_Settings(Pigeon_coeff_conversion([5.5492,2.3080,2.3425,-2.0530,0,0]), 'mm', None, None, 'Elbow', 'Pigeon; 1996')]}, \
+		"Notes" : [\
+					"BRA (Brachialis) EFE MA for Ramsay; 2009 has R² = 0.990 whereas Pigeon has R² = 0.9988. Curve appears to be a better fit, as it experiences its smallest MA when Elbow angle = 0. Coefficients and equation number/type are listed below to test either implementation."\
+					],
+		'Shoulder MA' : {	"Primary Source" : "Est",\
+		 					"Sources" : \
+								[\
+									MA_Settings(0, 'Est', 'm', None, None, 'Shoulder')\
+								]}, \
+		'Elbow MA' : {	"Primary Source" : "Ramsay; 2009", \
+	 					"Sources" : \
+							[\
+								MA_Settings([16.1991,-16.1463,24.5512,-6.3335,0], 'Ramsay; 2009', 'mm', 1, None, 'Elbow'),\
+								MA_Settings(Pigeon_coeff_conversion([5.5492,2.3080,2.3425,-2.0530,0,0]), 'Pigeon; 1996', 'mm', None, None, 'Elbow'),\
+								MA_Settings([18,0,0,0,0,0], 'Holzbaur; 2005', 'mm', None, None, 'Elbow')\
+							]}, \
 		'Spindle' : Spindle_Settings(256,272.1,0.94,"Banks; 2006"),\
-		'Mass' : (141, "Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(8.6, 'Holzbaur; 2005', 'cm')]}}
+		'Mass' : {	"Primary Source" : "Banks; 2006", \
+					"Sources" : \
+						[\
+							Input_Source(141, "Banks; 2006", 'g')\
+						]},\
+		'Optimal Muscle Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(8.6, 'Holzbaur; 2005', 'cm'),\
+											Input_Source(10.28, 'Holzbaur; 2005', 'cm')\
+										]},\
+		'Optimal Tendon Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(5.4, "Holzbaur; 2005", 'cm'),\
+											Input_Source(1.75, "Holzbaur; 2005", 'cm')\
+										]}, \
+		'Pennation Angle' : {	"Primary Source" : "Holzbaur; 2005", \
+								"Sources" : \
+									[\
+										Input_Source(0, "Holzbaur; 2005", 'deg')\
+									]}, \
+		'PCSA' : {	"Primary Source" : "Holzbaur; 2005", \
+					'Sources' : \
+						[\
+							Input_Source(7.1,"Holzbaur; 2005",'sq cm'),\
+							Input_Source(25.88,"Garner & Pandy; 2003",'sq cm')\
+						]}, \
+		'Maximum Isometric Force': {	"Primary Source" : "Holzbaur; 2005", \
+										'Sources': \
+											[\
+												Input_Source(987.3,"Holzbaur; 2005","N"),\
+												Input_Source(583.76,"Garner & Pandy; 2003","N")\
+											]}\
+		}}
 
-	"""
-	BRD (Brachioradialis) for Ramsay; 2009 has R² = 0.988 whereas Pigeon has R² = 0.9989. Pigeon, however, only takes elbow angle into account, whereas Ramsay; 2009 takes in variable PS angles. Coefficients and equation number/type are listed below to test either implementation.
-	"""
 	BRD_Settings = {\
-		'Shoulder MA' : {"Primary Source" : "Est",\
-		 					"Sources" : [MA_Settings(0, 'm', None, None, 'Shoulder', 'Est')]}, \
-		'Elbow MA' : {"Primary Source" : "Ramsay; 2009", \
-		 					"Sources" : [MA_Settings(	[15.2564,-11.8355,2.8129,-5.7781,44.8143,0,2.9032,0,0,-13.4956,0,-0.3940,0,0,0,0], 'mm', 2, None, 'Elbow', 'Ramsay; 2009'), \
-							MA_Settings(	Pigeon_coeff_conversion([19.490,1.6681,10.084,-6.5171,0,0]), 'mm', None, None, 'Elbow', 'Pigeon; 1996')]}, \
+		"Notes" : [\
+					"BRD (Brachioradialis) for Ramsay; 2009 has R² = 0.988 whereas Pigeon has R² = 0.9989. Pigeon, however, only takes elbow angle into account, whereas Ramsay; 2009 takes in variable PS angles. Coefficients and equation number/type are listed below to test either implementation."\
+					],
+		'Shoulder MA' : {	"Primary Source" : "Est",\
+		 					"Sources" : \
+								[\
+									MA_Settings(0, 'Est', 'm', None, None, 'Shoulder')\
+								]}, \
+		'Elbow MA' : {	"Primary Source" : "Ramsay; 2009", \
+	 					"Sources" : \
+							[\
+								MA_Settings(	[15.2564,-11.8355,2.8129,-5.7781,44.8143,0,2.9032,0,0,-13.4956,0,-0.3940,0,0,0,0], 'Ramsay; 2009', 'mm', 2, None, 'Elbow'), \
+								MA_Settings(	Pigeon_coeff_conversion([19.490,1.6681,10.084,-6.5171,0,0]), 'Pigeon; 1996', 'mm', None, None, 'Elbow')\
+							]}, \
 		'Spindle' : Spindle_Settings(70,190.2,0.37,"Banks; 2006"),\
-		'Mass' : (64.7,"Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(17.3, 'Holzbaur; 2005', 'cm')]}}
+		'Mass' : {	"Primary Source" : "Banks; 2006",\
+					"Sources" : \
+						[\
+							Input_Source(64.7,"Banks; 2006", 'g')\
+						]},\
+		'Optimal Muscle Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(17.3, 'Holzbaur; 2005', 'cm'),\
+											Input_Source(27.03, 'Garner & Pandy; 2003', 'cm')\
+										]},\
+		'Optimal Tendon Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(13.3, "Holzbaur; 2005", 'cm'),\
+											Input_Source(6.04, "Garner & Pandy; 2003", 'cm')\
+										]}, \
+		'Pennation Angle' : {	"Primary Source" : "Holzbaur; 2005", \
+								"Sources" : \
+									[\
+										Input_Source(0, "Holzbaur; 2005", 'deg')\
+									]}, \
+		'PCSA' : {	"Primary Source" : "Holzbaur; 2005", \
+					'Sources' : \
+						[\
+							Input_Source(1.9,"Holzbaur; 2005",'sq cm'),\
+							Input_Source(3.08,"Garner & Pandy; 2003",'sq cm')\
+						]}, \
+		'Maximum Isometric Force': {	"Primary Source" : "Holzbaur; 2005", \
+										'Sources': \
+											[\
+												Input_Source(261.3,"Holzbaur; 2005",'N'),\
+												Input_Source(101.56,"Garner & Pandy; 2003",'N')\
+											]}\
+		}}
 
 	PRO_Settings = {\
-		'Shoulder MA' : {"Primary Source" : "Est",\
-		 					"Sources" : [MA_Settings(0, 'm', None, None, 'Shoulder', 'Est')]}, \
-		'Elbow MA' : {"Primary Source" : "Ramsay; 2009", \
-		 					"Sources" : [MA_Settings(	[11.0405,-1.0079,0.3933,-10.4824,-12.1639,-0.4369,36.9174,3.5232,-10.4223,21.2604,-37.2444,10.2666,-11.0060,14.5974,-3.9919,1.7526,-2.0089,0.5460], 'mm', 3, None, 'Elbow', 'Ramsay; 2009')]}, \
+		'Notes' : [\
+					""\
+					]
+		'Shoulder MA' : {	"Primary Source" : "Est",\
+		 					"Sources" : \
+								[\
+									MA_Settings(0, 'Est', 'm', None, None, 'Shoulder')\
+								]}, \
+		'Elbow MA' : {	"Primary Source" : "Ramsay; 2009", \
+	 					"Sources" : \
+							[\
+								MA_Settings(	[11.0405,-1.0079,0.3933,-10.4824,-12.1639,-0.4369,36.9174,3.5232,-10.4223,21.2604,-37.2444,10.2666,-11.0060,14.5974,-3.9919,1.7526,-2.0089,0.5460], 'Ramsay; 2009', 'mm', 3, None, 'Elbow')\
+							]}, \
 		'Spindle' : Spindle_Settings(187.6,185.5,1.3,"Banks; 2006"),\
-		'Mass' : (38.8, "Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(4.9, 'Holzbaur; 2005', 'cm')]}}
-
-	"""
-	FCR EFE MA is not listed in Ramsay; 2009 but Pigeon has a quadratic function with R² = 0.9975. Pigeon only takes elbow angle into account. Coefficients and equation number/type are listed below to test either implementation. EFE MA was estimated to be constant and 10 mm for this muscle. If you use Pigeon, make sure to only accept positive moment arm values, as this model fails outside the ROM. One option is to set the MA to the constant value (i.e., MA[theta>140°] = MA[140°])
-	"""
+		'Mass' : {	"Primary Source" : "Banks; 2006",\
+					"Sources" : \
+						[\
+							Input_Source(38.8, "Banks; 2006", 'g')\
+						]},\
+		'Optimal Muscle Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(4.9, 'Holzbaur; 2005', 'cm')\
+										]},\
+		'Optimal Tendon Length' : {	"Primary Source" : "Holzbaur; 2005", \
+									"Sources" : \
+										[\
+											Input_Source(9.8, "Holzbaur; 2005", 'cm')\
+										]}, \
+		'Pennation Angle' : {	"Primary Source" : "Holzbaur; 2005", \
+								"Sources" : \
+									[\
+										Input_Source(10, "Holzbaur; 2005", 'deg')\
+									]}, \
+		'PCSA' : {	"Primary Source" : "Holzbaur; 2005", \
+					'Sources' : \
+						[\
+							Input_Source(4.0,"Holzbaur; 2005",'sq cm')\
+						]}, \
+		'Maximum Isometric Force': {	"Primary Source" : "Holzbaur; 2005", \
+										'Sources': \
+											[\
+												Input_Source(566.2,"Holzbaur; 2005",'N')\
+											]}\
+		}}
+		\\\\\\\\\\\\\\\\
 	FCR_Settings = {\
-		'Shoulder MA' : {"Primary Source" : "Est",\
-		 					"Sources" : [MA_Settings(0, 'm', None, None, 'Shoulder', 'Est')]}, \
-		'Elbow MA' : {"Primary Source" : "Pigeon; 1996", \
-		 					"Sources" : [MA_Settings(Pigeon_coeff_conversion([0.9351,0.5375,-0.3627,0,0,0]), 'mm', None, 2.86, 'Elbow', 'Pigeon; 1996'),\
-							MA_Settings(1, 'cm', None, None, 'Elbow', 'Est')]}, \
+		'Notes' : [\
+					"FCR EFE MA is not listed in Ramsay; 2009 but Pigeon has a quadratic function with R² = 0.9975. Pigeon only takes elbow angle into account. Coefficients and equation number/type are listed below to test either implementation. EFE MA was estimated to be constant and 10 mm for this muscle. If you use Pigeon, make sure to only accept positive moment arm values, as this model fails outside the ROM. One option is to set the MA to the constant value (i.e., MA[theta>140°] = MA[140°])"\
+					]
+		'Shoulder MA' : {	"Primary Source" : "Est",\
+		 					"Sources" : \
+								[\
+									MA_Settings(0, 'Est', 'm', None, None, 'Shoulder')\
+								]}, \
+		'Elbow MA' : {	"Primary Source" : "Pigeon; 1996", \
+	 					"Sources" : \
+							[\
+								MA_Settings(Pigeon_coeff_conversion([0.9351,0.5375,-0.3627,0,0,0]), 'Pigeon; 1996', 'mm', None, 2.86, 'Elbow'),\
+								MA_Settings(1, 'Est', 'cm', None, None, 'Elbow')\
+							]}, \
 		'Spindle' : Spindle_Settings(129,125.7,1.0,"Banks; 2006"),\
 		'Mass' : (28.7, "Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(6.3, 'Holzbaur; 2005', 'cm')]}}
+		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(6.3, 'Holzbaur; 2005', 'cm')]},\
+		'Optimal Tendon Length' : {	"Primary Source" : None, \
+			"Sources" : \
+				[\
+					Input_Source(None, None, None)\
+				]}, \
+		'Pennation Angle' : {	"Primary Source" : None, \
+		"Sources" : \
+			[\
+				Input_Source(None, None, None)\
+			]}, \
+		'PCSA' : {	"Primary Source" : None, \
+		'Sources' : \
+		[\
+		Input_Source(None,None,None)\
+		]}, \
+		'Maximum Isometric Force': {	"Primary Source" : None, \
+				'Sources': \
+					[\
+						Input_Source(None,None,None)\
+					]}\
+		}}
 
 	ECRB_Settings = {\
 		'Shoulder MA' : {"Primary Source" : "Est",\
@@ -173,7 +575,28 @@ def return_muscle_settings(PreselectedMuscles=None):
 		 					"Sources" : [MA_Settings([-11.256,17.8548,1.6398,-0.5073,-2.8827,0,-0.0942,0,0,0,0,0,0,0,0,0], 'mm', 2, None, 'Elbow', 'Ramsay; 2009')]}, \
 		'Spindle' : Spindle_Settings(102,132.7,0.77,"Banks; 2006"),\
 		'Mass' : (32.1, "Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(5.9, 'Holzbaur; 2005', 'cm')]}}
+		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(5.9, 'Holzbaur; 2005', 'cm')]},\
+		'Optimal Tendon Length' : {	"Primary Source" : None, \
+			"Sources" : \
+				[\
+					Input_Source(None, None, None)\
+				]}, \
+		'Pennation Angle' : {	"Primary Source" : None, \
+		"Sources" : \
+			[\
+				Input_Source(None, None, None)\
+			]}, \
+		'PCSA' : {	"Primary Source" : None, \
+		'Sources' : \
+		[\
+		Input_Source(None,None,None)\
+		]}, \
+		'Maximum Isometric Force': {	"Primary Source" : None, \
+				'Sources': \
+					[\
+						Input_Source(None,None,None)\
+					]}\
+		}}
 
 	"""
 	ECRL EFE MA for Ramsay; 2009 has R² = 0.978 whereas Pigeon has R² = 0.9986. Pigeon, however, only takes elbow angle into account, whereas Ramsay; 2009 takes in variable PS angles. Additionally, Pigeon only considers elbow angles between 0 and 140 degrees and exhibits a decrease in MA as elbow angle approaches the upper bound of the ROM. This should (intiutively speaking) make the extensors MA largest, but Pigeon exhibits a drop off that may make it less favorable for movements at the boundary of the ROM. Coefficients and equation number/type are listed below to test either implementation.
@@ -186,7 +609,28 @@ def return_muscle_settings(PreselectedMuscles=None):
 							MA_Settings([-7.7034,16.3913,7.4361,-1.7566,0,-1.3336,0,0.0742,0,0,0,0,0,0,0,0], 'mm', 2, None, 'Elbow', 'Ramsay; 2009')]}, \
 		'Spindle' : Spindle_Settings(74,155.2,0.48,"Banks; 2006"),\
 		'Mass' : (44.3, "Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(8.1, 'Holzbaur; 2005', 'cm')]}}
+		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(8.1, 'Holzbaur; 2005', 'cm')]},\
+		'Optimal Tendon Length' : {	"Primary Source" : None, \
+			"Sources" : \
+				[\
+					Input_Source(None, None, None)\
+				]}, \
+		'Pennation Angle' : {	"Primary Source" : None, \
+		"Sources" : \
+			[\
+				Input_Source(None, None, None)\
+			]}, \
+		'PCSA' : {	"Primary Source" : None, \
+		'Sources' : \
+		[\
+		Input_Source(None,None,None)\
+		]}, \
+		'Maximum Isometric Force': {	"Primary Source" : None, \
+				'Sources': \
+					[\
+						Input_Source(None,None,None)\
+					]}\
+		}}
 
 	FCU_Settings = {\
 		'Shoulder MA' : {"Primary Source" : "Est",\
@@ -195,7 +639,28 @@ def return_muscle_settings(PreselectedMuscles=None):
 		 					"Sources" : [MA_Settings(1, 'cm', None, None, 'Elbow', 'Est')]}, \
 		'Spindle' : Spindle_Settings(175,141.2,1.2,"Banks; 2006"),\
 		'Mass' : (36.5,"Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(5.1, 'Holzbaur; 2005', 'cm')]}}
+		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(5.1, 'Holzbaur; 2005', 'cm')]},\
+		'Optimal Tendon Length' : {	"Primary Source" : None, \
+			"Sources" : \
+				[\
+					Input_Source(None, None, None)\
+				]}, \
+		'Pennation Angle' : {	"Primary Source" : None, \
+		"Sources" : \
+			[\
+				Input_Source(None, None, None)\
+			]}, \
+		'PCSA' : {	"Primary Source" : None, \
+		'Sources' : \
+		[\
+		Input_Source(None,None,None)\
+		]}, \
+		'Maximum Isometric Force': {	"Primary Source" : None, \
+				'Sources': \
+					[\
+						Input_Source(None,None,None)\
+					]}\
+		}}
 
 	"""
 	Note: only they muscle for the second digit was used for the FDS muscle. NEED TO DETERMINE IF THIS SHOULD BE A SUM OR AN AVERAGE FOR MEASURES LIKE PCSA, F_MAX, ETC.
@@ -207,7 +672,28 @@ def return_muscle_settings(PreselectedMuscles=None):
 		 					"Sources" : [MA_Settings(1, 'cm', None, None, 'Elbow', 'Est')]}, \
 		'Spindle' : Spindle_Settings(356,224.9,1.6,"Banks; 2006"),\
 		'Mass' : (95.2,"Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(8.4, 'Holzbaur; 2005', 'cm')]}}
+		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(8.4, 'Holzbaur; 2005', 'cm')]},\
+		'Optimal Tendon Length' : {	"Primary Source" : None, \
+			"Sources" : \
+				[\
+					Input_Source(None, None, None)\
+				]}, \
+		'Pennation Angle' : {	"Primary Source" : None, \
+		"Sources" : \
+			[\
+				Input_Source(None, None, None)\
+			]}, \
+		'PCSA' : {	"Primary Source" : None, \
+		'Sources' : \
+		[\
+		Input_Source(None,None,None)\
+		]}, \
+		'Maximum Isometric Force': {	"Primary Source" : None, \
+				'Sources': \
+					[\
+						Input_Source(None,None,None)\
+					]}\
+		}}
 
 	PL_Settings = {\
 		'Shoulder MA' : {"Primary Source" : "Est",\
@@ -216,7 +702,28 @@ def return_muscle_settings(PreselectedMuscles=None):
 		 					"Sources" : [MA_Settings(1, 'cm', None, None, 'Elbow', 'Est')]}, \
 		'Spindle' : Spindle_Settings(None,None,None,None),\
 		'Mass' : (None, "N/A","N/A"),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(6.4, 'Holzbaur; 2005', 'cm')]}}
+		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(6.4, 'Holzbaur; 2005', 'cm')]},\
+		'Optimal Tendon Length' : {	"Primary Source" : None, \
+			"Sources" : \
+				[\
+					Input_Source(None, None, None)\
+				]}, \
+		'Pennation Angle' : {	"Primary Source" : None, \
+		"Sources" : \
+			[\
+				Input_Source(None, None, None)\
+			]}, \
+		'PCSA' : {	"Primary Source" : None, \
+		'Sources' : \
+		[\
+		Input_Source(None,None,None)\
+		]}, \
+		'Maximum Isometric Force': {	"Primary Source" : None, \
+				'Sources': \
+					[\
+						Input_Source(None,None,None)\
+					]}\
+		}}
 
 	"""
 	ECU EFE MA is not listed in Ramsay; 2009 but Pigeon has a quadratic function with R² = 0.9966. Pigeon only takes elbow angle into account. Coefficients and equation number/type are listed below to test either implementation. EFE MA was estimated to be constant and -10 mm for this muscle. If you use Pigeon, make sure to only accept negative moment arm values, as this model fails outside the ROM. One option is to set the MA to the constant value (i.e., MA[theta>140°] = MA[140°])
@@ -229,7 +736,28 @@ def return_muscle_settings(PreselectedMuscles=None):
 							MA_Settings(-1, 'cm', None, None, 'Elbow', 'Est')]}, \
 		'Spindle' : Spindle_Settings(157,118,1.3,"Banks; 2006"),\
 		'Mass' : (25.2,"Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(6.2, 'Holzbaur; 2005', 'cm')]}}
+		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(6.2, 'Holzbaur; 2005', 'cm')]},\
+		'Optimal Tendon Length' : {	"Primary Source" : None, \
+			"Sources" : \
+				[\
+					Input_Source(None, None, None)\
+				]}, \
+		'Pennation Angle' : {	"Primary Source" : None, \
+		"Sources" : \
+			[\
+				Input_Source(None, None, None)\
+			]}, \
+		'PCSA' : {	"Primary Source" : None, \
+		'Sources' : \
+		[\
+		Input_Source(None,None,None)\
+		]}, \
+		'Maximum Isometric Force': {	"Primary Source" : None, \
+				'Sources': \
+					[\
+						Input_Source(None,None,None)\
+					]}\
+		}}
 
 	EDM_Settings = {\
 		'Shoulder MA' : {"Primary Source" : "Est",\
@@ -238,7 +766,28 @@ def return_muscle_settings(PreselectedMuscles=None):
 		 					"Sources" : [MA_Settings(-1, 'cm', None, None, 'Elbow', 'Est')]}, \
 		'Spindle' : Spindle_Settings(53,59.8,0.89,"Banks; 2006"),\
 		'Mass' : (6.2, "Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(6.8, 'Holzbaur; 2005', 'cm')]}}
+		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(6.8, 'Holzbaur; 2005', 'cm')]},\
+		'Optimal Tendon Length' : {	"Primary Source" : None, \
+			"Sources" : \
+				[\
+					Input_Source(None, None, None)\
+				]}, \
+		'Pennation Angle' : {	"Primary Source" : None, \
+		"Sources" : \
+			[\
+				Input_Source(None, None, None)\
+			]}, \
+		'PCSA' : {	"Primary Source" : None, \
+		'Sources' : \
+		[\
+		Input_Source(None,None,None)\
+		]}, \
+		'Maximum Isometric Force': {	"Primary Source" : None, \
+				'Sources': \
+					[\
+						Input_Source(None,None,None)\
+					]}\
+		}}
 
 	"""
 	Note: only they muscle for the second digit was used for the EDC muscle. NEED TO DETERMINE IF THIS SHOULD BE A SUM OR AN AVERAGE FOR MEASURES LIKE PCSA, F_MAX, ETC.
@@ -250,7 +799,28 @@ def return_muscle_settings(PreselectedMuscles=None):
 		 					"Sources" : [MA_Settings(-1, 'cm', None, None, 'Elbow', 'Est')]}, \
 		'Spindle' : Spindle_Settings(219,152.6,1.4,"Banks; 2006"),\
 		'Mass' : (42.8, "Banks; 2006", 'g'),\
-		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(7.0, 'Holzbaur; 2005', 'cm')]}}
+		'Optimal Muscle Length' : {"Primary Source" : "Holzbaur; 2005", "Sources" : [(7.0, 'Holzbaur; 2005', 'cm')]},\
+		'Optimal Tendon Length' : {	"Primary Source" : None, \
+			"Sources" : \
+				[\
+					Input_Source(None, None, None)\
+				]}, \
+		'Pennation Angle' : {	"Primary Source" : None, \
+		"Sources" : \
+			[\
+				Input_Source(None, None, None)\
+			]}, \
+		'PCSA' : {	"Primary Source" : None, \
+		'Sources' : \
+		[\
+		Input_Source(None,None,None)\
+		]}, \
+		'Maximum Isometric Force': {	"Primary Source" : None, \
+				'Sources': \
+					[\
+						Input_Source(None,None,None)\
+					]}\
+		}}
 
 	AN_Settings = {\
 		'Shoulder MA' : {"Primary Source" : "Est",\
@@ -259,7 +829,28 @@ def return_muscle_settings(PreselectedMuscles=None):
 		 					"Sources" : [MA_Settings(Pigeon_coeff_conversion([-5.3450,-2.2841,8.4297,-14.329,10.448,-2.736]), 'mm', None, None, 'Elbow', 'Pigeon; 1996')]}, \
 		'Spindle' : Spindle_Settings(None,None,None,None),\
 		'Mass' : (None, "N/A", "N/A"),\
-		'Optimal Muscle Length' : {"Primary Source" : None, "Sources" : [(None,None,None)]}}
+		'Optimal Muscle Length' : {"Primary Source" : None, "Sources" : [(None,None,None)]},\
+		'Optimal Tendon Length' : {	"Primary Source" : None, \
+			"Sources" : \
+				[\
+					Input_Source(None, None, None)\
+				]}, \
+		'Pennation Angle' : {	"Primary Source" : None, \
+		"Sources" : \
+			[\
+				Input_Source(None, None, None)\
+			]}, \
+		'PCSA' : {	"Primary Source" : None, \
+		'Sources' : \
+		[\
+		Input_Source(None,None,None)\
+		]}, \
+		'Maximum Isometric Force': {	"Primary Source" : None, \
+				'Sources': \
+					[\
+						Input_Source(None,None,None)\
+					]}\
+		}}
 
 	AllAvailableMuscles =[	"PC", "DELTa", "CB", "DELTp", "BIC", \
 							"TRI", "BRA", "BRD", "PRO", "FCR",\
@@ -330,6 +921,18 @@ def return_muscle_settings(PreselectedMuscles=None):
 		for Muscle in MusclesToBeDeleted:
 			del(AllMuscleSettings[Muscle])
 	return(AllMuscleSettings)
+def unit_angle_conversion(Value,Units):
+	import numpy as np
+	assert type(Units)==str, "Units must be a string."
+	assert Units.capitalize() in ["Degrees","Deg","Degree","Radians","Radian","Rad"], "Can covert inches, cm, and mm to meters. Please use appropriate Units."
+
+	if Units.capitalize() in ["Radians","Radian","Rad"]:
+		return(Value)
+	elif Units.capitalize() in ["Degrees","Deg","Degree"]:
+		if type(Value)==list:
+			return(list(np.array(Value)*np.pi/180))
+		else:
+			return(Value*np.pi/180)
 def unit_length_conversion(Value,Units):
 	assert type(Units)==str, "Units must be a string."
 	assert Units.capitalize() in ["In","Inches","Cm","Centimeters","Centimeter","Mm","Millimeters","Millimeter","Meters","Meter","M"], "Can covert inches, cm, and mm to meters. Please use appropriate Units."
@@ -418,18 +1021,22 @@ def return_MA_matrix_functions(AllMuscleSettings):
 		Parameters = ParameterList[np.where([params.Source == PrimarySource for params in ParameterList])[0][0]]
 		assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
 		src = Parameters.Source
-		Coefficients = unit_length_conversion(Parameters.Coefficients,Parameters.Units)
+		Coefficients = unit_length_conversion(Parameters.Values,Parameters.Units)
 		eq = Parameters.Equation_Number
 		dof = Parameters.DOF
 		threshold = Parameters.Threshold
 
 		global θ_SFE,θ_EFE,θ_PS
 		assert type(src) == str, "src must be a str."
-		assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
+		assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Holzbaur; 2005', 'Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
 		if dof != None:
 			assert type(dof) == str, "dof must be a str."
 			assert dof.capitalize() in ['Shoulder','Elbow'], "dof must be either Shoulder or Elbow."
-		if src.capitalize() == 'Pigeon; 1996' or src.capitalize() == 'Kuechle; 1997':
+		'''
+		Note:
+		For Kuechle and Holzbaur, where estimates or average MA were given, the format should be [MA,0,0,0,0,0] such that the function returns a constant MA function (See matrix multiplication below).
+		'''
+		if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
 			assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
 			assert dof != None, "For Pigeon (1996), dof must be stated."
 			eq = None
@@ -618,8 +1225,8 @@ k_1 = 0.046
 Lr1 = 1.17
 η = 0.01
 
-lo1 = return_optimal_length(AllMuscleSettings["BIC"])
-lo2 = return_optimal_length(AllMuscleSettings["TRI"])
+lo1 = return_primary_source(AllMuscleSettings["BIC"]["Optimal Muscle Length"])
+lo2 = return_primary_source(AllMuscleSettings["TRI"]["Optimal Muscle Length"])
 
 lo1 = unit_length_conversion(lo1[0],lo1[2])
 lo2 = unit_length_conversion(lo2[0],lo2[2])
