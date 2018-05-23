@@ -18,13 +18,9 @@ def return_muscle_settings(PreselectedMuscles=None):
 	Notes:
 	Coefficients from observation, Ramsay; 2009, FVC, Holtzbaur, Pigeon, Kuechle, or Banks. Optimal Muscle Length given in mm. Optimal tendon/muscle lengths and PCSA were taken from Garner and Pandy (2003)
 	"""
-	import sympy as sp
 	from sympy.utilities import lambdify
 	import numpy as np
 	from numpy import pi
-
-	global θ_SFE,θ_EFE,θ_PS
-	θ_SFE,θ_EFE,θ_PS = sp.symbols('θ_SFE'),sp.symbols('θ_EFE'),sp.symbols('θ_PS')
 
 	# Coefficients from observation, Ramsay; 2009, Pigeon, FVC, Holtzbaur, Garner & Pandy, or Banks.
 
@@ -1089,84 +1085,6 @@ def return_muscle_settings(PreselectedMuscles=None):
 		for Muscle in MusclesToBeDeleted:
 			del(AllMuscleSettings[Muscle])
 	return(AllMuscleSettings)
-# def unit_angle_conversion(params):
-# 	import numpy as np
-# 	Units = params.Units
-# 	Value = params.Values
-# 	assert type(Units)==str, "Units must be a string."
-# 	assert Units.capitalize() in ["Degrees","Deg","Degree","Radians","Radian","Rad","Rads"], "Can covert inches, cm, and mm to meters. Please use appropriate Units."
-#
-# 	if Units.capitalize() in ["Radians","Radian","Rad"]:
-# 		return(Value)
-# 	elif Units.capitalize() in ["Degrees","Deg","Degree"]:
-# 		if type(Value)==list:
-# 			return(list(np.array(Value)*np.pi/180))
-# 		else:
-# 			return(Value*np.pi/180)
-# def unit_length_conversion(params):
-# 	Units = params.Units
-# 	Value = params.Values
-# 	assert type(Units)==str, "Units must be a string."
-# 	assert Units.capitalize() in ["In","Inches","Cm","Centimeters","Centimeter","Mm","Millimeters","Millimeter","Meters","Meter","M"], "Can covert inches, cm, and mm to meters. Please use appropriate Units."
-#
-# 	if Units.capitalize() in ["Meter","Meters","M"]:
-# 		return(Value)
-# 	elif Units.capitalize() in ["In","Inches"]:
-# 		if type(Value)==list:
-# 			return(list(np.array(Value)*2.54/100))
-# 		else:
-# 			return(Value*2.54/100)
-# 	elif Units.capitalize() in  ["Cm","Centimeters","Centimeter"]:
-# 		if type(Value)==list:
-# 			return(list(np.array(Value)/100))
-# 		else:
-# 			return(Value/100)
-# 	elif Units.capitalize() in  ["Mm","Millimeters","Millimeter"]:
-# 		if type(Value)==list:
-# 			return(list(np.array(Value)/1000))
-# 		else:
-# 			return(Value/1000)
-# def unit_area_conversion(params):
-# 	Units = params.Units
-# 	Value = params.Values
-# 	assert type(Units)==str, "Units must be a string."
-# 	assert Units.capitalize() in ["Sq in","Squared inches","Inches squared","In sq","Cm sq","Sq cm","Centimeters squared","Squared centimeters","Mm sq","Sq mm","Millimeters squared","Squared millimeters","Meters squared","Squared meter","M sq","Sq m"], "Can covert inches², cm², and mm² to meters². Please use appropriate Units."
-#
-# 	if Units.capitalize() in ["Meters squared","Squared meter","M sq","Sq m"]:
-# 		return(Value)
-# 	elif Units.capitalize() in ["Sq in","Squared inches","Inches squared","In sq"]:
-# 		if type(Value)==list:
-# 			return(list(np.array(Value)*((2.54/100)**2)))
-# 		else:
-# 			return(Value*((2.54/100)**2))
-# 	elif Units.capitalize() in ["Cm sq","Sq cm","Centimeters squared","Squared centimeters"]:
-# 		if type(Value)==list:
-# 			return(list(np.array(Value)/(100**2)))
-# 		else:
-# 			return(Value/(100**2))
-# 	elif Units.capitalize() in ["Mm sq","Sq mm","Millimeters squared","Squared millimeters"]:
-# 		if type(Value)==list:
-# 			return(list(np.array(Value)/(1000**2)))
-# 		else:
-# 			return(Value/(1000**2))
-# def unit_mass_conversion(params):
-# 	Units = params.Units
-# 	Value = params.Values
-# 	assert type(Units)==str, "Units must be a string."
-# 	assert Units.capitalize() in ["Lbs","Lb","Pounds","G","Grams","Gram","Kg","Kilograms","Kilogram"], "Can covert lbs and g to kilograms. Please use appropriate Units."
-#
-# 	if Units.capitalize() in ["Kg","Kilograms","Kilogram"]:
-# 		return(Value)
-# 	elif Units.capitalize() in ["G","Grams","Gram"]:
-# 		if type(Value)==list:
-# 			return(list(np.array(Value)/1000))
-# 		else:
-# 			return(Value/1000)
-# 	elif Units.capitalize() in  ["Lbs","Lb","Pounds"]:
-# 		if type(Value)==list:
-# 			return(list(np.array(Value)*0.45359237))
-# 		else:
-# 			return(Value*0.45359237)
 def unit_conversion(Params):
 	import numpy as np
 	Units = Params.Units
@@ -1246,92 +1164,381 @@ def return_optimal_length(MuscleSettings):
 	OptimalMuscleLengthsList = MuscleSettings["Optimal Muscle Length"]["Sources"]
 	PrimarySource = MuscleSettings["Optimal Muscle Length"]["Primary Source"]
 	return(OptimalMuscleLengthsList[np.where([src[1] == PrimarySource for src in OptimalMuscleLengthsList])[0][0]])
-def return_MA_matrix_functions(AllMuscleSettings):
+def MA_function(Parameters,θ_PS=None):
+	"""
+	Note:
+
+	Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
+
+	Notes:
+
+	threshold is only needed for Pigeon or Ramsay; 2009 MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
+
+	eq is only needed for Ramsay; 2009 (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
+	"""
 	import numpy as np
-	import sympy as sp
-	from sympy.utilities import lambdify
-	def MA_function(Parameters):
-		"""
-		Note:
+	Parameters = return_primary_source(Parameters)
+	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
+	if θ_PS==None:
+		θ_PS = np.pi
+	else:
+		assert type(θ_PS)==float, "θ_PS must be a float."
+	src = Parameters.Source
+	Coefficients = unit_conversion(Parameters)
+	eq = Parameters.Equation_Number
+	threshold = Parameters.Threshold
 
-		Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
+	assert type(src) == str, "src must be a str."
+	assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Holzbaur; 2005', 'Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
 
-		Notes:
+	'''
+	Note:
+	For Kuechle and Holzbaur, where estimates or average MA were given, the format should be [MA,0,0,0,0,0] such that the function returns a constant MA function (See matrix multiplication below).
+	'''
 
-		threshold is only needed for Pigeon or Ramsay; 2009 MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
-
-		dof only needed for Pigeon (Ramsay; 2009 only handles EFE for this 2 DOF system). Must be either 'Shoulder' or 'Elbow'.
-
-		eq is only needed for Ramsay; 2009 (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
-		"""
-		import sympy as sp
-		import numpy as np
-		Parameters = return_primary_source(Parameters)
-		assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
-		src = Parameters.Source
-		Coefficients = unit_conversion(Parameters)
-		eq = Parameters.Equation_Number
-		dof = Parameters.DOF
-		threshold = Parameters.Threshold
-
-		global θ_SFE,θ_EFE,θ_PS
-		assert type(src) == str, "src must be a str."
-		assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Holzbaur; 2005', 'Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
-		if dof != None:
-			assert type(dof) == str, "dof must be a str."
-			assert dof.capitalize() in ['Shoulder','Elbow'], "dof must be either Shoulder or Elbow."
-		'''
-		Note:
-		For Kuechle and Holzbaur, where estimates or average MA were given, the format should be [MA,0,0,0,0,0] such that the function returns a constant MA function (See matrix multiplication below).
-		'''
-		if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
-			assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
-			assert dof != None, "For Pigeon (1996), dof must be stated."
-			eq = None
-			if dof.capitalize() == 'Elbow MA':
-				θ = θ_EFE
-			else:
-				θ = θ_SFE
-			MomentArm = (np.matrix(Coefficients,dtype='float64')\
-							*np.matrix([1,θ,θ**2,θ**3,θ**4,θ**5]).T)[0,0]
-		elif src.capitalize() == 'Est':
-			MomentArm = np.array(Coefficients,dtype='float64')
-		else: #src.capitalize() == 'Ramsay; 2009'
-			θ = θ_EFE
-			assert type(Coefficients) == list, "Coefficients must be a list."
-			assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
-			assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay; 2009 (2009)."
-			if eq == 1:
-				assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
-				MomentArm = (sp.Matrix(Coefficients,dtype='float64').T\
-								*sp.Matrix([1,θ,θ**2,θ**3,θ**4]))[0,0]
-			elif eq == 2:
-				assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
-				MomentArm = (sp.Matrix(Coefficients,dtype='float64').T*\
-								sp.Matrix([1, θ, θ_PS, θ*θ_PS, θ**2, \
-											θ_PS**2, (θ**2)*θ_PS, θ*(θ_PS**2), \
-											(θ**2)*(θ_PS**2), θ**3, θ_PS**3, \
-											(θ**3)*θ_PS, θ*(θ_PS**3), \
-											(θ**3)*(θ_PS**2), (θ**2)*(θ_PS**3), \
-											(θ**3)*(θ_PS**3)]))[0, 0]
-			else: # eq == 3
-				assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
-				MomentArm = (sp.Matrix(Coefficients,dtype='float64').T*\
-								sp.Matrix([1, θ, θ_PS, θ*θ_PS, θ**2, \
+	if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
+		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
+		MomentArm = lambda θ: (np.matrix(Coefficients,dtype='float64')\
+										*np.matrix([1,θ,θ**2,θ**3,θ**4,θ**5]).T)[0,0]
+	elif src.capitalize() == 'Est':
+		MomentArm = lambda θ: np.array(Coefficients,dtype='float64')
+	else: #src.capitalize() == 'Ramsay; 2009'
+		assert type(Coefficients) == list, "Coefficients must be a list."
+		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
+		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay; 2009 (2009)."
+		if eq == 1:
+			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
+			MomentArm = lambda θ: \
+					(np.matrix(Coefficients,dtype='float64')*\
+						np.matrix([1,θ,θ**2,θ**3,θ**4]).T)[0,0]
+		elif eq == 2:
+			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
+			MomentArm = lambda θ: \
+					(np.matrix(Coefficients,dtype='float64')*\
+						np.matrix([1, θ, θ_PS, θ*θ_PS, θ**2, \
+									θ_PS**2, (θ**2)*θ_PS, θ*(θ_PS**2), \
+									(θ**2)*(θ_PS**2), θ**3, θ_PS**3, \
+									(θ**3)*θ_PS, θ*(θ_PS**3), \
+									(θ**3)*(θ_PS**2), (θ**2)*(θ_PS**3), \
+									(θ**3)*(θ_PS**3)]).T)[0, 0]
+		else: # eq == 3
+			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
+			MomentArm = lambda θ: \
+					(np.matrix(Coefficients,dtype='float64')*\
+						np.matrix([1, θ, θ_PS, θ*θ_PS, θ**2, \
 									θ_PS**2, (θ**2)*θ_PS, θ*(θ_PS**2), (θ**2)*(θ_PS**2), \
 									θ**3, (θ**3)*θ_PS, (θ**3)*(θ_PS**2), \
 									θ**4, (θ**4)*θ_PS, (θ**4)*(θ_PS**2),  \
-									θ**5, (θ**5)*θ_PS, (θ**5)*(θ_PS**2)]))[0, 0]
-		if threshold == None:
-			return(MomentArm)
-		else:
-			assert type(threshold) in [int,float], "threshold must be a number."
-			MomentArm = sp.Piecewise((MomentArm,θ<threshold),(MomentArm.subs(θ,threshold),θ>=threshold))
-			return(MomentArm)
+									θ**5, (θ**5)*θ_PS, (θ**5)*(θ_PS**2)]).T)[0, 0]
+	if threshold == None:
+		return(MomentArm)
+	else:
+		assert type(threshold) in [int,float], "threshold must be a number."
+		PiecewiseMomentArm = lambda θ:\
+					np.piecewise(θ,[θ<threshold,θ>=threshold],\
+									[MomentArm(θ),MomentArm(threshold)])
+		return(PiecewiseMomentArm)
+def MA_deriv(Parameters,θ_PS=None):
 	"""
-	Working towards doing away with symbolic representation. 05/21/18.
+	Note:
+
+	Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
+
+	Notes:
+
+	threshold is only needed for Pigeon or Ramsay; 2009 MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
+
+	eq is only needed for Ramsay; 2009 (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
 	"""
-	# def MA_deriv(Parameters):
+	import numpy as np
+	Parameters = return_primary_source(Parameters)
+	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
+	if θ_PS==None:
+		θ_PS = np.pi
+	else:
+		assert type(θ_PS)==float, "θ_PS must be a float."
+	src = Parameters.Source
+	Coefficients = unit_conversion(Parameters)
+	eq = Parameters.Equation_Number
+	threshold = Parameters.Threshold
+
+	assert type(src) == str, "src must be a str."
+	assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Holzbaur; 2005', 'Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
+
+	'''
+	Note:
+	For Kuechle and Holzbaur, where estimates or average MA were given, the format should be [MA,0,0,0,0,0] such that the function returns a constant MA function (See matrix multiplication below).
+	'''
+
+	if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
+		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
+		"""
+		(d/dθ) [MomentArm] = (np.matrix(Coefficients,dtype='float64')\
+						*np.matrix([(d/dθ)[1],(d/dθ)[θ],(d/dθ)[θ**2],\
+										(d/dθ)[θ**3],(d/dθ)[θ**4],(d/dθ)[θ**5]]).T)[0,0]
+		"""
+		Derivative = lambda θ: (np.matrix(Coefficients,dtype='float64')\
+						*np.matrix([0,1,(2*θ),(3*θ**2),(4*θ**3),(5*θ**4)]).T)[0,0]
+	elif src.capitalize() == 'Est':
+		"""
+		(d/dθ)[MomentArm] = np.array((d/dθ)[Coefficients],dtype='float64')
+		"""
+		Derivative = lambda θ:  0
+	else: #src.capitalize() == 'Ramsay; 2009'
+		assert type(Coefficients) == list, "Coefficients must be a list."
+		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
+		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay; 2009 (2009)."
+		if eq == 1:
+			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
+			"""
+			(d/dθ)[MomentArm] = (np.matrix(Coefficients,dtype='float64')\
+									*np.matrix([	(d/dθ)[1],		(d/dθ)[θ],\
+													(d/dθ)[θ**2],	(d/dθ)[θ**3],\
+													(d/dθ)[θ**4]]).T)[0,0]
+			"""
+			Derivative = lambda θ: (np.matrix(Coefficients,dtype='float64')\
+							*np.matrix([	0,				1,\
+											(2*θ),			(3*θ**2),\
+											(4*θ**3)]).T)[0,0]
+		elif eq == 2:
+			"""
+			This is only good for this ReferenceTracking Ex where PS is fixed. Derivative is only wrt one DOF.
+			"""
+			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
+			"""
+			(d/dθ)[MomentArm] = \
+					(np.matrix(Coefficients,dtype='float64')*\
+							np.matrix([(d/dθ)[1], 					(d/dθ)[θ], \
+										(d/dθ)[θ_PS], 				(d/dθ)[θ*θ_PS],\
+										(d/dθ)[θ**2],				(d/dθ)[θ_PS**2],\
+										(d/dθ)[(θ**2)*θ_PS],		(d/dθ)[θ*(θ_PS**2)],\
+										(d/dθ)[(θ**2)*(θ_PS**2)],	(d/dθ)[θ**3], \
+										(d/dθ)[θ_PS**3], 			(d/dθ)[(θ**3)*θ_PS],\
+										(d/dθ)[θ*(θ_PS**3)],		(d/dθ)[(θ**3)*(θ_PS**2)],\
+										(d/dθ)[(θ**2)*(θ_PS**3)],	(d/dθ)[(θ**3)*(θ_PS**3)]\
+										]).T)[0, 0]
+			"""
+			Derivative = lambda θ: (np.matrix(Coefficients,dtype='float64')*\
+							np.matrix([ 0, 					1,\
+										0,  				θ_PS, \
+										(2*θ), 				0, \
+										(2*θ)*θ_PS, 		(θ_PS**2), 	\
+										(2*θ)*(θ_PS**2), 	(3*θ**2), \
+										0, 					(3*θ**2)*θ_PS, \
+										(θ_PS**3), 			(3*θ**2)*(θ_PS**2), \
+										(2*θ)*(θ_PS**3),	(3*θ**2)*(θ_PS**3)]).T)[0, 0]
+		else: # eq == 3
+			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
+			"""
+			(d/dθ)[MomentArm] = \
+					(np.matrix(Coefficients,dtype='float64')*\
+							np.matrix([(d/dθ)[1], 					(d/dθ)[θ], \
+										(d/dθ)[θ_PS], 				(d/dθ)[θ*θ_PS],\
+										(d/dθ)[θ**2], 				(d/dθ)[θ_PS**2],\
+										(d/dθ)[(θ**2)*θ_PS], 		(d/dθ)[θ*(θ_PS**2)],\
+										(d/dθ)[(θ**2)*(θ_PS**2)], 	(d/dθ)[θ**3],\
+										(d/dθ)[(θ**3)*θ_PS], 		(d/dθ)[(θ**3)*(θ_PS**2)],\
+										(d/dθ)[θ**4], 				(d/dθ)[(θ**4)*θ_PS],\
+										(d/dθ)[(θ**4)*(θ_PS**2)],  	(d/dθ)[θ**5],\
+										(d/dθ)[(θ**5)*θ_PS], 		(d/dθ)[(θ**5)*(θ_PS**2)\
+										]]).T)[0, 0]
+			"""
+			Derivative = lambda θ: (np.matrix(Coefficients,dtype='float64')*\
+								np.matrix([	0, 					1,\
+											0, 					θ_PS,\
+										  	(2*θ),				0,\
+									 		(2*θ)*θ_PS, 		(θ_PS**2),\
+									  		(2*θ)*(θ_PS**2),	(3*θ**2),\
+									 		(3*θ**2)*θ_PS, 		(3*θ**2)*(θ_PS**2),\
+											(4*θ**3), 			(4*θ**3)*θ_PS,\
+									 		(4*θ**3)*(θ_PS**2),	(5*θ**4),\
+									 		(5*θ**4)*θ_PS, 		(5*θ**4)*(θ_PS**2)]).T)[0, 0]
+	if threshold == None:
+		return(Derivative)
+	else:
+		assert type(threshold) in [int,float], "threshold must be a number."
+		PiecewiseDerivative = lambda θ:\
+									np.piecewise(θ,[θ<threshold,θ>=threshold],\
+													[Derivative(θ),0])
+		return(PiecewiseDerivative)
+def MA_2nd_deriv(Parameters,θ_PS=None):
+	"""
+	Note:
+
+	Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
+
+	Notes:
+
+	threshold is only needed for Pigeon or Ramsay; 2009 MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
+
+	eq is only needed for Ramsay; 2009 (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
+	"""
+
+	import numpy as np
+	Parameters = return_primary_source(Parameters)
+	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
+	if θ_PS==None:
+		θ_PS = np.pi
+	else:
+		assert type(θ_PS)==float, "θ_PS must be a float."
+	src = Parameters.Source
+	Coefficients = unit_conversion(Parameters)
+	eq = Parameters.Equation_Number
+	threshold = Parameters.Threshold
+
+	assert type(src) == str, "src must be a str."
+	assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Holzbaur; 2005', 'Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
+
+	'''
+	Note:
+	For Kuechle and Holzbaur, where estimates or average MA were given, the format should be [MA,0,0,0,0,0] such that the function returns a constant MA function (See matrix multiplication below).
+	'''
+
+	if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
+		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
+		"""
+		(d²/dθ²) [MomentArm] \
+			= (np.matrix(Coefficients,dtype='float64')\
+						*np.matrix([(d²/dθ²)[1],		(d²/dθ²)[θ],\
+									(d²/dθ²)[θ**2],		(d²/dθ²)[θ**3],\
+									(d²/dθ²)[θ**4],		(d²/dθ²)[θ**5]]).T)[0,0]
+
+			= (d/dθ)[Derivative]
+			= (np.matrix(Coefficients,dtype='float64')\
+						*np.matrix([(d/dθ)[0],			(d/dθ)[1],\
+									(d/dθ)[(2*θ)],		(d/dθ)[(3*θ**2)],\
+									(d/dθ)[(4*θ**3)],	(d/dθ)[(5*θ**4)]]).T)[0,0]
+		"""
+
+		SecondDerivative = lambda θ: (np.matrix(Coefficients,dtype='float64')\
+											*np.matrix([0,			0,\
+														2,			6*θ,\
+														(12*θ**2),	(20*θ**3)]).T)[0,0]
+	elif src.capitalize() == 'Est':
+		"""
+		(d²/dθ²)[MomentArm] = np.array((d²/dθ²)[Coefficients],dtype='float64')
+		"""
+		# (d/dθ)[Derivative] = lambda θ:  (d/dθ)[0]
+		SecondDerivative = lambda θ:  0
+	else: #src.capitalize() == 'Ramsay; 2009'
+		assert type(Coefficients) == list, "Coefficients must be a list."
+		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
+		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay; 2009 (2009)."
+		if eq == 1:
+			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
+			"""
+			(d²/dθ²)[MomentArm] \
+				= (np.matrix(Coefficients,dtype='float64')\
+							*np.matrix([(d²/dθ²)[1],		(d²/dθ²)[θ],\
+										(d²/dθ²)[θ**2],		(d²/dθ²)[θ**3],\
+										(d²/dθ²)[θ**4]]).T)[0,0]
+
+				= (d/dθ)[Derivative] \
+				= (np.matrix(Coefficients,dtype='float64')\
+							*np.matrix([(d/dθ)[0],			(d/dθ)[1],\
+										(d/dθ)[(2*θ)],  	(d/dθ)[(3*θ**2)],\
+										(d/dθ)[(4*θ**3)]]).T)[0,0]
+			"""
+			SecondDerivative = lambda θ: \
+						(np.matrix(Coefficients,dtype='float64')\
+								*np.matrix([0,			0,\
+											2, 			6*θ,\
+											(12*θ**2)				]).T)[0,0]
+		elif eq == 2:
+			"""
+			This is only good for this ReferenceTracking Ex where PS is fixed. Derivative is only wrt one DOF.
+			"""
+			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
+			"""
+			(d²/dθ²)[MomentArm] \
+				= (np.matrix(Coefficients,dtype='float64')*\
+						np.matrix([	(d²/dθ²)[1], 				(d²/dθ²)[θ], \
+									(d²/dθ²)[θ_PS], 			(d²/dθ²)[θ*θ_PS],\
+									(d²/dθ²)[θ**2],				(d²/dθ²)[θ_PS**2],\
+									(d²/dθ²)[(θ**2)*θ_PS],		(d²/dθ²)[θ*(θ_PS**2)],\
+									(d²/dθ²)[(θ**2)*(θ_PS**2)],	(d²/dθ²)[θ**3], \
+									(d²/dθ²)[θ_PS**3], 			(d²/dθ²)[(θ**3)*θ_PS],\
+									(d²/dθ²)[θ*(θ_PS**3)],		(d²/dθ²)[(θ**3)*(θ_PS**2)],\
+									(d²/dθ²)[(θ**2)*(θ_PS**3)],	(d²/dθ²)[(θ**3)*(θ_PS**3)]\
+									]).T)[0, 0]
+
+				= (d/dθ)[Derivative] \
+				= (np.matrix(Coefficients,dtype='float64')*\
+						np.matrix([ (d/dθ)[0], 					(d/dθ)[1], \
+									(d/dθ)[0], 					(d/dθ)[θ_PS], \
+									(d/dθ)[(2*θ)], 				(d/dθ)[0], \
+									(d/dθ)[(2*θ)*θ_PS], 		(d/dθ)[(θ_PS**2)], \
+									(d/dθ)[(2*θ)*(θ_PS**2)], 	(d/dθ)[(3*θ**2)], \
+									(d/dθ)[0], 					(d/dθ)[(3*θ**2)*θ_PS], \
+									(d/dθ)[(θ_PS**3)], 			(d/dθ)[(3*θ**2)*(θ_PS**2)], \
+									(d/dθ)[(2*θ)*(θ_PS**3)],	(d/dθ)[(3*θ**2)*(θ_PS**3)]\
+									]).T)[0, 0]
+			"""
+			SecondDerivative = lambda θ: \
+					(np.matrix(Coefficients,dtype='float64')*\
+						np.matrix([ 0, 					0,\
+						 			0,					0,\
+									2,					0,\
+				 					2*θ_PS,				0,\
+						 			2*(θ_PS**2),		(6*θ),\
+									0,					(6*θ)*θ_PS,\
+									0,					(6*θ)*(θ_PS**2),\
+									2*(θ_PS**3),		(6*θ)*(θ_PS**3)\
+									]).T)[0, 0]
+		else: # eq == 3
+			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
+			"""
+			(d²/dθ²)[MomentArm] \
+				= (np.matrix(Coefficients,dtype='float64')*\
+						np.matrix([(d²/dθ²)[1], 					(d²/dθ²)[θ], \
+									(d²/dθ²)[θ_PS], 				(d²/dθ²)[θ*θ_PS],\
+									(d²/dθ²)[θ**2], 				(d²/dθ²)[θ_PS**2],\
+									(d²/dθ²)[(θ**2)*θ_PS], 			(d²/dθ²)[θ*(θ_PS**2)],\
+									(d²/dθ²)[(θ**2)*(θ_PS**2)], 	(d²/dθ²)[θ**3],\
+									(d²/dθ²)[(θ**3)*θ_PS], 			(d²/dθ²)[(θ**3)*(θ_PS**2)],\
+									(d²/dθ²)[θ**4], 				(d²/dθ²)[(θ**4)*θ_PS],\
+									(d²/dθ²)[(θ**4)*(θ_PS**2)], 	(d²/dθ²)[θ**5],\
+									(d²/dθ²)[(θ**5)*θ_PS], 			(d²/dθ²)[(θ**5)*(θ_PS**2)\
+									]]).T)[0, 0]
+
+				= (d/dθ)[Derivative] \
+				= (np.matrix(Coefficients,dtype='float64')*\
+						np.matrix([	(d/dθ)[0], 					(d/dθ)[1],\
+									(d/dθ)[0], 					(d/dθ)[θ_PS],\
+								  	(d/dθ)[(2*θ)],				(d/dθ)[0],\
+							 		(d/dθ)[(2*θ)*θ_PS], 		(d/dθ)[(θ_PS**2)],\
+							  		(d/dθ)[(2*θ)*(θ_PS**2)],	(d/dθ)[(3*θ**2)],\
+							 		(d/dθ)[(3*θ**2)*θ_PS], 		(d/dθ)[(3*θ**2)*(θ_PS**2)],\
+									(d/dθ)[(4*θ**3)], 			(d/dθ)[(4*θ**3)*θ_PS],\
+							 		(d/dθ)[(4*θ**3)*(θ_PS**2)],	(d/dθ)[(5*θ**4)],\
+							 		(d/dθ)[(5*θ**4)*θ_PS], 		(d/dθ)[(5*θ**4)*(θ_PS**2)]\
+									]).T)[0, 0]
+			"""
+			SecondDerivative = lambda θ: \
+					(np.matrix(Coefficients,dtype='float64')*\
+							np.matrix([	0, 						0,\
+										0, 						0,\
+										2,						0,\
+										2*θ_PS, 				0,\
+										2*(θ_PS**2),			(6*θ),\
+										(6*θ)*θ_PS, 			(6*θ)*(θ_PS**2),\
+										(12*θ**2), 				(12*θ**2)*θ_PS,\
+										(12*θ**2)*(θ_PS**2),	(20*θ**3),\
+										(20*θ**3)*θ_PS, 		(20*θ**3)*(θ_PS**2)\
+										]).T)[0, 0]
+	if threshold == None:
+		return(SecondDerivative)
+	else:
+		assert type(threshold) in [int,float], "threshold must be a number."
+		PiecewiseSecondDerivative = lambda θ:\
+									np.piecewise(θ,[θ<threshold,θ>=threshold],\
+													[SecondDerivative(θ),0])
+		return(PiecewiseSecondDerivative)
+def return_MA_matrix_functions(AllMuscleSettings,ReturnMatrixFunction=False,θ_PS=None):
+	import numpy as np
+	import sympy as sp
+	from sympy.utilities import lambdify
+	# def MA_function(Parameters):
 	# 	"""
 	# 	Note:
 	#
@@ -1368,55 +1575,435 @@ def return_MA_matrix_functions(AllMuscleSettings):
 	# 	if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
 	# 		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
 	# 		assert dof != None, "For Pigeon (1996), dof must be stated."
-	# 		Derivative = lambda θ: (np.matrix(Coefficients[1:],dtype='float64')\
-	# 						*np.matrix([1,2*θ,3*θ**2,4*θ**3,5*θ**4]).T)[0,0]
+	# 		eq = None
+	# 		if dof.capitalize() == 'Elbow MA':
+	# 			θ = θ_EFE
+	# 		else:
+	# 			θ = θ_SFE
+	# 		MomentArm = (np.matrix(Coefficients,dtype='float64')\
+	# 						*np.matrix([1,θ,θ**2,θ**3,θ**4,θ**5]).T)[0,0]
 	# 	elif src.capitalize() == 'Est':
-	# 		Derivative = lambda θ: 0
+	# 		MomentArm = np.array(Coefficients,dtype='float64')
+	# 	else: #src.capitalize() == 'Ramsay; 2009'
+	# 		θ = θ_EFE
+	# 		assert type(Coefficients) == list, "Coefficients must be a list."
+	# 		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
+	# 		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay; 2009 (2009)."
+	# 		if eq == 1:
+	# 			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
+	# 			MomentArm = (sp.Matrix(Coefficients,dtype='float64').T\
+	# 							*sp.Matrix([1,θ,θ**2,θ**3,θ**4]))[0,0]
+	# 		elif eq == 2:
+	# 			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
+	# 			MomentArm = (sp.Matrix(Coefficients,dtype='float64').T*\
+	# 							sp.Matrix([1, θ, θ_PS, θ*θ_PS, θ**2, \
+	# 										θ_PS**2, (θ**2)*θ_PS, θ*(θ_PS**2), \
+	# 										(θ**2)*(θ_PS**2), θ**3, θ_PS**3, \
+	# 										(θ**3)*θ_PS, θ*(θ_PS**3), \
+	# 										(θ**3)*(θ_PS**2), (θ**2)*(θ_PS**3), \
+	# 										(θ**3)*(θ_PS**3)]))[0, 0]
+	# 		else: # eq == 3
+	# 			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
+	# 			MomentArm = (sp.Matrix(Coefficients,dtype='float64').T*\
+	# 							sp.Matrix([1, θ, θ_PS, θ*θ_PS, θ**2, \
+	# 								θ_PS**2, (θ**2)*θ_PS, θ*(θ_PS**2), (θ**2)*(θ_PS**2), \
+	# 								θ**3, (θ**3)*θ_PS, (θ**3)*(θ_PS**2), \
+	# 								θ**4, (θ**4)*θ_PS, (θ**4)*(θ_PS**2),  \
+	# 								θ**5, (θ**5)*θ_PS, (θ**5)*(θ_PS**2)]))[0, 0]
+	# 	if threshold == None:
+	# 		return(MomentArm)
+	# 	else:
+	# 		assert type(threshold) in [int,float], "threshold must be a number."
+	# 		MomentArm = sp.Piecewise((MomentArm,θ<threshold),(MomentArm.subs(θ,threshold),θ>=threshold))
+	# 		return(MomentArm)
+	# def MA_function(Parameters):
+	# 	"""
+	# 	Note:
+	#
+	# 	Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
+	#
+	# 	Notes:
+	#
+	# 	threshold is only needed for Pigeon or Ramsay; 2009 MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
+	#
+	# 	eq is only needed for Ramsay; 2009 (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
+	# 	"""
+	# 	import numpy as np
+	# 	Parameters = return_primary_source(Parameters)
+	# 	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
+	# 	src = Parameters.Source
+	# 	Coefficients = unit_conversion(Parameters)
+	# 	eq = Parameters.Equation_Number
+	# 	threshold = Parameters.Threshold
+	#
+	# 	assert type(src) == str, "src must be a str."
+	# 	assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Holzbaur; 2005', 'Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
+	#
+	# 	'''
+	# 	Note:
+	# 	For Kuechle and Holzbaur, where estimates or average MA were given, the format should be [MA,0,0,0,0,0] such that the function returns a constant MA function (See matrix multiplication below).
+	# 	'''
+	#
+	# 	if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
+	# 		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
+	# 		MomentArm = lambda θ,θ_PS: (np.matrix(Coefficients,dtype='float64')\
+	# 										*np.matrix([1,θ,θ**2,θ**3,θ**4,θ**5]).T)[0,0]
+	# 	elif src.capitalize() == 'Est':
+	# 		MomentArm = lambda θ,θ_PS: np.array(Coefficients,dtype='float64')
 	# 	else: #src.capitalize() == 'Ramsay; 2009'
 	# 		assert type(Coefficients) == list, "Coefficients must be a list."
 	# 		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
 	# 		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay; 2009 (2009)."
 	# 		if eq == 1:
 	# 			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
-	# 			Derivative = (np.matrix(Coefficients[1:],dtype='float64').T\
-	# 							*np.matrix([1,2*θ,3*θ**2,4*θ**3]))[0,0]
+	# 			MomentArm = lambda θ,θ_PS: \
+	# 					(np.matrix(Coefficients,dtype='float64').T*\
+	# 						np.matrix([1,θ,θ**2,θ**3,θ**4]))[0,0]
+	# 		elif eq == 2:
+	# 			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
+	# 			MomentArm = lambda θ,θ_PS: \
+	# 					(np.matrix(Coefficients,dtype='float64').T*\
+	# 						np.matrix([1, θ, θ_PS, θ*θ_PS, θ**2, \
+	# 									θ_PS**2, (θ**2)*θ_PS, θ*(θ_PS**2), \
+	# 									(θ**2)*(θ_PS**2), θ**3, θ_PS**3, \
+	# 									(θ**3)*θ_PS, θ*(θ_PS**3), \
+	# 									(θ**3)*(θ_PS**2), (θ**2)*(θ_PS**3), \
+	# 									(θ**3)*(θ_PS**3)]))[0, 0]
+	# 		else: # eq == 3
+	# 			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
+	# 			MomentArm = lambda θ,θ_PS: \
+	# 					(np.matrix(Coefficients,dtype='float64').T*\
+	# 						np.matrix([1, θ, θ_PS, θ*θ_PS, θ**2, \
+	# 									θ_PS**2, (θ**2)*θ_PS, θ*(θ_PS**2), (θ**2)*(θ_PS**2), \
+	# 									θ**3, (θ**3)*θ_PS, (θ**3)*(θ_PS**2), \
+	# 									θ**4, (θ**4)*θ_PS, (θ**4)*(θ_PS**2),  \
+	# 									θ**5, (θ**5)*θ_PS, (θ**5)*(θ_PS**2)]))[0, 0]
+	# 	if threshold == None:
+	# 		return(MomentArm)
+	# 	else:
+	# 		assert type(threshold) in [int,float], "threshold must be a number."
+	# 		MomentArm = lambda θ,θ_PS:\
+	# 					np.piecewise(θ,[θ<threshold,θ>=threshold],\
+	# 									[MomentArm(θ,θ_PS),MomentArm(threshold,θ_PS)])
+	# 		return(MomentArm)
+	# def MA_deriv(Parameters):
+	# 	"""
+	# 	Note:
+	#
+	# 	Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
+	#
+	# 	Notes:
+	#
+	# 	threshold is only needed for Pigeon or Ramsay; 2009 MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
+	#
+	# 	eq is only needed for Ramsay; 2009 (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
+	# 	"""
+	# 	import numpy as np
+	# 	Parameters = return_primary_source(Parameters)
+	# 	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
+	# 	src = Parameters.Source
+	# 	Coefficients = unit_conversion(Parameters)
+	# 	eq = Parameters.Equation_Number
+	# 	threshold = Parameters.Threshold
+	#
+	# 	assert type(src) == str, "src must be a str."
+	# 	assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Holzbaur; 2005', 'Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
+	#
+	# 	'''
+	# 	Note:
+	# 	For Kuechle and Holzbaur, where estimates or average MA were given, the format should be [MA,0,0,0,0,0] such that the function returns a constant MA function (See matrix multiplication below).
+	# 	'''
+	#
+	# 	if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
+	# 		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
+	# 		"""
+	# 		(d/dθ) [MomentArm] = (np.matrix(Coefficients,dtype='float64')\
+	# 						*np.matrix([(d/dθ)[1],(d/dθ)[θ],(d/dθ)[θ**2],\
+	# 										(d/dθ)[θ**3],(d/dθ)[θ**4],(d/dθ)[θ**5]]).T)[0,0]
+	# 		"""
+	# 		Derivative = lambda θ,θ_PS: (np.matrix(Coefficients,dtype='float64')\
+	# 						*np.matrix([0,1,(2*θ),(3*θ**2),(4*θ**3),(5*θ**4)]).T)[0,0]
+	# 	elif src.capitalize() == 'Est':
+	# 		"""
+	# 		(d/dθ)[MomentArm] = np.array((d/dθ)[Coefficients],dtype='float64')
+	# 		"""
+	# 		Derivative = lambda θ,θ_PS:  0
+	# 	else: #src.capitalize() == 'Ramsay; 2009'
+	# 		assert type(Coefficients) == list, "Coefficients must be a list."
+	# 		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
+	# 		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay; 2009 (2009)."
+	# 		if eq == 1:
+	# 			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
+	# 			"""
+	# 			(d/dθ)[MomentArm] = (np.matrix(Coefficients,dtype='float64').T\
+	# 									*np.matrix([(d/dθ)[1],(d/dθ)[θ],(d/dθ)[θ**2],\
+	# 													(d/dθ)[θ**3],(d/dθ)[θ**4]]))[0,0]
+	# 			"""
+	# 			Derivative = lambda θ,θ_PS: (np.matrix(Coefficients,dtype='float64').T\
+	# 							*np.matrix([0,			1,			(2*θ),\
+	# 										(3*θ**2),		(4*θ**3)				]))[0,0]
 	# 		elif eq == 2:
 	# 			"""
 	# 			This is only good for this ReferenceTracking Ex where PS is fixed. Derivative is only wrt one DOF.
 	# 			"""
 	# 			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
-	# 			Derivative = (np.matrix(Coefficients[1:],dtype='float64').T*\
-	# 							np.matrix([ 1, 0, θ_PS, 2*θ, \
-	# 										0, (2*θ)*θ_PS, θ_PS**2, \
-	# 										(2*θ)*(θ_PS**2), 3*θ**2, 0, \
-	# 										(3*θ**2)*θ_PS, θ_PS**3, \
-	# 										(3*θ**2)*(θ_PS**2), (2*θ)*(θ_PS**3), \
-	# 										(3*θ**2)*(θ_PS**3)]))[0, 0]
+	# 			"""
+	# 			(d/dθ)[MomentArm] = \
+	# 					(np.matrix(Coefficients,dtype='float64').T*\
+	# 							np.matrix([(d/dθ)[1], 					(d/dθ)[θ], \
+	# 										(d/dθ)[θ_PS], 				(d/dθ)[θ*θ_PS],\
+	# 										(d/dθ)[θ**2],				(d/dθ)[θ_PS**2],\
+	# 										(d/dθ)[(θ**2)*θ_PS],		(d/dθ)[θ*(θ_PS**2)],\
+	# 										(d/dθ)[(θ**2)*(θ_PS**2)],	(d/dθ)[θ**3], \
+	# 										(d/dθ)[θ_PS**3], 			(d/dθ)[(θ**3)*θ_PS],\
+	# 										(d/dθ)[θ*(θ_PS**3)],		(d/dθ)[(θ**3)*(θ_PS**2)],\
+	# 										(d/dθ)[(θ**2)*(θ_PS**3)],	(d/dθ)[(θ**3)*(θ_PS**3)]\
+	# 										]))[0, 0]
+	# 			"""
+	# 			Derivative = lambda θ,θ_PS: (np.matrix(Coefficients,dtype='float64').T*\
+	# 							np.matrix([ 0, 					1,\
+	# 										0,  				θ_PS, \
+	# 										(2*θ), 				0, \
+	# 										(2*θ)*θ_PS, 		(θ_PS**2), 	\
+	# 										(2*θ)*(θ_PS**2), 	(3*θ**2), \
+	# 										0, 					(3*θ**2)*θ_PS, \
+	# 										(θ_PS**3), 			(3*θ**2)*(θ_PS**2), \
+	# 										(2*θ)*(θ_PS**3),	(3*θ**2)*(θ_PS**3)\
+	# 										]))[0, 0]
 	# 		else: # eq == 3
 	# 			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
-	# 			Derivative = (np.matrix(Coefficients[1:],dtype='float64').T*\
-	# 							np.matrix([1, 0, θ_PS, 2*θ, \
-	# 								0, (2*θ)*θ_PS, θ_PS**2, (2*θ)*(θ_PS**2), \
-	# 								3*θ**2, (3*θ**2)*θ_PS, (3*θ**2)*(θ_PS**2), \
-	# 								4*θ**3, (4*θ**3)*θ_PS, (4*θ**3)*(θ_PS**2),  \
-	# 								5*θ**4, (5*θ**4)*θ_PS, (5*θ**4)*(θ_PS**2)]))[0, 0]
+	# 			"""
+	# 			(d/dθ)[MomentArm] = \
+	# 					(np.matrix(Coefficients,dtype='float64').T*\
+	# 							np.matrix([(d/dθ)[1], 					(d/dθ)[θ], \
+	# 										(d/dθ)[θ_PS], 				(d/dθ)[θ*θ_PS],\
+	# 										(d/dθ)[θ**2], 				(d/dθ)[θ_PS**2],\
+	# 										(d/dθ)[(θ**2)*θ_PS], 		(d/dθ)[θ*(θ_PS**2)],\
+	# 										(d/dθ)[(θ**2)*(θ_PS**2)], 	(d/dθ)[θ**3],\
+	# 										(d/dθ)[(θ**3)*θ_PS], 		(d/dθ)[(θ**3)*(θ_PS**2)],\
+	# 										(d/dθ)[θ**4], 				(d/dθ)[(θ**4)*θ_PS],\
+	# 										(d/dθ)[(θ**4)*(θ_PS**2)],  	(d/dθ)[θ**5],\
+	# 										(d/dθ)[(θ**5)*θ_PS], 		(d/dθ)[(θ**5)*(θ_PS**2)\
+	# 										]]))[0, 0]
+	# 			"""
+	# 			Derivative = lambda θ,θ_PS: (np.matrix(Coefficients,dtype='float64').T*\
+	# 								np.matrix([	0, 					1,\
+	# 											0, 					θ_PS,\
+	# 										  	(2*θ),				0,\
+	# 									 		(2*θ)*θ_PS, 		(θ_PS**2),\
+	# 									  		(2*θ)*(θ_PS**2),	(3*θ**2),\
+	# 									 		(3*θ**2)*θ_PS, 		(3*θ**2)*(θ_PS**2),\
+	# 											(4*θ**3), 			(4*θ**3)*θ_PS,\
+	# 									 		(4*θ**3)*(θ_PS**2),	(5*θ**4),\
+	# 									 		(5*θ**4)*θ_PS, 		(5*θ**4)*(θ_PS**2)\
+	# 									 												]))[0, 0]
 	# 	if threshold == None:
-	# 		return(MomentArm)
+	# 		return(Derivative)
 	# 	else:
 	# 		assert type(threshold) in [int,float], "threshold must be a number."
-	# 		Derivative = lambda θ: np.piecewise((Derivative,θ<threshold),(Derivative(threshold),θ>=threshold))
-	# 		return(MomentArm)
+	# 		Derivative = lambda θ,θ_PS:\
+	# 									np.piecewise(θ,[θ<threshold,θ>=threshold],\
+	# 													[Derivative(θ,θ_PS),0])
+	# 		return(Derivative)
+	# def MA_2nd_deriv(Parameters):
+	# 	"""
+	# 	Note:
+	#
+	# 	Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
+	#
+	# 	Notes:
+	#
+	# 	threshold is only needed for Pigeon or Ramsay; 2009 MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
+	#
+	# 	eq is only needed for Ramsay; 2009 (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
+	# 	"""
+	#
+	# 	import numpy as np
+	# 	Parameters = return_primary_source(Parameters)
+	# 	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
+	# 	src = Parameters.Source
+	# 	Coefficients = unit_conversion(Parameters)
+	# 	eq = Parameters.Equation_Number
+	# 	threshold = Parameters.Threshold
+	#
+	# 	assert type(src) == str, "src must be a str."
+	# 	assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Holzbaur; 2005', 'Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
+	#
+	# 	'''
+	# 	Note:
+	# 	For Kuechle and Holzbaur, where estimates or average MA were given, the format should be [MA,0,0,0,0,0] such that the function returns a constant MA function (See matrix multiplication below).
+	# 	'''
+	#
+	# 	if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
+	# 		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
+	# 		"""
+	# 		(d²/dθ²) [MomentArm] \
+	# 			= (np.matrix(Coefficients,dtype='float64')\
+	# 						*np.matrix([(d²/dθ²)[1],		(d²/dθ²)[θ],\
+	# 									(d²/dθ²)[θ**2],		(d²/dθ²)[θ**3],\
+	# 									(d²/dθ²)[θ**4],		(d²/dθ²)[θ**5]]).T)[0,0]
+	#
+	# 			= (d/dθ)[Derivative]
+	# 			= (np.matrix(Coefficients,dtype='float64')\
+	# 						*np.matrix([(d/dθ)[0],			(d/dθ)[1],\
+	# 									(d/dθ)[(2*θ)],		(d/dθ)[(3*θ**2)],\
+	# 									(d/dθ)[(4*θ**3)],	(d/dθ)[(5*θ**4)]]).T)[0,0]
+	# 		"""
+	#
+	# 		SecondDerivative = lambda θ,θ_PS: (np.matrix(Coefficients,dtype='float64')\
+	# 											*np.matrix([0,			0,\
+	# 														2,			6*θ,\
+	# 														(12*θ**2),	(20*θ**3)]).T)[0,0]
+	# 	elif src.capitalize() == 'Est':
+	# 		"""
+	# 		(d²/dθ²)[MomentArm] = np.array((d²/dθ²)[Coefficients],dtype='float64')
+	# 		"""
+	# 		# (d/dθ)[Derivative] = lambda θ,θ_PS:  (d/dθ)[0]
+	# 		SecondDerivative = lambda θ,θ_PS:  0
+	# 	else: #src.capitalize() == 'Ramsay; 2009'
+	# 		assert type(Coefficients) == list, "Coefficients must be a list."
+	# 		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
+	# 		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay; 2009 (2009)."
+	# 		if eq == 1:
+	# 			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
+	# 			"""
+	# 			(d²/dθ²)[MomentArm] \
+	# 				= (np.matrix(Coefficients,dtype='float64').T\
+	# 							*np.matrix([(d²/dθ²)[1],		(d²/dθ²)[θ],\
+	# 										(d²/dθ²)[θ**2],		(d²/dθ²)[θ**3],\
+	# 										(d²/dθ²)[θ**4]]))[0,0]
+	#
+	# 				= (d/dθ)[Derivative] \
+	# 				= (np.matrix(Coefficients,dtype='float64').T\
+	# 							*np.matrix([(d/dθ)[0],			(d/dθ)[1],\
+	# 										(d/dθ)[(2*θ)],  	(d/dθ)[(3*θ**2)],\
+	# 										(d/dθ)[(4*θ**3)]]))[0,0]
+	# 			"""
+	# 			SecondDerivative = lambda θ,θ_PS: \
+	# 						(np.matrix(Coefficients,dtype='float64').T\
+	# 								*np.matrix([0,			0,\
+	# 											2, 			6*θ,\
+	# 											(12*θ**2)				]))[0,0]
+	# 		elif eq == 2:
+	# 			"""
+	# 			This is only good for this ReferenceTracking Ex where PS is fixed. Derivative is only wrt one DOF.
+	# 			"""
+	# 			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
+	# 			"""
+	# 			(d²/dθ²)[MomentArm] \
+	# 				= (np.matrix(Coefficients,dtype='float64').T*\
+	# 						np.matrix([	(d²/dθ²)[1], 				(d²/dθ²)[θ], \
+	# 									(d²/dθ²)[θ_PS], 			(d²/dθ²)[θ*θ_PS],\
+	# 									(d²/dθ²)[θ**2],				(d²/dθ²)[θ_PS**2],\
+	# 									(d²/dθ²)[(θ**2)*θ_PS],		(d²/dθ²)[θ*(θ_PS**2)],\
+	# 									(d²/dθ²)[(θ**2)*(θ_PS**2)],	(d²/dθ²)[θ**3], \
+	# 									(d²/dθ²)[θ_PS**3], 			(d²/dθ²)[(θ**3)*θ_PS],\
+	# 									(d²/dθ²)[θ*(θ_PS**3)],		(d²/dθ²)[(θ**3)*(θ_PS**2)],\
+	# 									(d²/dθ²)[(θ**2)*(θ_PS**3)],	(d²/dθ²)[(θ**3)*(θ_PS**3)]\
+	# 									]))[0, 0]
+	#
+	# 				= (d/dθ)[Derivative] \
+	# 				= (np.matrix(Coefficients,dtype='float64').T*\
+	# 						np.matrix([ (d/dθ)[0], 					(d/dθ)[1], \
+	# 									(d/dθ)[0], 					(d/dθ)[θ_PS], \
+	# 									(d/dθ)[(2*θ)], 				(d/dθ)[0], \
+	# 									(d/dθ)[(2*θ)*θ_PS], 		(d/dθ)[(θ_PS**2)], \
+	# 									(d/dθ)[(2*θ)*(θ_PS**2)], 	(d/dθ)[(3*θ**2)], \
+	# 									(d/dθ)[0], 					(d/dθ)[(3*θ**2)*θ_PS], \
+	# 									(d/dθ)[(θ_PS**3)], 			(d/dθ)[(3*θ**2)*(θ_PS**2)], \
+	# 									(d/dθ)[(2*θ)*(θ_PS**3)],	(d/dθ)[(3*θ**2)*(θ_PS**3)]\
+	# 									]))[0, 0]
+	# 			"""
+	# 			SecondDerivative = lambda θ,θ_PS: \
+	# 					(np.matrix(Coefficients,dtype='float64').T*\
+	# 						np.matrix([ 0, 					0,\
+	# 						 			0,					0,\
+	# 									2,					0,\
+	# 				 					2*θ_PS,				0,\
+	# 						 			2*(θ_PS**2),		(6*θ),\
+	# 									0,					(6*θ)*θ_PS,\
+	# 									0,					(6*θ)*(θ_PS**2),\
+	# 									2*(θ_PS**3),		(6*θ)*(θ_PS**3)\
+	# 									]))[0, 0]
+	# 		else: # eq == 3
+	# 			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
+	# 			"""
+	# 			(d²/dθ²)[MomentArm] \
+	# 				= (np.matrix(Coefficients,dtype='float64').T*\
+	# 						np.matrix([(d²/dθ²)[1], 					(d²/dθ²)[θ], \
+	# 									(d²/dθ²)[θ_PS], 				(d²/dθ²)[θ*θ_PS],\
+	# 									(d²/dθ²)[θ**2], 				(d²/dθ²)[θ_PS**2],\
+	# 									(d²/dθ²)[(θ**2)*θ_PS], 			(d²/dθ²)[θ*(θ_PS**2)],\
+	# 									(d²/dθ²)[(θ**2)*(θ_PS**2)], 	(d²/dθ²)[θ**3],\
+	# 									(d²/dθ²)[(θ**3)*θ_PS], 			(d²/dθ²)[(θ**3)*(θ_PS**2)],\
+	# 									(d²/dθ²)[θ**4], 				(d²/dθ²)[(θ**4)*θ_PS],\
+	# 									(d²/dθ²)[(θ**4)*(θ_PS**2)], 	(d²/dθ²)[θ**5],\
+	# 									(d²/dθ²)[(θ**5)*θ_PS], 			(d²/dθ²)[(θ**5)*(θ_PS**2)\
+	# 									]]))[0, 0]
+	#
+	# 				= (d/dθ)[Derivative] \
+	# 				= (np.matrix(Coefficients,dtype='float64').T*\
+	# 						np.matrix([	(d/dθ)[0], 					(d/dθ)[1],\
+	# 									(d/dθ)[0], 					(d/dθ)[θ_PS],\
+	# 								  	(d/dθ)[(2*θ)],				(d/dθ)[0],\
+	# 							 		(d/dθ)[(2*θ)*θ_PS], 		(d/dθ)[(θ_PS**2)],\
+	# 							  		(d/dθ)[(2*θ)*(θ_PS**2)],	(d/dθ)[(3*θ**2)],\
+	# 							 		(d/dθ)[(3*θ**2)*θ_PS], 		(d/dθ)[(3*θ**2)*(θ_PS**2)],\
+	# 									(d/dθ)[(4*θ**3)], 			(d/dθ)[(4*θ**3)*θ_PS],\
+	# 							 		(d/dθ)[(4*θ**3)*(θ_PS**2)],	(d/dθ)[(5*θ**4)],\
+	# 							 		(d/dθ)[(5*θ**4)*θ_PS], 		(d/dθ)[(5*θ**4)*(θ_PS**2)]\
+	# 									]))[0, 0]
+	# 			"""
+	# 			SecondDerivative = lambda θ,θ_PS: \
+	# 					(np.matrix(Coefficients,dtype='float64').T*\
+	# 							np.matrix([	0, 						0,\
+	# 										0, 						0,\
+	# 										2,						0,\
+	# 										2*θ_PS, 				0,\
+	# 										2*(θ_PS**2),			(6*θ),\
+	# 										(6*θ)*θ_PS, 			(6*θ)*(θ_PS**2),\
+	# 										(12*θ**2), 				(12*θ**2)*θ_PS,\
+	# 										(12*θ**2)*(θ_PS**2),	(20*θ**3),\
+	# 										(20*θ**3)*θ_PS, 		(20*θ**3)*(θ_PS**2)\
+	# 										]))[0, 0]
+	# 	if threshold == None:
+	# 		return(SecondDerivative)
+	# 	else:
+	# 		assert type(threshold) in [int,float], "threshold must be a number."
+	# 		SecondDerivative = lambda θ,θ_PS:\
+	# 									np.piecewise(θ,[θ<threshold,θ>=threshold],\
+	# 													[SecondDerivative(θ,θ_PS),0])
+	# 		return(SecondDerivative)
 
 	MuscleList = AllMuscleSettings.keys()
-
-	RT_symbolic = sp.Matrix([MA_function(AllMuscleSettings[muscle]['Elbow MA']) for muscle in MuscleList])
-	dRT_symbolic = sp.Matrix(sp.diff(RT_symbolic,θ_EFE))
-	d2RT_symbolic = sp.Matrix(sp.diff(sp.diff(RT_symbolic,θ_EFE),θ_EFE))
-	# RT_func = lambdify([θ_SFE,x1,θ_PS],RT_symbolic)
-	# dRT_func = lambdify([θ_SFE,x1,θ_PS],dRT_symbolic)
-	# import ipdb; ipdb.set_trace()
+	if ReturnMatrixFunction == False:
+		R_Transpose = np.matrix([\
+			[MA_function(AllMuscleSettings[muscle]["Shoulder MA"],θ_PS=θ_PS), \
+			MA_function(AllMuscleSettings[muscle]["Elbow MA"],θ_PS=θ_PS)]\
+				for muscle in MuscleList])
+		dR_Transpose = np.matrix([\
+			[MA_deriv(AllMuscleSettings[muscle]["Shoulder MA"],θ_PS=θ_PS), \
+			MA_deriv(AllMuscleSettings[muscle]["Elbow MA"],θ_PS=θ_PS)]\
+				for muscle in MuscleList])
+		d2R_Transpose = np.matrix([\
+			[MA_2nd_deriv(AllMuscleSettings[muscle]["Shoulder MA"],θ_PS=θ_PS), \
+			MA_2nd_deriv(AllMuscleSettings[muscle]["Elbow MA"],θ_PS=θ_PS)]\
+					for muscle in MuscleList])
+	else:
+		R_Transpose = lambda θ_SFE, θ_EFE: \
+			np.matrix([[MA_function(AllMuscleSettings[muscle]["Shoulder MA"],θ_PS=θ_PS)(θ_SFE),\
+						MA_function(AllMuscleSettings[muscle]["Elbow MA"],θ_PS=θ_PS)(θ_EFE)] \
+							for muscle in MuscleList])
+		dR_Transpose = lambda θ_SFE, θ_EFE, θ_PS: \
+			np.matrix([[MA_deriv(AllMuscleSettings[muscle]["Shoulder MA"],θ_PS=θ_PS)(θ_SFE),\
+						MA_deriv(AllMuscleSettings[muscle]["Elbow MA"],θ_PS=θ_PS)(θ_EFE)] \
+							for muscle in MuscleList])
+		d2R_Transpose = lambda θ_SFE, θ_EFE, θ_PS: \
+			np.matrix([[MA_2nd_deriv(AllMuscleSettings[muscle]["Shoulder MA"],θ_PS=θ_PS)(θ_SFE),\
+						MA_2nd_deriv(AllMuscleSettings[muscle]["Elbow MA"],θ_PS=θ_PS)(θ_EFE)] \
+							for muscle in MuscleList])
 	# returns an (n,m) matrix when n is the number of muscles and m is the number of DOFS. We chose to return R.T because this is commonly utilized in muscle velocity calculations.
-	return(RT_symbolic,dRT_symbolic,d2RT_symbolic)
+	return(R_Transpose,dR_Transpose,d2R_Transpose)
 def statusbar(i,N,**kwargs):
 	"""
 	i is the current iteration (must be an int) and N is the length of
@@ -1557,7 +2144,15 @@ lo2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Optimal Mu
 lTo1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Optimal Tendon Length"]))
 lTo2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Optimal Tendon Length"]))
 
-[[r1,r2],[dr1,dr2],[d2r1,d2r2]]= return_MA_matrix_functions(AllMuscleSettings)
+R_Transpose, dR_Transpose, d2R_Transpose = \
+			return_MA_matrix_functions(AllMuscleSettings,ReturnMatrixFunction=False,θ_PS=np.pi/2)
+"""
+R_Transpose, dR_Transpose, and d2R_Transpose are of the form (n,m), where n is the number of muscles and m in the number of joints. In order to unpack the two muscles used in this model, we first must get the elbow MA functions R_Transpose[:,1], then change to a 1xn matrix (by the transpose), and then change to an array to reduce the ndmin from 2 to 1.
+"""
+r1,r2 = np.array(R_Transpose[:,1].T)[0]
+dr1_dθ, dr2_dθ = np.array(dR_Transpose[:,1].T)[0]
+d2r1_dθ2, d2r2_dθ2 = np.array(d2R_Transpose[:,1].T)[0]
+
 PCSA1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["PCSA"]))
 PCSA2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["PCSA"]))
 # SpecificTension = 330 #kPa (Garner & Pandy; 2003)
@@ -1620,12 +2215,6 @@ F_{LV,1} &= f_{L,1}(l_{m,1}) \cdot f_{V,1}(l_{m,1},v_{m,1}) \\
 F_{LV,2} &= f_{L,2}(l_{m,2}) \cdot f_{V,2}(l_{m,2},v_{m,2}) \\
 '''
 
-r1 = lambdify([θ_EFE],r1.subs([(θ_PS,np.pi/2)]))
-r2 = lambdify([θ_EFE],r2.subs([(θ_PS,np.pi/2)]))
-dr1_dθ = lambdify([θ_EFE],dr1.subs([(θ_PS,np.pi/2)]))
-dr2_dθ = lambdify([θ_EFE],dr2.subs([(θ_PS,np.pi/2)]))
-d2r1_dθ2 = lambdify([θ_EFE],d2r1.subs([(θ_PS,np.pi/2)]))
-d2r2_dθ2 = lambdify([θ_EFE],d2r2.subs([(θ_PS,np.pi/2)]))
 # FL = lambda l,lo: 1
 # FV = lambda l,v,lo: 1
 FL = lambda l,lo: np.exp(-abs(((l/lo)**β-1)/ω)**ρ)
@@ -1651,10 +2240,20 @@ def dKT_1_dx3(X):
 	return(1/(kT*lTo1)*np.exp(-X[2]/(F_MAX1*cT*kT))) # NOT NORMALIZED (in N/m)
 def v_MTU1(X):
 	return(np.sign(-R1(X))*X[1]*np.sqrt(dR1_dx1(X)**2 + R1(X)**2)) # NOT NORMALIZED (in m/s)
+def a_MTU1(X):
+	return(np.sign(-R1(X))*(dX2_dt(X)*np.sqrt(dR1_dx1(X)**2 + R1(X)**2) \
+				+ (X[1]**2)*dR1_dx1(X)*(d2R1_dx12(X) + R1(X))/np.sqrt(dR1_dx1(X)**2 + R1(X)**2)) \
+					# NOT NORMALIZED (in m/s)
 def KT_2(X):
 	return((F_MAX2*cT/lTo2)*(1-np.exp(-X[3]/(F_MAX2*cT*kT)))) # NOT NORMALIZED (in N/m)
+def dKT_2_dx4(X):
+	return(1/(kT*lTo2)*np.exp(-X[3]/(F_MAX2*cT*kT))) # NOT NORMALIZED (in N/m)
 def v_MTU2(X):
 	return(np.sign(-R2(X))*X[1]*np.sqrt(dR2_dx1(X)**2 + R2(X)**2)) # NOT NORMALIZED (in m/s)
+def a_MTU2(X):
+	return(np.sign(-R2(X))*(dX2_dt(X)*np.sqrt(dR2_dx1(X)**2 + R2(X)**2) \
+				+ (X[1]**2)*dR2_dx1(X)*(d2R2_dx12(X) + R2(X))/np.sqrt(dR2_dx1(X)**2 + R2(X)**2)) \
+					# NOT NORMALIZED (in m/s)
 def FLV_1(X):
 	return(FL(X[4],lo1)*FV(X[4],X[6],lo1))
 def FLV_2(X):
@@ -1685,11 +2284,16 @@ u_2 &= \dot{l}_{m,2} \\
 
 def dX1_dt(X):
 	return(X[1])
+def d2X1_dt2(X):
+	return(dX2_dt(X))
 def dX2_dt(X,U=None):
 	if U==None:
 		return(c1*np.sin(X[0]) + c2*R1(X)*X[2] + c2*R2(X)*X[3])
 	else:
 		return(c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1])
+def d2X2_dt2(X):
+	return(c1*np.cos(X[0])*dX1_dt(X) + c2*dR1_dx1(X)*dX1_dt(X)*X[2] + c2*R1(X)*dX3_dt(X)\
+			+ c2*dR2_dx1(X)*dX1_dt(X)*X[3] + c2*R2(X)*dX4_dt(X))
 def dX3_dt(X,U=None):
 	if U == None:
 		return(KT_1(X)*(v_MTU1(X) - c3*X[6]))
@@ -1705,64 +2309,127 @@ r = lambda t: Amp*np.sin(Freq*t) + Base
 dr = lambda t: Amp*Freq*np.cos(Freq*t)
 d2r = lambda t: -Amp*Freq**2*np.sin(Freq*t)
 d3r = lambda t: -Amp*Freq**3*np.cos(Freq*t)
+def Z1(t,X):
+	return(r(t) - X[0])
+def dZ1(t,X):
+	return(dr(t) - dX1_dt(X))
+def d2Z1(t,X):
+	return(d2r(t) - dX2_dt(X))
+def d3Z1(t,X):
+	return(d3r(t) - d2X2_dt2(X))
+def A1(t,X):
+	return(dr(t) + k1*Z1(t,X))
+def dA1(t,X):
+	return(d2r(t) + k1*dZ1(t,X))
+def d2A1(t,X):
+	return(d3r(t) + k1*d2Z1(t,X))
+def d3A1(t,X):
+	return(d4r(t) + k1*d3Z1(t,X))
+def Z2(t,X):
+	return(X[1] - A1(t,X))
+"""
+def dZ2(t,X,U):
+	return(c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1] - dA1(t,X))
+"""
+def dZ2(t,X):
+	return(dX2_dt(X) - dA1(t,X))
+def d2Z2(t,X):
+	return(d2X2_dt2(X) - d2A1(t,X))
+def A2(t,X):
+	return(Z1(t,X) + dA1(t,X) - c1*np.sin(X[0]) - k2*Z2(t,X))
+def dA2(t,X):
+	return(dZ1(t,X) + d2A1(t,X) - c1*np.cos(X[0])*dX1_dt(X) - k2*dZ2(t,X))
+def d2A2(t,X):
+	return(d2Z1(t,X) + d3A1(t,X) + c1*np.sin(X[0])*(dX1_dt(X)**2) - c1*np.cos(X[0])*d2X1_dt2(X) - k2*d2Z2(t,X))
+def Z3(t,X):
+	return(c2*R1(X)*X[2] + c2*R2(X)*X[3] - A2(t,X))
+"""
+def dZ3(t,X):
+	return(c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
+					+ c2*R1(X)*KT_1(X)*v_MTU1(X) - c2*c3*R1(X)*KT_1(X)*U[0] \
+						+ c2*R2(X)*KT_2(X)*v_MTU2(X) - c2*c4*R2(X)*KT_2(X)*U[1] \
+							- dA2(t,X))
+"""
+def dZ3(t,X):
+	return(c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
+					+ c2*R1(X)*KT_1(X)*v_MTU1(X) - c2*c3*R1(X)*KT_1(X)*X[6] \
+						+ c2*R2(X)*KT_2(X)*v_MTU2(X) - c2*c4*R2(X)*KT_2(X)*X[7] \
+							- dA2(t,X))
+def A3(t,X):
+	return(Z2(t,X) - dA2(t,X) + k3*Z3(t,X) \
+		+ c2*dR1_dx1(X)*dX1_dt(X)*X[2] + 	c2*dR2_dx1(X)*dX1_dt(X)*X[3] \
+			+ c2*R1(X)*KT_1(X)*v_MTU1(X) + c2*R2(X)*KT_2(X)*v_MTU2(X))
 
+def dA3(t,X):
+	return(dZ2(t,X) - d2A2(t,X) + k3*dZ3(t,X) \
+		+ c2*d2R1_dx12(X)*(dX1_dt(X)**2)*X[2] \
+			+ c2*dR1_dx1(X)*d2X1_dt2(X)*X[2] \
+	 			+ c2*dR1_dx1(X)*dX1_dt(X)*dX3_dt(X)\
+		 + c2*d2R2_dx12(X)*(dX1_dt(X)**2)*X[3] \
+	 		+ c2*dR2_dx1(X)*d2X1_dt2(X)*X[3] \
+	  			+ c2*dR2_dx1(X)*dX1_dt(X)*dX4_dt(X) \
+		+ c2*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*v_MTU1(X) \
+			+ c2*R1(X)*dKT_1_dx3(X)*dX3_dt(X)*v_MTU1(X) \
+			 	+ c2*R1(X)*KT_1(X)*a_MTU1(X) \
+		+ c2*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*v_MTU2(X) \
+			+ c2*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*v_MTU2(X) \
+				+ c2*R2(X)*KT_2(X)*a_MTU2(X))
+\\\\\ NEED TO PICK UP AT DEFINING Z4!!!
 def return_constraint_variables_tension_driven(t,X):
-	def Z1(t,X):
-		return(r(t) - X[0])
-	def dZ1(t,X):
-		return(dr(t) - dX1_dt(X))
-	def A1(t,X):
-		return(dr(t) + k1*Z1(t,X))
-	def dA1(t,X):
-		return(d2r(t) + k1*dZ1(t,X))
-	def Z2(t,X):
-		return(X[1] - A1(t,X))
-	"""
-	def dZ2(t,X,U):
-		return(c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1] - dA1(t,X))
-	"""
-	def A2(t,X):
-		return(Z1(t,X) + dA1(t,X) - c1*np.sin(X[0]) - k2*Z2(t,X))
+	# def Z1(t,X):
+	# 	return(r(t) - X[0])
+	# def dZ1(t,X):
+	# 	return(dr(t) - dX1_dt(X))
+	# def A1(t,X):
+	# 	return(dr(t) + k1*Z1(t,X))
+	# def dA1(t,X):
+	# 	return(d2r(t) + k1*dZ1(t,X))
+	# def Z2(t,X):
+	# 	return(X[1] - A1(t,X))
+	# """
+	# def dZ2(t,X,U):
+	# 	return(c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1] - dA1(t,X))
+	# """
+	# def A2(t,X):
+	# 	return(Z1(t,X) + dA1(t,X) - c1*np.sin(X[0]) - k2*Z2(t,X))
 	Coefficient1 = c2*R1(X)
 	Coefficient2 = c2*R2(X)
 	Constraint = A2(t,X)
 	return(Coefficient1,Coefficient2,Constraint)
 def return_constraint_variables_muscle_velocity_driven(t,X):
-	def Z1(t,X):
-		return(r(t) - X[0])
-	def dZ1(t,X):
-		return(dr(t) - dX1_dt(X))
-	def d2Z1(t,X):
-		return(d2r(t) - dX2_dt(X))
-	def A1(t,X):
-		return(dr(t) + k1*Z1(t,X))
-	def dA1(t,X):
-		return(d2r(t) + k1*dZ1(t,X))
-	def d2A1(t,X):
-		return(d3r(t) + k1*d2Z1(t,X))
-	def Z2(t,X):
-		return(X[1] - A1(t,X))
-	def dZ2(t,X):
-		return(dX2_dt(X) - dA1(t,X))
-	def A2(t,X):
-		return(Z1(t,X) + dA1(t,X) - c1*np.sin(X[0]) - k2*Z2(t,X))
-	def dA2(t,X):
-		return(dZ1(t,X) + d2A1(t,X) - c1*np.cos(X[0])*dX1_dt(X) - k2*dZ2(t,X))
-	def Z3(t,X):
-		return(c2*R1(X)*X[2] + c2*R2(X)*X[3] - A2(t,X))
-	def dZ3(t,X):
-		g1 = R1(X)
-		g2 = R2(X)
-		g3 = KT_1(X)
-		g5 = KT_2(X)
-		return(c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
-						+ c2*g1*g3*v_MTU1(X) - c2*c3*g1*g3*U[0] \
-							+ c2*g2*g5*v_MTU2(X) - c2*c4*g2*g5*U[1] \
-								- dA2(t,X))
-	def A3(t,X):
-		return(Z2(t,X) - dA2(t,X) + k3*Z3(t,X) \
-		+ c2*dR1_dx1(X)*X[1]*X[2] + 	c2*dR2_dx1(X)*X[1]*X[3] \
-				+ c2*R1(X)*KT_1(X)*v_MTU1(X) + c2*R2(X)*KT_2(X)*v_MTU2(X))
+	# def Z1(t,X):
+	# 	return(r(t) - X[0])
+	# def dZ1(t,X):
+	# 	return(dr(t) - dX1_dt(X))
+	# def d2Z1(t,X):
+	# 	return(d2r(t) - dX2_dt(X))
+	# def A1(t,X):
+	# 	return(dr(t) + k1*Z1(t,X))
+	# def dA1(t,X):
+	# 	return(d2r(t) + k1*dZ1(t,X))
+	# def d2A1(t,X):
+	# 	return(d3r(t) + k1*d2Z1(t,X))
+	# def Z2(t,X):
+	# 	return(X[1] - A1(t,X))
+	# def dZ2(t,X):
+	# 	return(dX2_dt(X) - dA1(t,X))
+	# def A2(t,X):
+	# 	return(Z1(t,X) + dA1(t,X) - c1*np.sin(X[0]) - k2*Z2(t,X))
+	# def dA2(t,X):
+	# 	return(dZ1(t,X) + d2A1(t,X) - c1*np.cos(X[0])*dX1_dt(X) - k2*dZ2(t,X))
+	# def Z3(t,X):
+	# 	return(c2*R1(X)*X[2] + c2*R2(X)*X[3] - A2(t,X))
+	# """
+	# def dZ3(t,X):
+	# 	return(c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
+	# 					+ c2*R1(X)*KT_1(X)*v_MTU1(X) - c2*c3*R1(X)*KT_1(X)*U[0] \
+	# 						+ c2*R2(X)*KT_2(X)*v_MTU2(X) - c2*c4*R2(X)*KT_2(X)*U[1] \
+	# 							- dA2(t,X))
+	# """
+	# def A3(t,X):
+	# 	return(Z2(t,X) - dA2(t,X) + k3*Z3(t,X) \
+	# 	+ c2*dR1_dx1(X)*X[1]*X[2] + 	c2*dR2_dx1(X)*X[1]*X[3] \
+	# 			+ c2*R1(X)*KT_1(X)*v_MTU1(X) + c2*R2(X)*KT_2(X)*v_MTU2(X))
 	Coefficient1 = c2*c3*R1(X)*KT_1(X)
 	Coefficient2 = c2*c4*R2(X)*KT_2(X)
 	Constraint = A3(t,X)
