@@ -2101,7 +2101,8 @@ dt = Time[1]-Time[0]
 
 AllMuscleSettings = return_muscle_settings(PreselectedMuscles=[5,6])
 
-g,L = 9.80, 0.45 #m/s², m
+# g,L = 9.80, 0.45 #m/s², m
+g,L = 0, 0.45 #m/s², m REMOVING GRAVITY
 M = 2 # kg
 
 α1 = 0 # 10*np.pi/180 # rads
@@ -2135,6 +2136,8 @@ bv = 0.69
 
 c_1 = 23.0
 k_1 = 0.046
+L_CE_max_1 = 1.1 # These values must be adjusted (SENSITIVITY ANALYSIS NEEDED!)
+L_CE_max_2 = 1.1 # These values must be adjusted (SENSITIVITY ANALYSIS NEEDED!)
 Lr1 = 1.17
 η = 0.01
 
@@ -2166,11 +2169,18 @@ Freq = 2*np.pi
 
 k1,k2,k3,k4 = 100,100,10,100
 
-MaxStep_Tension = 0.01 # percentage of positive maximum.
-Tension_Bounds = [[0,F_MAX1],[0,0.10*F_MAX2]]
+if g == 0:
+	MaxStep_Tension = 0.01 # percentage of positive maximum.
+	Tension_Bounds = [[0,F_MAX1],[0,F_MAX2]]
 
-MaxStep_MuscleVelocity = 5 # percentage of positive maximum.
-MuscleVelocity_Bounds =[[-2*lo1,2*lo1],[-0.2*lo2,0.2*lo2]]
+	MaxStep_MuscleVelocity = 0.2 # percentage of positive maximum.
+	MuscleVelocity_Bounds =[[-5*lo1,5*lo1],[-5*lo2,5*lo2]]
+else:
+	MaxStep_Tension = 0.01 # percentage of positive maximum.
+	Tension_Bounds = [[0,F_MAX1],[0,0.10*F_MAX2]]
+
+	MaxStep_MuscleVelocity = 5 # percentage of positive maximum.
+	MuscleVelocity_Bounds =[[-2*lo1,2*lo1],[-0.2*lo2,0.2*lo2]]
 
 MaxStep_Activation = 0.1 # percentage of positive maximum (1)
 Activation_Bounds = [[0,1],[0,1]]
@@ -2237,27 +2247,29 @@ def d2R2_dx12(X):
 def KT_1(X):
 	return((F_MAX1*cT/lTo1)*(1-np.exp(-X[2]/(F_MAX1*cT*kT)))) # NOT NORMALIZED (in N/m)
 def dKT_1_dx3(X):
-	return(1/(kT*lTo1)*np.exp(-X[2]/(F_MAX1*cT*kT))) # NOT NORMALIZED (in N/m)
+	return((1/(kT*lTo1))*np.exp(-X[2]/(F_MAX1*cT*kT))) # NOT NORMALIZED (in N/m)
 def v_MTU1(X):
 	return(np.sign(-R1(X))*X[1]*np.sqrt(dR1_dx1(X)**2 + R1(X)**2)) # NOT NORMALIZED (in m/s)
 def a_MTU1(X):
 	return(np.sign(-R1(X))*(dX2_dt(X)*np.sqrt(dR1_dx1(X)**2 + R1(X)**2) \
-				+ (X[1]**2)*dR1_dx1(X)*(d2R1_dx12(X) + R1(X))/np.sqrt(dR1_dx1(X)**2 + R1(X)**2)) \
-					# NOT NORMALIZED (in m/s)
+				+ (X[1]**2)*dR1_dx1(X)*(d2R1_dx12(X) + R1(X))/np.sqrt(dR1_dx1(X)**2 + R1(X)**2)))
 def KT_2(X):
 	return((F_MAX2*cT/lTo2)*(1-np.exp(-X[3]/(F_MAX2*cT*kT)))) # NOT NORMALIZED (in N/m)
 def dKT_2_dx4(X):
-	return(1/(kT*lTo2)*np.exp(-X[3]/(F_MAX2*cT*kT))) # NOT NORMALIZED (in N/m)
+	return((1/(kT*lTo2))*np.exp(-X[3]/(F_MAX2*cT*kT))) # NOT NORMALIZED (in N/m)
 def v_MTU2(X):
 	return(np.sign(-R2(X))*X[1]*np.sqrt(dR2_dx1(X)**2 + R2(X)**2)) # NOT NORMALIZED (in m/s)
 def a_MTU2(X):
 	return(np.sign(-R2(X))*(dX2_dt(X)*np.sqrt(dR2_dx1(X)**2 + R2(X)**2) \
-				+ (X[1]**2)*dR2_dx1(X)*(d2R2_dx12(X) + R2(X))/np.sqrt(dR2_dx1(X)**2 + R2(X)**2)) \
-					# NOT NORMALIZED (in m/s)
+				+ (X[1]**2)*dR2_dx1(X)*(d2R2_dx12(X) + R2(X))/np.sqrt(dR2_dx1(X)**2 + R2(X)**2)))
 def FLV_1(X):
 	return(FL(X[4],lo1)*FV(X[4],X[6],lo1))
 def FLV_2(X):
 	return(FL(X[5],lo2)*FV(X[5],X[7],lo2))
+def F_PE1_1(X):
+	return(c_1*k_1*np.log(np.exp((X[4]/(lo1*L_CE_max_1) - Lr1)/k_1) + 1) + η*(X[6]/lo1))
+def F_PE1_2(X):
+	return(c_1*k_1*np.log(np.exp((X[5]/(lo2*L_CE_max_2) - Lr1)/k_1) + 1) + η*(X[7]/lo2))
 
 """
 ################################
@@ -2279,6 +2291,21 @@ u_2 &= T_{2} \\
 \dot{x}_4 &= K_{T,2}(v_{MTU,2} - c_{4}u_2) \\
 u_1 &= \dot{l}_{m,1} \\
 u_2 &= \dot{l}_{m,2} \\
+
+################################
+### Muscle Activation Driven ###
+################################
+
+\dot{x}_1 &= x_{2} \\
+\dot{x}_2 &= c_{1}\sin(x_{1}) + c_{2}R_{1}x_{3} - c_{2}R_{2}x_{4} \\
+\dot{x}_3 &= K_{T,1}(v_{MTU,1} - c_{3}u_1) \\
+\dot{x}_4 &= K_{T,2}(v_{MTU,2} - c_{4}u_2) \\
+\dot{x}_5 &= x_7 \\
+\dot{x}_6 &= x_8 \\
+\dot{x}_7 &= c_5x_3 - c_6F_{PE,1}(x_5,x_7) - c_7x_7 + \frac{c_{8}x_7^2}{x_5} - c_6F_{LV,1}(x_5,x_7)u_1 \\
+\dot{x}_8 &= c_9x_4 - c_{10}F_{PE,2}(x_6,x_8) - c_{11}x_8 + \frac{c_{12}x_8^2}{x_6} - c_{10}F_{LV,2}(x_6,x_8)u_2 \\
+u_1 &= \alpha_{1} \\
+u_2 &= \alpha_{2} \\
 
 """
 
@@ -2304,11 +2331,25 @@ def dX4_dt(X,U=None):
 		return(KT_2(X)*(v_MTU2(X) - c4*X[7]))
 	else:
 		return(KT_2(X)*(v_MTU2(X) - c4*U[1]))
+def dX5_dt(X):
+	return(X[6])
+def dX6_dt(X):
+	return(X[7])
+def dX7_dt(X,U):
+	return(c5*X[2] - c6*F_PE1_1(X) - c7*X[6] + c8*X[6]**2/X[4] - c6*FLV_1(X)*U[0])
+def dX8_dt(X,U):
+	return(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5] - c10*FLV_2(X)*U[1])
+
+### Reference Trajectory ###
 
 r = lambda t: Amp*np.sin(Freq*t) + Base
 dr = lambda t: Amp*Freq*np.cos(Freq*t)
 d2r = lambda t: -Amp*Freq**2*np.sin(Freq*t)
 d3r = lambda t: -Amp*Freq**3*np.cos(Freq*t)
+d4r = lambda t: Amp*Freq**4*np.sin(Freq*t)
+
+############################
+
 def Z1(t,X):
 	return(r(t) - X[0])
 def dZ1(t,X):
@@ -2374,71 +2415,64 @@ def dA3(t,X):
 		+ c2*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*v_MTU2(X) \
 			+ c2*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*v_MTU2(X) \
 				+ c2*R2(X)*KT_2(X)*a_MTU2(X))
-\\\\\ NEED TO PICK UP AT DEFINING Z4!!!
+def Z4(t,X):
+	return(c2*c3*R1(X)*KT_1(X)*X[6] + c2*c4*R2(X)*KT_2(X)*X[7] - A3(t,X))
+def dZ4(t,X,U):
+	"""
+	dZ4 = 	c2*c3*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*X[6]\
+				+ c2*c3*R1(X)*dKT_1_dx3(X)*dX3_dt(X)*X[6]\
+					+ c2*c3*R1(X)*KT_1(X)*dX7_dt(X)\
+			+ c2*c4*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*X[7]\
+				+ c2*c4*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*X[7]\
+					+ c2*c4*R2(X)*KT_2(X)*dX8_dt(X)\
+			- dA3(t,X)
+	"""
+	return(	c2*c3*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*X[6] \
+				+ c2*c3*R1(X)*dKT_1_dx3(X)*dX3_dt(X)*X[6] \
+					+ c2*c3*R1(X)*KT_1(X)*(c5*X[2] - c6*F_PE1_1(X) - c7*X[6] + c8*X[6]**2/X[4]) \
+					 	- c2*c3*c6*R1(X)*KT_1(X)*FLV_1(X)*U[0] \
+			+ c2*c4*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*X[7] \
+			 	+ c2*c4*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*X[7] \
+					+ c2*c4*R2(X)*KT_2(X)*(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5]) \
+					 	- c2*c4*c10*R2(X)*KT_2(X)*FLV_2(X)*U[1] \
+			- dA3(t,X))
+def A4(t,X):
+	"""
+	c2*c3*c6*R1(X)*KT_1(X)*FLV_1(X)*U[0] \
+		+ c2*c4*c10*R2(X)*KT_2(X)*FLV_2(X)*U[1] = \
+					c2*c3*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*X[6] \
+					+ c2*c3*R1(X)*dKT_1_dx3(X)*dX3_dt(X)*X[6] \
+					+ c2*c3*R1(X)*KT_1(X)*(c5*X[2] - c6*F_PE1_1(X) - c7*X[6] + c8*X[6]**2/X[4]) \
+					+ c2*c4*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*X[7] \
+					+ c2*c4*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*X[7] \
+					+ c2*c4*R2(X)*KT_2(X)*(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5]) \
+					- dA3(t,X) - Z3(t,X) + k4*Z4(t,X)
+	"""
+	return(c2*c3*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*X[6] \
+				+ c2*c3*R1(X)*dKT_1_dx3(X)*dX3_dt(X)*X[6] \
+					+ c2*c3*R1(X)*KT_1(X)*(c5*X[2] - c6*F_PE1_1(X) - c7*X[6] + c8*X[6]**2/X[4]) \
+			+ c2*c4*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*X[7] \
+			 	+ c2*c4*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*X[7] \
+					+ c2*c4*R2(X)*KT_2(X)*(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5]) \
+			- dA3(t,X) - Z3(t,X) + k4*Z4(t,X))
 def return_constraint_variables_tension_driven(t,X):
-	# def Z1(t,X):
-	# 	return(r(t) - X[0])
-	# def dZ1(t,X):
-	# 	return(dr(t) - dX1_dt(X))
-	# def A1(t,X):
-	# 	return(dr(t) + k1*Z1(t,X))
-	# def dA1(t,X):
-	# 	return(d2r(t) + k1*dZ1(t,X))
-	# def Z2(t,X):
-	# 	return(X[1] - A1(t,X))
-	# """
-	# def dZ2(t,X,U):
-	# 	return(c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1] - dA1(t,X))
-	# """
-	# def A2(t,X):
-	# 	return(Z1(t,X) + dA1(t,X) - c1*np.sin(X[0]) - k2*Z2(t,X))
 	Coefficient1 = c2*R1(X)
 	Coefficient2 = c2*R2(X)
 	Constraint = A2(t,X)
 	return(Coefficient1,Coefficient2,Constraint)
 def return_constraint_variables_muscle_velocity_driven(t,X):
-	# def Z1(t,X):
-	# 	return(r(t) - X[0])
-	# def dZ1(t,X):
-	# 	return(dr(t) - dX1_dt(X))
-	# def d2Z1(t,X):
-	# 	return(d2r(t) - dX2_dt(X))
-	# def A1(t,X):
-	# 	return(dr(t) + k1*Z1(t,X))
-	# def dA1(t,X):
-	# 	return(d2r(t) + k1*dZ1(t,X))
-	# def d2A1(t,X):
-	# 	return(d3r(t) + k1*d2Z1(t,X))
-	# def Z2(t,X):
-	# 	return(X[1] - A1(t,X))
-	# def dZ2(t,X):
-	# 	return(dX2_dt(X) - dA1(t,X))
-	# def A2(t,X):
-	# 	return(Z1(t,X) + dA1(t,X) - c1*np.sin(X[0]) - k2*Z2(t,X))
-	# def dA2(t,X):
-	# 	return(dZ1(t,X) + d2A1(t,X) - c1*np.cos(X[0])*dX1_dt(X) - k2*dZ2(t,X))
-	# def Z3(t,X):
-	# 	return(c2*R1(X)*X[2] + c2*R2(X)*X[3] - A2(t,X))
-	# """
-	# def dZ3(t,X):
-	# 	return(c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
-	# 					+ c2*R1(X)*KT_1(X)*v_MTU1(X) - c2*c3*R1(X)*KT_1(X)*U[0] \
-	# 						+ c2*R2(X)*KT_2(X)*v_MTU2(X) - c2*c4*R2(X)*KT_2(X)*U[1] \
-	# 							- dA2(t,X))
-	# """
-	# def A3(t,X):
-	# 	return(Z2(t,X) - dA2(t,X) + k3*Z3(t,X) \
-	# 	+ c2*dR1_dx1(X)*X[1]*X[2] + 	c2*dR2_dx1(X)*X[1]*X[3] \
-	# 			+ c2*R1(X)*KT_1(X)*v_MTU1(X) + c2*R2(X)*KT_2(X)*v_MTU2(X))
 	Coefficient1 = c2*c3*R1(X)*KT_1(X)
 	Coefficient2 = c2*c4*R2(X)*KT_2(X)
 	Constraint = A3(t,X)
 	return(Coefficient1,Coefficient2,Constraint)
+def return_constraint_variables_muscle_activation_driven(t,X):
+	Coefficient1 = c2*c3*c6*R1(X)*KT_1(X)*FLV_1(X)
+	Coefficient2 = c2*c4*c10*R2(X)*KT_2(X)*FLV_2(X)
+	Constraint = A4(t,X)
+	return(Coefficient1,Coefficient2,Constraint)
 def return_U_tension_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	import random
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_tension_driven(t,X)
-	# elif Method == "Muscle Velocity":
-	# 		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t,X)
 	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
 	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
 	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
@@ -2457,55 +2491,16 @@ def return_U_tension_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 		UpperBound = Constraint1/Coefficient1
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
 		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
-	elif np.sign(-Coefficient1) == np.sign(Coefficient2):
-		if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
-			LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
-		else:
-			LowerBound = Bounds[0][0]
-
-		if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 > Bounds[1][1]:
-			UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
-		else:
-			UpperBound = Bounds[0][1]
-		assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+	else:
+		SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+									(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+		LowerBound = max(Bounds[0][0], SortedBounds[0])
+		UpperBound = min(Bounds[0][1], SortedBounds[1])
+		assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 								for el in FeasibleInput1])
-	else: # np.sign(-Coefficient1) != np.sign(Coefficient2)
-		if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 > Bounds[1][1]:
-			LowerBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
-		else:
-			LowerBound = Bounds[0][0]
 
-		if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 < Bounds[1][0]:
-			UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
-		else:
-			UpperBound = Bounds[0][1]
-		assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
-		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
-								for el in FeasibleInput1])
-	#
-	# if Constraint1 > 0:
-	# 	assert Bounds[0] >= Constraint1/Coefficient1, "Tension cannot be made by muscle 1."
-	# 	LowerBound = Constraint1/Coefficient1
-	# 	if (Constraint1 - Coefficient1*Bounds[0])/Coefficient2 > Bounds[1]:
-	# 		UpperBound = (Constraint1 - Coefficient2*Bounds[1])/Coefficient1
-	# 	else:
-	# 		UpperBound = Bounds[0]
-	# elif Constraint1 < 0:
-	# 	assert Bounds[1] >= Constraint1/Coefficient2, "Tension cannot be made by muscle 2."
-	# 	LowerBound = 0
-	# 	if (Constraint1 - Coefficient2*Bounds[1])/Coefficient1 > Bounds[0]:
-	# 		UpperBound = Bounds[0]
-	# 	else:
-	# 		UpperBound = (Constraint1 - Coefficient2*Bounds[1])/Coefficient1
-	# else: # Constraint1 == 0
-	# 	LowerBound = 0
-	# 	if -Coefficient1*Bounds[0]/Coefficient2 > Bounds[1]:
-	# 		UpperBound = -Coefficient2*Bounds[1]/Coefficient1
-	# 	else:
-	# 		UpperBound = Bounds[0]
 	"""
 	Checking to see which inputs have the appropriate allowable step size.
 	"""
@@ -2631,10 +2626,63 @@ def return_U_muscle_velocity_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	euclid_dist = np.array(list(map(lambda u1,u2: np.sqrt(((U[0]-u1)/lo1)**2 + ((U[1]-u2)/lo2)**2),\
 							FeasibleInput1,FeasibleInput2)))
 
-	if t<30*dt: MaxStep = 10*MaxStep
+	if t<50*dt:
+		MaxStep = 50*MaxStep
+	elif t<100*dt:
+		MaxStep = 10*MaxStep
 	feasible_index = np.where(euclid_dist<=MaxStep)
 
 	if len(feasible_index[0]) == 0: import ipdb; ipdb.set_trace()
+	next_index = random.choice(feasible_index[0])
+	u1 = FeasibleInput1[next_index]
+	u2 = FeasibleInput2[next_index]
+	return([u1,u2])
+def return_U_muscle_activation_driven(t,X,U,dt,MaxStep,Bounds,Noise):
+	"""
+	First attempt will see what happens when the activations are restricted to the positive real domain.
+	"""
+	import random
+	Coefficient1,Coefficient2,Constraint1 =\
+	 			return_constraint_variables_muscle_activation_driven(t,X)
+	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+	assert Coefficient1!=0 and Coefficient2!=0, "Error with Coefficients. Shouldn't both be zero."
+	if Constraint1 < 0:
+		assert not(Coefficient1 > 0 and Coefficient2 > 0), "Infeasible activations. (Constraint1 < 0, Coefficient1 > 0, Coefficient2 > 0)"
+	if Constraint1 > 0:
+		assert not(Coefficient1 < 0 and Coefficient2 < 0), "Infeasible activations. (Constraint1 > 0, Coefficient1 < 0, Coefficient2 < 0)"
+
+	if Coefficient1 == 0:
+		LowerBound = Bounds[0][0]
+		UpperBound = Bounds[0][1]
+		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+	elif Coefficient2 == 0:
+		LowerBound = Constraint1/Coefficient1
+		UpperBound = Constraint1/Coefficient1
+		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
+	else:
+		SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+									(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+		LowerBound = max(Bounds[0][0], SortedBounds[0])
+		UpperBound = min(Bounds[0][1], SortedBounds[1])
+		assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
+		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+								for el in FeasibleInput1])
+	"""
+	Checking to see which inputs have the appropriate allowable step size.
+	"""
+	euclid_dist = np.array(list(map(lambda u1,u2: \
+						np.sqrt(((U[0]-u1)/Bounds[0][1])**2 + ((U[1]-u2)/Bounds[1][1])**2),\
+																	FeasibleInput1,FeasibleInput2)))
+
+	if t<10*dt: MaxStep = 10*MaxStep
+	feasible_index = np.where(euclid_dist<=MaxStep)
+	if len(feasible_index[0]) == 0: \
+		return({"First Coefficient" : Coefficient1, "Second Coefficient" : Coefficient2, "Constraint" : Constraint1, "Lower Bounds" : LowerBound, "Upper Bounds" : UpperBound})
 	next_index = random.choice(feasible_index[0])
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
@@ -2657,7 +2705,7 @@ def plot_MA_values(Time,x1):
 	ax1.set_xticklabels([""]*len(ax1.get_xticks()))
 	ax1.set_ylabel("Moment Arm for\n Muscle 1 (m)")
 
-	ax2.plot(Time,np.array(list(map(lambda x1: R1([x1]),x1))),'g')
+	ax2.plot(Time[:len(x1)],np.array(list(map(lambda x1: R1([x1]),x1))),'g')
 	ax2.set_ylim(ax1.get_ylim())
 	ax2.set_yticks(ax1.get_yticks())
 	ax2.set_yticklabels([""]*len(ax1.get_yticks()))
@@ -2674,7 +2722,7 @@ def plot_MA_values(Time,x1):
 	ax3.set_xlabel("Joint Angle (rads)")
 	ax3.set_ylabel("Moment Arm for\n Muscle 2 (m)")
 
-	ax4.plot(Time,np.array(list(map(lambda x1: R2([x1]),x1))),'r')
+	ax4.plot(Time[:len(x1)],np.array(list(map(lambda x1: R2([x1]),x1))),'r')
 	ax4.set_ylim(ax3.get_ylim())
 	ax4.set_yticks(ax3.get_yticks())
 	ax4.set_yticklabels([""]*len(ax3.get_yticks()))
@@ -3181,6 +3229,9 @@ u1_1,u2_1 = [100],[10]
 x1_2,x2_2,x3_2,x4_2= [Base],[Amp*Freq],[100],[70]
 u1_2,u2_2 = [0.01],[0.01]
 
+x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3= [Base],[Amp*Freq],[100],[70],\
+											[0.9*lo1],[0.9*lo2],[-0.1],[0.1]
+u1_3,u2_3 = [0.01],[0.01]
 
 CocontractionIndex = 2
 
@@ -3213,46 +3264,73 @@ def update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray):
 	x3_2.append(x3_2[-1] + dX3_dt(X,U=U)*dt)
 	x2_2.append(x2_2[-1] + dX2_dt(X)*dt)
 	x1_2.append(x1_2[-1] + dX1_dt(X)*dt)
+def update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,dt,NoiseArray):
+	import numpy as np
+	Method = "Muscle Act."
+	X = [x1_3[-1],x2_3[-1],x3_3[-1],x4_3[-1],x5_3[-1],x6_3[-1],x7_3[-1],x8_3[-1]]
+	U = [u1_3[-1],u2_3[-1]]
+	U = return_U_muscle_activation_driven(t,X,U,dt,MaxStep_Activation,Activation_Bounds,NoiseArray[:,int(t/dt)])
+	u1_3.append(U[0])
+	u2_3.append(U[1])
+	x8_3.append(x8_3[-1] + dX8_dt(X,U)*dt)
+	x7_3.append(x7_3[-1] + dX7_dt(X,U)*dt)
+	x6_3.append(x6_3[-1] + dX6_dt(X)*dt)
+	x5_3.append(x5_3[-1] + dX5_dt(X)*dt)
+	x4_3.append(x4_3[-1] + dX4_dt(X)*dt)
+	x3_3.append(x3_3[-1] + dX3_dt(X)*dt)
+	x2_3.append(x2_3[-1] + dX2_dt(X)*dt)
+	x1_3.append(x1_3[-1] + dX1_dt(X)*dt)
 
 StartTime = time.time()
 for t in Time[1:]:
 	update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray)
 	update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray)
+	# update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,dt,NoiseArray)
 	statusbar(int(t/dt),len(Time),StartTime=StartTime,Title="Forced-Pendulum")
 
 fig1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time,x1_1)
 fig2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time,x1_2)
+fig3,[ax1_3,ax2_3,ax3_3,ax4_3] = plot_MA_values(Time,x1_3)
 
 plt.figure()
 plt.title("Underdetermined Tendon-Tension-Driven\nForced Pendulum Example",\
                 fontsize=16,color='gray')
-plt.plot(Time,x1_1,'b',lw=2)
-plt.plot(Time,x1_2,'g',lw=2)
-plt.plot(Time,r(Time),'r--')
+plt.plot(Time[:len(x1_1)],x1_1,'b',lw=2)
+plt.plot(Time[:len(x1_2)],x1_2,'g',lw=2)
+plt.plot(Time[:len(x1_3)],x1_3,'k',lw=2)
+plt.plot(Time[:len(x1_1)],r(Time[:len(x1_1)]),'r--')
 plt.xlabel("Time (s)")
 plt.ylabel("Desired Measure")
-plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (mm Velocity)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
+plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (mm Velocity)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
 
 plt.figure()
 plt.title('Error vs. Time')
-plt.plot(Time, r(Time)-x1_1,color='b')
-plt.plot(Time, r(Time)-x1_2,color='g')
-plt.legend(["Tension Driven","Muscle Velocity Driven"],loc='best')
+plt.plot(Time[:len(x1_1)], r(Time[:len(x1_1)])-x1_1,color='b')
+plt.plot(Time[:len(x1_2)], r(Time[:len(x1_2)])-x1_2,color='g')
+plt.plot(Time[:len(x1_3)], r(Time[:len(x1_3)])-x1_3,color='k')
+plt.legend(["Tension Driven","Muscle Velocity Driven"," Muscle Activation"],loc='best')
 plt.xlabel("Time (s)")
 plt.ylabel("Error")
 
 plt.figure()
-plt.plot(Time,u1_1,'g',Time,u2_1,'r')
+plt.plot(Time[:len(u1_1)],u1_1,'g',Time[:len(u2_1)],u2_1,'r')
 plt.title('Tendon Tensions vs. Time')
 plt.xlabel("Time (s)")
 plt.ylabel("Tendon Tensions (N)")
 plt.legend(["Muscle 1","Muscle 2"])
 
 plt.figure()
-plt.plot(Time,u1_2,'g',Time,u2_2,'r')
+plt.plot(Time[:len(u1_2)],u1_2,'g',Time[:len(u2_2)],u2_2,'r')
 plt.title('Muscle Velocities vs. Time')
 plt.xlabel("Time (s)")
 plt.ylabel("Muscle Velocities (m/s)")
+plt.legend(["Muscle 1","Muscle 2"])
+
+plt.figure()
+plt.plot(Time[:len(u1_3)],u1_3,'g',Time[:len(u2_3)],u2_3,'r')
+plt.title('Muscle Activation vs. Time')
+plt.xlabel("Time (s)")
+plt.ylabel("Muscle Activation")
 plt.legend(["Muscle 1","Muscle 2"])
 
 plt.show()
