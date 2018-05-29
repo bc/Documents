@@ -1538,442 +1538,6 @@ def return_MA_matrix_functions(AllMuscleSettings,ReturnMatrixFunction=False,θ_P
 	import numpy as np
 	import sympy as sp
 	from sympy.utilities import lambdify
-	# def MA_function(Parameters):
-	# 	"""
-	# 	Note:
-	#
-	# 	Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
-	#
-	# 	Notes:
-	#
-	# 	threshold is only needed for Pigeon or Ramsay; 2009 MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
-	#
-	# 	dof only needed for Pigeon (Ramsay; 2009 only handles EFE for this 2 DOF system). Must be either 'Shoulder' or 'Elbow'.
-	#
-	# 	eq is only needed for Ramsay; 2009 (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
-	# 	"""
-	# 	import sympy as sp
-	# 	import numpy as np
-	# 	Parameters = return_primary_source(Parameters)
-	# 	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
-	# 	src = Parameters.Source
-	# 	Coefficients = unit_conversion(Parameters)
-	# 	eq = Parameters.Equation_Number
-	# 	dof = Parameters.DOF
-	# 	threshold = Parameters.Threshold
-	#
-	# 	global θ_SFE,θ_EFE,θ_PS
-	# 	assert type(src) == str, "src must be a str."
-	# 	assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Holzbaur; 2005', 'Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
-	# 	if dof != None:
-	# 		assert type(dof) == str, "dof must be a str."
-	# 		assert dof.capitalize() in ['Shoulder','Elbow'], "dof must be either Shoulder or Elbow."
-	# 	'''
-	# 	Note:
-	# 	For Kuechle and Holzbaur, where estimates or average MA were given, the format should be [MA,0,0,0,0,0] such that the function returns a constant MA function (See matrix multiplication below).
-	# 	'''
-	# 	if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
-	# 		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
-	# 		assert dof != None, "For Pigeon (1996), dof must be stated."
-	# 		eq = None
-	# 		if dof.capitalize() == 'Elbow MA':
-	# 			θ = θ_EFE
-	# 		else:
-	# 			θ = θ_SFE
-	# 		MomentArm = (np.matrix(Coefficients,dtype='float64')\
-	# 						*np.matrix([1,θ,θ**2,θ**3,θ**4,θ**5]).T)[0,0]
-	# 	elif src.capitalize() == 'Est':
-	# 		MomentArm = np.array(Coefficients,dtype='float64')
-	# 	else: #src.capitalize() == 'Ramsay; 2009'
-	# 		θ = θ_EFE
-	# 		assert type(Coefficients) == list, "Coefficients must be a list."
-	# 		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
-	# 		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay; 2009 (2009)."
-	# 		if eq == 1:
-	# 			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
-	# 			MomentArm = (sp.Matrix(Coefficients,dtype='float64').T\
-	# 							*sp.Matrix([1,θ,θ**2,θ**3,θ**4]))[0,0]
-	# 		elif eq == 2:
-	# 			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
-	# 			MomentArm = (sp.Matrix(Coefficients,dtype='float64').T*\
-	# 							sp.Matrix([1, θ, θ_PS, θ*θ_PS, θ**2, \
-	# 										θ_PS**2, (θ**2)*θ_PS, θ*(θ_PS**2), \
-	# 										(θ**2)*(θ_PS**2), θ**3, θ_PS**3, \
-	# 										(θ**3)*θ_PS, θ*(θ_PS**3), \
-	# 										(θ**3)*(θ_PS**2), (θ**2)*(θ_PS**3), \
-	# 										(θ**3)*(θ_PS**3)]))[0, 0]
-	# 		else: # eq == 3
-	# 			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
-	# 			MomentArm = (sp.Matrix(Coefficients,dtype='float64').T*\
-	# 							sp.Matrix([1, θ, θ_PS, θ*θ_PS, θ**2, \
-	# 								θ_PS**2, (θ**2)*θ_PS, θ*(θ_PS**2), (θ**2)*(θ_PS**2), \
-	# 								θ**3, (θ**3)*θ_PS, (θ**3)*(θ_PS**2), \
-	# 								θ**4, (θ**4)*θ_PS, (θ**4)*(θ_PS**2),  \
-	# 								θ**5, (θ**5)*θ_PS, (θ**5)*(θ_PS**2)]))[0, 0]
-	# 	if threshold == None:
-	# 		return(MomentArm)
-	# 	else:
-	# 		assert type(threshold) in [int,float], "threshold must be a number."
-	# 		MomentArm = sp.Piecewise((MomentArm,θ<threshold),(MomentArm.subs(θ,threshold),θ>=threshold))
-	# 		return(MomentArm)
-	# def MA_function(Parameters):
-	# 	"""
-	# 	Note:
-	#
-	# 	Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
-	#
-	# 	Notes:
-	#
-	# 	threshold is only needed for Pigeon or Ramsay; 2009 MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
-	#
-	# 	eq is only needed for Ramsay; 2009 (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
-	# 	"""
-	# 	import numpy as np
-	# 	Parameters = return_primary_source(Parameters)
-	# 	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
-	# 	src = Parameters.Source
-	# 	Coefficients = unit_conversion(Parameters)
-	# 	eq = Parameters.Equation_Number
-	# 	threshold = Parameters.Threshold
-	#
-	# 	assert type(src) == str, "src must be a str."
-	# 	assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Holzbaur; 2005', 'Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
-	#
-	# 	'''
-	# 	Note:
-	# 	For Kuechle and Holzbaur, where estimates or average MA were given, the format should be [MA,0,0,0,0,0] such that the function returns a constant MA function (See matrix multiplication below).
-	# 	'''
-	#
-	# 	if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
-	# 		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
-	# 		MomentArm = lambda θ,θ_PS: (np.matrix(Coefficients,dtype='float64')\
-	# 										*np.matrix([1,θ,θ**2,θ**3,θ**4,θ**5]).T)[0,0]
-	# 	elif src.capitalize() == 'Est':
-	# 		MomentArm = lambda θ,θ_PS: np.array(Coefficients,dtype='float64')
-	# 	else: #src.capitalize() == 'Ramsay; 2009'
-	# 		assert type(Coefficients) == list, "Coefficients must be a list."
-	# 		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
-	# 		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay; 2009 (2009)."
-	# 		if eq == 1:
-	# 			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
-	# 			MomentArm = lambda θ,θ_PS: \
-	# 					(np.matrix(Coefficients,dtype='float64').T*\
-	# 						np.matrix([1,θ,θ**2,θ**3,θ**4]))[0,0]
-	# 		elif eq == 2:
-	# 			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
-	# 			MomentArm = lambda θ,θ_PS: \
-	# 					(np.matrix(Coefficients,dtype='float64').T*\
-	# 						np.matrix([1, θ, θ_PS, θ*θ_PS, θ**2, \
-	# 									θ_PS**2, (θ**2)*θ_PS, θ*(θ_PS**2), \
-	# 									(θ**2)*(θ_PS**2), θ**3, θ_PS**3, \
-	# 									(θ**3)*θ_PS, θ*(θ_PS**3), \
-	# 									(θ**3)*(θ_PS**2), (θ**2)*(θ_PS**3), \
-	# 									(θ**3)*(θ_PS**3)]))[0, 0]
-	# 		else: # eq == 3
-	# 			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
-	# 			MomentArm = lambda θ,θ_PS: \
-	# 					(np.matrix(Coefficients,dtype='float64').T*\
-	# 						np.matrix([1, θ, θ_PS, θ*θ_PS, θ**2, \
-	# 									θ_PS**2, (θ**2)*θ_PS, θ*(θ_PS**2), (θ**2)*(θ_PS**2), \
-	# 									θ**3, (θ**3)*θ_PS, (θ**3)*(θ_PS**2), \
-	# 									θ**4, (θ**4)*θ_PS, (θ**4)*(θ_PS**2),  \
-	# 									θ**5, (θ**5)*θ_PS, (θ**5)*(θ_PS**2)]))[0, 0]
-	# 	if threshold == None:
-	# 		return(MomentArm)
-	# 	else:
-	# 		assert type(threshold) in [int,float], "threshold must be a number."
-	# 		MomentArm = lambda θ,θ_PS:\
-	# 					np.piecewise(θ,[θ<threshold,θ>=threshold],\
-	# 									[MomentArm(θ,θ_PS),MomentArm(threshold,θ_PS)])
-	# 		return(MomentArm)
-	# def MA_deriv(Parameters):
-	# 	"""
-	# 	Note:
-	#
-	# 	Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
-	#
-	# 	Notes:
-	#
-	# 	threshold is only needed for Pigeon or Ramsay; 2009 MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
-	#
-	# 	eq is only needed for Ramsay; 2009 (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
-	# 	"""
-	# 	import numpy as np
-	# 	Parameters = return_primary_source(Parameters)
-	# 	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
-	# 	src = Parameters.Source
-	# 	Coefficients = unit_conversion(Parameters)
-	# 	eq = Parameters.Equation_Number
-	# 	threshold = Parameters.Threshold
-	#
-	# 	assert type(src) == str, "src must be a str."
-	# 	assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Holzbaur; 2005', 'Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
-	#
-	# 	'''
-	# 	Note:
-	# 	For Kuechle and Holzbaur, where estimates or average MA were given, the format should be [MA,0,0,0,0,0] such that the function returns a constant MA function (See matrix multiplication below).
-	# 	'''
-	#
-	# 	if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
-	# 		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
-	# 		"""
-	# 		(d/dθ) [MomentArm] = (np.matrix(Coefficients,dtype='float64')\
-	# 						*np.matrix([(d/dθ)[1],(d/dθ)[θ],(d/dθ)[θ**2],\
-	# 										(d/dθ)[θ**3],(d/dθ)[θ**4],(d/dθ)[θ**5]]).T)[0,0]
-	# 		"""
-	# 		Derivative = lambda θ,θ_PS: (np.matrix(Coefficients,dtype='float64')\
-	# 						*np.matrix([0,1,(2*θ),(3*θ**2),(4*θ**3),(5*θ**4)]).T)[0,0]
-	# 	elif src.capitalize() == 'Est':
-	# 		"""
-	# 		(d/dθ)[MomentArm] = np.array((d/dθ)[Coefficients],dtype='float64')
-	# 		"""
-	# 		Derivative = lambda θ,θ_PS:  0
-	# 	else: #src.capitalize() == 'Ramsay; 2009'
-	# 		assert type(Coefficients) == list, "Coefficients must be a list."
-	# 		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
-	# 		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay; 2009 (2009)."
-	# 		if eq == 1:
-	# 			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
-	# 			"""
-	# 			(d/dθ)[MomentArm] = (np.matrix(Coefficients,dtype='float64').T\
-	# 									*np.matrix([(d/dθ)[1],(d/dθ)[θ],(d/dθ)[θ**2],\
-	# 													(d/dθ)[θ**3],(d/dθ)[θ**4]]))[0,0]
-	# 			"""
-	# 			Derivative = lambda θ,θ_PS: (np.matrix(Coefficients,dtype='float64').T\
-	# 							*np.matrix([0,			1,			(2*θ),\
-	# 										(3*θ**2),		(4*θ**3)				]))[0,0]
-	# 		elif eq == 2:
-	# 			"""
-	# 			This is only good for this ReferenceTracking Ex where PS is fixed. Derivative is only wrt one DOF.
-	# 			"""
-	# 			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
-	# 			"""
-	# 			(d/dθ)[MomentArm] = \
-	# 					(np.matrix(Coefficients,dtype='float64').T*\
-	# 							np.matrix([(d/dθ)[1], 					(d/dθ)[θ], \
-	# 										(d/dθ)[θ_PS], 				(d/dθ)[θ*θ_PS],\
-	# 										(d/dθ)[θ**2],				(d/dθ)[θ_PS**2],\
-	# 										(d/dθ)[(θ**2)*θ_PS],		(d/dθ)[θ*(θ_PS**2)],\
-	# 										(d/dθ)[(θ**2)*(θ_PS**2)],	(d/dθ)[θ**3], \
-	# 										(d/dθ)[θ_PS**3], 			(d/dθ)[(θ**3)*θ_PS],\
-	# 										(d/dθ)[θ*(θ_PS**3)],		(d/dθ)[(θ**3)*(θ_PS**2)],\
-	# 										(d/dθ)[(θ**2)*(θ_PS**3)],	(d/dθ)[(θ**3)*(θ_PS**3)]\
-	# 										]))[0, 0]
-	# 			"""
-	# 			Derivative = lambda θ,θ_PS: (np.matrix(Coefficients,dtype='float64').T*\
-	# 							np.matrix([ 0, 					1,\
-	# 										0,  				θ_PS, \
-	# 										(2*θ), 				0, \
-	# 										(2*θ)*θ_PS, 		(θ_PS**2), 	\
-	# 										(2*θ)*(θ_PS**2), 	(3*θ**2), \
-	# 										0, 					(3*θ**2)*θ_PS, \
-	# 										(θ_PS**3), 			(3*θ**2)*(θ_PS**2), \
-	# 										(2*θ)*(θ_PS**3),	(3*θ**2)*(θ_PS**3)\
-	# 										]))[0, 0]
-	# 		else: # eq == 3
-	# 			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
-	# 			"""
-	# 			(d/dθ)[MomentArm] = \
-	# 					(np.matrix(Coefficients,dtype='float64').T*\
-	# 							np.matrix([(d/dθ)[1], 					(d/dθ)[θ], \
-	# 										(d/dθ)[θ_PS], 				(d/dθ)[θ*θ_PS],\
-	# 										(d/dθ)[θ**2], 				(d/dθ)[θ_PS**2],\
-	# 										(d/dθ)[(θ**2)*θ_PS], 		(d/dθ)[θ*(θ_PS**2)],\
-	# 										(d/dθ)[(θ**2)*(θ_PS**2)], 	(d/dθ)[θ**3],\
-	# 										(d/dθ)[(θ**3)*θ_PS], 		(d/dθ)[(θ**3)*(θ_PS**2)],\
-	# 										(d/dθ)[θ**4], 				(d/dθ)[(θ**4)*θ_PS],\
-	# 										(d/dθ)[(θ**4)*(θ_PS**2)],  	(d/dθ)[θ**5],\
-	# 										(d/dθ)[(θ**5)*θ_PS], 		(d/dθ)[(θ**5)*(θ_PS**2)\
-	# 										]]))[0, 0]
-	# 			"""
-	# 			Derivative = lambda θ,θ_PS: (np.matrix(Coefficients,dtype='float64').T*\
-	# 								np.matrix([	0, 					1,\
-	# 											0, 					θ_PS,\
-	# 										  	(2*θ),				0,\
-	# 									 		(2*θ)*θ_PS, 		(θ_PS**2),\
-	# 									  		(2*θ)*(θ_PS**2),	(3*θ**2),\
-	# 									 		(3*θ**2)*θ_PS, 		(3*θ**2)*(θ_PS**2),\
-	# 											(4*θ**3), 			(4*θ**3)*θ_PS,\
-	# 									 		(4*θ**3)*(θ_PS**2),	(5*θ**4),\
-	# 									 		(5*θ**4)*θ_PS, 		(5*θ**4)*(θ_PS**2)\
-	# 									 												]))[0, 0]
-	# 	if threshold == None:
-	# 		return(Derivative)
-	# 	else:
-	# 		assert type(threshold) in [int,float], "threshold must be a number."
-	# 		Derivative = lambda θ,θ_PS:\
-	# 									np.piecewise(θ,[θ<threshold,θ>=threshold],\
-	# 													[Derivative(θ,θ_PS),0])
-	# 		return(Derivative)
-	# def MA_2nd_deriv(Parameters):
-	# 	"""
-	# 	Note:
-	#
-	# 	Angles should be a number if Coefficients has a length of 5, or a list of length 2 when the Coefficients have lengths 16 or 18. Angles[0] will be the PRIMARY ANGLE for the DOF being considered while Angles[1] will be the secondary angle.
-	#
-	# 	Notes:
-	#
-	# 	threshold is only needed for Pigeon or Ramsay; 2009 MA functions that are invalid outside of a given value. Must be either None (default) or the radian value of the threshold.
-	#
-	# 	eq is only needed for Ramsay; 2009 (Pigeon has one quintic polynomial). eq must be either 1, 2, or 3, with list length requirements of 5, 16, or 18, respectively.
-	# 	"""
-	#
-	# 	import numpy as np
-	# 	Parameters = return_primary_source(Parameters)
-	# 	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
-	# 	src = Parameters.Source
-	# 	Coefficients = unit_conversion(Parameters)
-	# 	eq = Parameters.Equation_Number
-	# 	threshold = Parameters.Threshold
-	#
-	# 	assert type(src) == str, "src must be a str."
-	# 	assert src.capitalize() in ['Ramsay; 2009','Pigeon; 1996','Kuechle; 1997','Holzbaur; 2005', 'Est'], "src must be either Ramsay; 2009, Pigeon or Est (Estimate)."
-	#
-	# 	'''
-	# 	Note:
-	# 	For Kuechle and Holzbaur, where estimates or average MA were given, the format should be [MA,0,0,0,0,0] such that the function returns a constant MA function (See matrix multiplication below).
-	# 	'''
-	#
-	# 	if src.capitalize() in ['Pigeon; 1996', 'Kuechle; 1997', 'Holzbaur; 2005']:
-	# 		assert len(Coefficients)==6, 'For Pigeon (1996) the list of Coefficients must be 6 elements long. Insert zeros (0) for any additional empty coefficients.'
-	# 		"""
-	# 		(d²/dθ²) [MomentArm] \
-	# 			= (np.matrix(Coefficients,dtype='float64')\
-	# 						*np.matrix([(d²/dθ²)[1],		(d²/dθ²)[θ],\
-	# 									(d²/dθ²)[θ**2],		(d²/dθ²)[θ**3],\
-	# 									(d²/dθ²)[θ**4],		(d²/dθ²)[θ**5]]).T)[0,0]
-	#
-	# 			= (d/dθ)[Derivative]
-	# 			= (np.matrix(Coefficients,dtype='float64')\
-	# 						*np.matrix([(d/dθ)[0],			(d/dθ)[1],\
-	# 									(d/dθ)[(2*θ)],		(d/dθ)[(3*θ**2)],\
-	# 									(d/dθ)[(4*θ**3)],	(d/dθ)[(5*θ**4)]]).T)[0,0]
-	# 		"""
-	#
-	# 		SecondDerivative = lambda θ,θ_PS: (np.matrix(Coefficients,dtype='float64')\
-	# 											*np.matrix([0,			0,\
-	# 														2,			6*θ,\
-	# 														(12*θ**2),	(20*θ**3)]).T)[0,0]
-	# 	elif src.capitalize() == 'Est':
-	# 		"""
-	# 		(d²/dθ²)[MomentArm] = np.array((d²/dθ²)[Coefficients],dtype='float64')
-	# 		"""
-	# 		# (d/dθ)[Derivative] = lambda θ,θ_PS:  (d/dθ)[0]
-	# 		SecondDerivative = lambda θ,θ_PS:  0
-	# 	else: #src.capitalize() == 'Ramsay; 2009'
-	# 		assert type(Coefficients) == list, "Coefficients must be a list."
-	# 		assert len(Coefficients) in [5,16,18], "Coefficients as a list must be of length 5, 16, or 18."
-	# 		assert eq in [1,2,3], "eq must be either 1, 2, or 3 when using Ramsay; 2009 (2009)."
-	# 		if eq == 1:
-	# 			assert len(Coefficients) == 5, "For Eq. 1, Coefficients must be 5 elements long."
-	# 			"""
-	# 			(d²/dθ²)[MomentArm] \
-	# 				= (np.matrix(Coefficients,dtype='float64').T\
-	# 							*np.matrix([(d²/dθ²)[1],		(d²/dθ²)[θ],\
-	# 										(d²/dθ²)[θ**2],		(d²/dθ²)[θ**3],\
-	# 										(d²/dθ²)[θ**4]]))[0,0]
-	#
-	# 				= (d/dθ)[Derivative] \
-	# 				= (np.matrix(Coefficients,dtype='float64').T\
-	# 							*np.matrix([(d/dθ)[0],			(d/dθ)[1],\
-	# 										(d/dθ)[(2*θ)],  	(d/dθ)[(3*θ**2)],\
-	# 										(d/dθ)[(4*θ**3)]]))[0,0]
-	# 			"""
-	# 			SecondDerivative = lambda θ,θ_PS: \
-	# 						(np.matrix(Coefficients,dtype='float64').T\
-	# 								*np.matrix([0,			0,\
-	# 											2, 			6*θ,\
-	# 											(12*θ**2)				]))[0,0]
-	# 		elif eq == 2:
-	# 			"""
-	# 			This is only good for this ReferenceTracking Ex where PS is fixed. Derivative is only wrt one DOF.
-	# 			"""
-	# 			assert len(Coefficients)==16, "For Eq. 2, Coefficients must be 16 elements long."
-	# 			"""
-	# 			(d²/dθ²)[MomentArm] \
-	# 				= (np.matrix(Coefficients,dtype='float64').T*\
-	# 						np.matrix([	(d²/dθ²)[1], 				(d²/dθ²)[θ], \
-	# 									(d²/dθ²)[θ_PS], 			(d²/dθ²)[θ*θ_PS],\
-	# 									(d²/dθ²)[θ**2],				(d²/dθ²)[θ_PS**2],\
-	# 									(d²/dθ²)[(θ**2)*θ_PS],		(d²/dθ²)[θ*(θ_PS**2)],\
-	# 									(d²/dθ²)[(θ**2)*(θ_PS**2)],	(d²/dθ²)[θ**3], \
-	# 									(d²/dθ²)[θ_PS**3], 			(d²/dθ²)[(θ**3)*θ_PS],\
-	# 									(d²/dθ²)[θ*(θ_PS**3)],		(d²/dθ²)[(θ**3)*(θ_PS**2)],\
-	# 									(d²/dθ²)[(θ**2)*(θ_PS**3)],	(d²/dθ²)[(θ**3)*(θ_PS**3)]\
-	# 									]))[0, 0]
-	#
-	# 				= (d/dθ)[Derivative] \
-	# 				= (np.matrix(Coefficients,dtype='float64').T*\
-	# 						np.matrix([ (d/dθ)[0], 					(d/dθ)[1], \
-	# 									(d/dθ)[0], 					(d/dθ)[θ_PS], \
-	# 									(d/dθ)[(2*θ)], 				(d/dθ)[0], \
-	# 									(d/dθ)[(2*θ)*θ_PS], 		(d/dθ)[(θ_PS**2)], \
-	# 									(d/dθ)[(2*θ)*(θ_PS**2)], 	(d/dθ)[(3*θ**2)], \
-	# 									(d/dθ)[0], 					(d/dθ)[(3*θ**2)*θ_PS], \
-	# 									(d/dθ)[(θ_PS**3)], 			(d/dθ)[(3*θ**2)*(θ_PS**2)], \
-	# 									(d/dθ)[(2*θ)*(θ_PS**3)],	(d/dθ)[(3*θ**2)*(θ_PS**3)]\
-	# 									]))[0, 0]
-	# 			"""
-	# 			SecondDerivative = lambda θ,θ_PS: \
-	# 					(np.matrix(Coefficients,dtype='float64').T*\
-	# 						np.matrix([ 0, 					0,\
-	# 						 			0,					0,\
-	# 									2,					0,\
-	# 				 					2*θ_PS,				0,\
-	# 						 			2*(θ_PS**2),		(6*θ),\
-	# 									0,					(6*θ)*θ_PS,\
-	# 									0,					(6*θ)*(θ_PS**2),\
-	# 									2*(θ_PS**3),		(6*θ)*(θ_PS**3)\
-	# 									]))[0, 0]
-	# 		else: # eq == 3
-	# 			assert len(Coefficients)==18, "For Eq. 3, Coefficients must be 18 elements long."
-	# 			"""
-	# 			(d²/dθ²)[MomentArm] \
-	# 				= (np.matrix(Coefficients,dtype='float64').T*\
-	# 						np.matrix([(d²/dθ²)[1], 					(d²/dθ²)[θ], \
-	# 									(d²/dθ²)[θ_PS], 				(d²/dθ²)[θ*θ_PS],\
-	# 									(d²/dθ²)[θ**2], 				(d²/dθ²)[θ_PS**2],\
-	# 									(d²/dθ²)[(θ**2)*θ_PS], 			(d²/dθ²)[θ*(θ_PS**2)],\
-	# 									(d²/dθ²)[(θ**2)*(θ_PS**2)], 	(d²/dθ²)[θ**3],\
-	# 									(d²/dθ²)[(θ**3)*θ_PS], 			(d²/dθ²)[(θ**3)*(θ_PS**2)],\
-	# 									(d²/dθ²)[θ**4], 				(d²/dθ²)[(θ**4)*θ_PS],\
-	# 									(d²/dθ²)[(θ**4)*(θ_PS**2)], 	(d²/dθ²)[θ**5],\
-	# 									(d²/dθ²)[(θ**5)*θ_PS], 			(d²/dθ²)[(θ**5)*(θ_PS**2)\
-	# 									]]))[0, 0]
-	#
-	# 				= (d/dθ)[Derivative] \
-	# 				= (np.matrix(Coefficients,dtype='float64').T*\
-	# 						np.matrix([	(d/dθ)[0], 					(d/dθ)[1],\
-	# 									(d/dθ)[0], 					(d/dθ)[θ_PS],\
-	# 								  	(d/dθ)[(2*θ)],				(d/dθ)[0],\
-	# 							 		(d/dθ)[(2*θ)*θ_PS], 		(d/dθ)[(θ_PS**2)],\
-	# 							  		(d/dθ)[(2*θ)*(θ_PS**2)],	(d/dθ)[(3*θ**2)],\
-	# 							 		(d/dθ)[(3*θ**2)*θ_PS], 		(d/dθ)[(3*θ**2)*(θ_PS**2)],\
-	# 									(d/dθ)[(4*θ**3)], 			(d/dθ)[(4*θ**3)*θ_PS],\
-	# 							 		(d/dθ)[(4*θ**3)*(θ_PS**2)],	(d/dθ)[(5*θ**4)],\
-	# 							 		(d/dθ)[(5*θ**4)*θ_PS], 		(d/dθ)[(5*θ**4)*(θ_PS**2)]\
-	# 									]))[0, 0]
-	# 			"""
-	# 			SecondDerivative = lambda θ,θ_PS: \
-	# 					(np.matrix(Coefficients,dtype='float64').T*\
-	# 							np.matrix([	0, 						0,\
-	# 										0, 						0,\
-	# 										2,						0,\
-	# 										2*θ_PS, 				0,\
-	# 										2*(θ_PS**2),			(6*θ),\
-	# 										(6*θ)*θ_PS, 			(6*θ)*(θ_PS**2),\
-	# 										(12*θ**2), 				(12*θ**2)*θ_PS,\
-	# 										(12*θ**2)*(θ_PS**2),	(20*θ**3),\
-	# 										(20*θ**3)*θ_PS, 		(20*θ**3)*(θ_PS**2)\
-	# 										]))[0, 0]
-	# 	if threshold == None:
-	# 		return(SecondDerivative)
-	# 	else:
-	# 		assert type(threshold) in [int,float], "threshold must be a number."
-	# 		SecondDerivative = lambda θ,θ_PS:\
-	# 									np.piecewise(θ,[θ<threshold,θ>=threshold],\
-	# 													[SecondDerivative(θ,θ_PS),0])
-	# 		return(SecondDerivative)
 
 	MuscleList = AllMuscleSettings.keys()
 	if ReturnMatrixFunction == False:
@@ -2043,7 +1607,7 @@ def statusbar(i,N,**kwargs):
 	statusbar = Title +'[' + '\u25a0'*int((i+1)/(N/50)) + '\u25a1'*(50-int((i+1)/(N/50))) + '] '
 	TimeBreak = abs
 	if StartTime != False:
-		if i==1:
+		if i==0:
 			time_array = []
 			TimeLeft = '--'
 		elif i==int(0.02*N):
@@ -2094,29 +1658,29 @@ u_1 &= \alpha_1 \\
 u_2 &= \alpha_2 \\
 
 """
-
-N = 20001
-Time = np.linspace(0,20,N)
+N_seconds = 5
+N = N_seconds*10000 + 1
+Time = np.linspace(0,N_seconds,N)
 dt = Time[1]-Time[0]
 
 AllMuscleSettings = return_muscle_settings(PreselectedMuscles=[5,6])
 
 # g,L = 9.80, 0.45 #m/s², m
 g,L = 0, 0.45 #m/s², m REMOVING GRAVITY
-M = 2 # kg
+M = 1.6 # kg
 
-α1 = 0 # 10*np.pi/180 # rads
-α2 = 0 # 10*np.pi/180 # rads
+α1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Pennation Angle"])) # rads
+α2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Pennation Angle"])) # rads
 
-m1 = 1 # kg
-m2 = 1 # kg
+m1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Mass"])) # kg
+m2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Mass"])) # kg
 
 """
 There was some debate regarding damping terms. No explicit value was given. Loeb simplifies the equation by utilizing the F_{PE_{2,i}} damping term (η) instead, as this is added to B_{m,i}*(v_{m,i}/l_{o,i}) anyways. This η is very small (0.01), so the damping is not significant. Might need to do sensitivity analysis on these two values (currently set to zero) (06/16/2018).
 """
 
-bm1 = 0 # kg/s
-bm2 = 0 # kg/s
+bm1 = 0.01 # kg/s
+bm2 = 0.01 # kg/s
 
 cT = 27.8
 kT = 0.0047
@@ -2136,8 +1700,8 @@ bv = 0.69
 
 c_1 = 23.0
 k_1 = 0.046
-L_CE_max_1 = 1.1 # These values must be adjusted (SENSITIVITY ANALYSIS NEEDED!)
-L_CE_max_2 = 1.1 # These values must be adjusted (SENSITIVITY ANALYSIS NEEDED!)
+L_CE_max_1 = 1.2 # These values must be adjusted (SENSITIVITY ANALYSIS NEEDED!)
+L_CE_max_2 = 1.2 # These values must be adjusted (SENSITIVITY ANALYSIS NEEDED!)
 Lr1 = 1.17
 η = 0.01
 
@@ -2167,22 +1731,22 @@ Amp = 7.5*np.pi/180
 Base = 90*np.pi/180
 Freq = 2*np.pi
 
-k1,k2,k3,k4 = 100,100,10,100
+k1,k2,k3,k4 = 100,100,100,10
 
 if g == 0:
-	MaxStep_Tension = 0.01 # percentage of positive maximum.
+	MaxStep_Tension = 0.03 # percentage of positive maximum.
 	Tension_Bounds = [[0,F_MAX1],[0,F_MAX2]]
 
-	MaxStep_MuscleVelocity = 0.2 # percentage of positive maximum.
+	MaxStep_MuscleVelocity = 0.05 # percentage of positive maximum.
 	MuscleVelocity_Bounds =[[-5*lo1,5*lo1],[-5*lo2,5*lo2]]
 else:
 	MaxStep_Tension = 0.01 # percentage of positive maximum.
 	Tension_Bounds = [[0,F_MAX1],[0,0.10*F_MAX2]]
 
-	MaxStep_MuscleVelocity = 5 # percentage of positive maximum.
-	MuscleVelocity_Bounds =[[-2*lo1,2*lo1],[-0.2*lo2,0.2*lo2]]
+	MaxStep_MuscleVelocity = 1 # percentage of positive maximum.
+	MuscleVelocity_Bounds =[[-5*lo1,5*lo1],[-1*lo2,1*lo2]]
 
-MaxStep_Activation = 0.1 # percentage of positive maximum (1)
+MaxStep_Activation = 0.2 # percentage of positive maximum (1)
 Activation_Bounds = [[0,1],[0,1]]
 
 """
@@ -2225,8 +1789,6 @@ F_{LV,1} &= f_{L,1}(l_{m,1}) \cdot f_{V,1}(l_{m,1},v_{m,1}) \\
 F_{LV,2} &= f_{L,2}(l_{m,2}) \cdot f_{V,2}(l_{m,2},v_{m,2}) \\
 '''
 
-# FL = lambda l,lo: 1
-# FV = lambda l,v,lo: 1
 FL = lambda l,lo: np.exp(-abs(((l/lo)**β-1)/ω)**ρ)
 FV = lambda l,v,lo: np.piecewise(v,[v<=0, v>0],\
 	[lambda v: (V_max - v/lo)/(V_max + (cv0 + cv1*(l/lo))*(v/lo)),\
@@ -2509,12 +2071,44 @@ def return_U_tension_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 
 	if t<10*dt: MaxStep = 10*MaxStep
 	feasible_index = np.where(euclid_dist<=MaxStep)
-	# elif Method == "Muscle Velocity":
-	# 	feasible_index = np.where(np.logical_and(np.logical_and(euclid_dist>=0, euclid_dist<=MaxStep),np.sign(FeasibleInput1)!=np.sign(FeasibleInput2)))
 	if len(feasible_index[0]) == 0: import ipdb; ipdb.set_trace()
 	next_index = random.choice(feasible_index[0])
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
+	return([u1,u2])
+def return_initial_U_tension_driven(t,X,Bounds):
+	import random
+	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_tension_driven(t,X)
+	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+	if Constraint1 != 0:
+		assert Coefficient1!=0 and Coefficient2!=0, "Error with Coefficients. Shouldn't be zero with nonzero constraint."
+	else:
+		assert Coefficient1!=0 and Coefficient2!=0, "Error with Constraint. 0 = 0 implies all inputs valid."
+
+	if Coefficient1 == 0:
+		LowerBound = Bounds[0][0]
+		UpperBound = Bounds[0][1]
+		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+	elif Coefficient2 == 0:
+		LowerBound = Constraint1/Coefficient1
+		UpperBound = Constraint1/Coefficient1
+		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
+	else:
+		SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+									(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+		LowerBound = max(Bounds[0][0], SortedBounds[0])
+		UpperBound = min(Bounds[0][1], SortedBounds[1])
+		assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
+		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+								for el in FeasibleInput1])
+	index = random.choice(range(1000))
+	u1 = FeasibleInput1[index]
+	u2 = FeasibleInput2[index]
 	return([u1,u2])
 def return_U_muscle_velocity_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	"""
@@ -2532,9 +2126,18 @@ def return_U_muscle_velocity_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	else:
 		assert Coefficient1!=0 or Coefficient2!=0, "Error with Constraint. 0 = 0 implies all inputs valid."
 
-	if abs(Coefficient1) <= 1e-7:
-		LowerBound = Bounds[0][0]
-		UpperBound = Bounds[0][1]
+	Roots = np.sort(\
+				np.array(\
+	     			list(\
+	     				set(\
+		     				np.roots(\
+					     				[1,\
+						     				-Constraint1/Coefficient1,\
+						     					Coefficient2*lo1*lo2*(10**-6)/Coefficient1]\
+																							)))))
+	Roots = Roots[np.isreal(Roots)]
+
+	if Coefficient1 == 0:
 		if Constraint1/Coefficient2 > 0:
 			LowerBound = Bounds[0][0]
 			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
@@ -2543,9 +2146,7 @@ def return_U_muscle_velocity_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 			UpperBound = Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
-	elif abs(Coefficient2) <= 1e-7:
-		LowerBound = Constraint1/Coefficient1
-		UpperBound = Constraint1/Coefficient1
+	elif Coefficient2 == 0:
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
 		if Constraint1/Coefficient1 < 0:
 			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
@@ -2554,60 +2155,47 @@ def return_U_muscle_velocity_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 			LowerBound = Bounds[1][0]
 			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
 		FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-	elif np.sign(-Coefficient1) == np.sign(Coefficient2): # DIFFERENT SIGNS
-		if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
-			LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
-		else:
-			LowerBound = Bounds[0][0]
-
-		if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 > Bounds[1][1]:
-			UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
-		else:
-			UpperBound = Bounds[0][1]
-		assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
-		HyperbolicBounds = np.sort([(Constraint1 - \
-										np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
-											/(2*Coefficient1), \
-								 	(Constraint1 + \
-										np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
-											/(2*Coefficient1)])
-		LowerBound = max([LowerBound,HyperbolicBounds[0]])
-		UpperBound = min([UpperBound,HyperbolicBounds[1]])
-		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
-								for el in FeasibleInput1])
-	else: # np.sign(-Coefficient1) != np.sign(Coefficient2) SAME SIGN
-		if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 > Bounds[1][1]:
-			LowerBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
-		else:
-			LowerBound = Bounds[0][0]
-
-		if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 < Bounds[1][0]:
-			UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
-		else:
-			UpperBound = Bounds[0][1]
-		assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
-		if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
-			HyperbolicBounds = np.sort([(Constraint1 - \
-											np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
-												/(2*Coefficient1), \
-									 	(Constraint1 + \
-											np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
-												/(2*Coefficient1)])
-
-			assert LowerBound < HyperbolicBounds[0] or HyperbolicBounds[1] < UpperBound, "No feasible solutions."
-
-			FeasibleInput1 = []
-			while len(FeasibleInput1)<1000:
-				Random1 = (UpperBound-LowerBound)*np.random.rand() + LowerBound
-				if Random1<HyperbolicBounds[0] or Random1>HyperbolicBounds[1]: FeasibleInput1.append(Random1)
-			FeasinbleInput1 = np.array(FeasibleInput1)
-			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
-									for el in FeasibleInput1])
-		else:
+	else:
+		assert 0 not in Roots, "Zero should not be a root. (Implies Coefficient2 == 0)"
+		if len(Roots) in [0,1]:
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1])
+			assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 									for el in FeasibleInput1])
+		elif (Roots<0).all() or (Roots>0).all():
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1])
+			ConstraintLength1 = Coefficient1/(2*Coefficient2)*(LowerBound**2-Roots[0]**2) \
+									- Constraint1/Coefficient2*(LowerBound-Roots[0])
+			ConstraintLength1 = ConstraintLength1*(ConstraintLength1>0)
+			ConstraintLength2 = Coefficient1/(2*Coefficient2)*(Roots[1]**2-UpperBound**2) \
+									- Constraint1/Coefficient2*(Roots[1]-UpperBound)
+			ConstraintLength2 = ConstraintLength2*(ConstraintLength2>0)
+			assert ConstraintLength1!=0 or ConstraintLength2!=0, \
+								"Error generating bounds. Not feasible!"
+			N1 = int(np.round(1000*ConstraintLength1/(ConstraintLength1+ConstraintLength2)))
+			N2 = 1000-N1
+			FeasibleInput1_1 = (Roots[0]-LowerBound)*np.random.rand(N1) + LowerBound
+			FeasibleInput1_2 = (UpperBound-Roots[1])*np.random.rand(N2) + Roots[1]
+			FeasibleInput1 = np.concatenate([FeasibleInput1_1,FeasibleInput1_2])
+			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+									for el in FeasibleInput1])
+		else: # not((Roots<0).all()) and not((Roots>0).all()):
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0],Roots[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1],Roots[1])
+			assert UpperBound >= LowerBound, "Error with Bounds. Infeasible!"
+			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+									for el in FeasibleInput1])
+
 	def plot_constraints():
 		import matplotlib.pyplot as plt
 		plt.figure()
@@ -2637,7 +2225,152 @@ def return_U_muscle_velocity_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
 	return([u1,u2])
+def return_initial_U_muscle_velocity_driven(t,X,Bounds):
+	"""
+	Enforcing a hyperbolic domain constraint to allow for realistic lengthening/shortenting relationships.
+	Input2 = (lo1*0.001)*(lo2*0.001)/Input1 = lo1*lo2/(10^6*Input1)
+	"""
+
+	import random
+	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t,X)
+	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+	if Constraint1 != 0:
+		assert Coefficient1!=0 or Coefficient2!=0, "Error with Coefficients. Shouldn't be zero with nonzero constraint."
+	else:
+		assert Coefficient1!=0 or Coefficient2!=0, "Error with Constraint. 0 = 0 implies all inputs valid."
+
+	Roots = np.sort(\
+				np.array(\
+	     			list(\
+	     				set(\
+		     				np.roots(\
+					     				[1,\
+						     				-Constraint1/Coefficient1,\
+						     					Coefficient2*lo1*lo2*(10**-6)/Coefficient1]\
+																							)))))
+	Roots = Roots[np.isreal(Roots)]
+
+	if Coefficient1 == 0:
+		LowerBound = Bounds[0][0]
+		UpperBound = Bounds[0][1]
+		if Constraint1/Coefficient2 > 0:
+			LowerBound = Bounds[0][0]
+			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+		else:
+			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+			UpperBound = Bounds[0][1]
+		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+	elif Coefficient2 == 0:
+		LowerBound = Constraint1/Coefficient1
+		UpperBound = Constraint1/Coefficient1
+		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+		if Constraint1/Coefficient1 < 0:
+			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+			UpperBound = Bounds[1][1]
+		else:
+			LowerBound = Bounds[1][0]
+			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+		FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+	else:
+		assert 0 not in Roots, "Zero should not be a root. (Implies Coefficient2 == 0)"
+		if len(Roots) in [0,1]:
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1])
+			assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
+			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+									for el in FeasibleInput1])
+		elif (Roots<0).all() or (Roots>0).all():
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1])
+			ConstraintLength1 = Coefficient1/(2*Coefficient2)*(LowerBound**2-Roots[0]**2) \
+									- Constraint1/Coefficient2*(LowerBound-Roots[0])
+			ConstraintLength1 = ConstraintLength1*(ConstraintLength1>0)
+			ConstraintLength2 = Coefficient1/(2*Coefficient2)*(Roots[1]**2-UpperBound**2) \
+									- Constraint1/Coefficient2*(Roots[1]-UpperBound)
+			ConstraintLength2 = ConstraintLength2*(ConstraintLength2>0)
+			assert ConstraintLength1!=0 or ConstraintLength2!=0, \
+								"Error generating bounds. Not feasible!"
+			N1 = int(np.round(1000*ConstraintLength1/(ConstraintLength1+ConstraintLength2)))
+			N2 = 1000-N1
+			FeasibleInput1_1 = (Roots[0]-LowerBound)*np.random.rand(N1) + LowerBound
+			FeasibleInput1_2 = (UpperBound-Roots[1])*np.random.rand(N2) + Roots[1]
+			FeasibleInput1 = np.concatenate([FeasibleInput1_1,FeasibleInput1_2])
+			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+									for el in FeasibleInput1])
+		else: # not((Roots<0).all()) and not((Roots>0).all()):
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0],Roots[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1],Roots[1])
+			assert UpperBound >= LowerBound, "Error with Bounds. Infeasible!"
+			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+									for el in FeasibleInput1])
+
+	index = random.choice(range(1000))
+	u1 = FeasibleInput1[index]
+	u2 = FeasibleInput2[index]
+	return([u1,u2])
 def return_U_muscle_activation_driven(t,X,U,dt,MaxStep,Bounds,Noise):
+	"""
+	First attempt will see what happens when the activations are restricted to the positive real domain.
+	"""
+	import random
+	Coefficient1,Coefficient2,Constraint1 =\
+	 			return_constraint_variables_muscle_activation_driven(t,X)
+	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+	assert Coefficient1!=0 and Coefficient2!=0, "Error with Coefficients. Shouldn't both be zero."
+	if Constraint1 < 0:
+		assert not(Coefficient1 > 0 and Coefficient2 > 0), "Infeasible activations. (Constraint1 < 0, Coefficient1 > 0, Coefficient2 > 0)"
+	if Constraint1 > 0:
+		assert not(Coefficient1 < 0 and Coefficient2 < 0), "Infeasible activations. (Constraint1 > 0, Coefficient1 < 0, Coefficient2 < 0)"
+
+	if Coefficient1 == 0:
+		LowerBound = Bounds[0][0]
+		UpperBound = Bounds[0][1]
+		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+	elif Coefficient2 == 0:
+		LowerBound = Constraint1/Coefficient1
+		UpperBound = Constraint1/Coefficient1
+		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
+	else:
+		SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+									(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+		LowerBound = max(Bounds[0][0], SortedBounds[0])
+		UpperBound = min(Bounds[0][1], SortedBounds[1])
+		# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
+		assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
+		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+								for el in FeasibleInput1])
+	"""
+	Checking to see which inputs have the appropriate allowable step size.
+	"""
+	euclid_dist = np.array(list(map(lambda u1,u2: \
+						np.sqrt(((U[0]-u1)/Bounds[0][1])**2 + ((U[1]-u2)/Bounds[1][1])**2),\
+																	FeasibleInput1,FeasibleInput2)))
+
+	if t<10*dt: MaxStep = 10*MaxStep
+	feasible_index = np.where(euclid_dist<=MaxStep)
+	if len(feasible_index[0]) == 0: \
+		return({"First Coefficient" : Coefficient1, "Second Coefficient" : Coefficient2, "Constraint" : Constraint1, "Lower Bounds" : LowerBound, "Upper Bounds" : UpperBound})
+	next_index = random.choice(feasible_index[0])
+	u1 = FeasibleInput1[next_index]
+	u2 = FeasibleInput2[next_index]
+	return([u1,u2])
+def return_initial_U_muscle_activation_driven(t,X,Bounds):
 	"""
 	First attempt will see what happens when the activations are restricted to the positive real domain.
 	"""
@@ -2672,20 +2405,10 @@ def return_U_muscle_activation_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 								for el in FeasibleInput1])
-	"""
-	Checking to see which inputs have the appropriate allowable step size.
-	"""
-	euclid_dist = np.array(list(map(lambda u1,u2: \
-						np.sqrt(((U[0]-u1)/Bounds[0][1])**2 + ((U[1]-u2)/Bounds[1][1])**2),\
-																	FeasibleInput1,FeasibleInput2)))
 
-	if t<10*dt: MaxStep = 10*MaxStep
-	feasible_index = np.where(euclid_dist<=MaxStep)
-	if len(feasible_index[0]) == 0: \
-		return({"First Coefficient" : Coefficient1, "Second Coefficient" : Coefficient2, "Constraint" : Constraint1, "Lower Bounds" : LowerBound, "Upper Bounds" : UpperBound})
-	next_index = random.choice(feasible_index[0])
-	u1 = FeasibleInput1[next_index]
-	u2 = FeasibleInput2[next_index]
+	index = random.choice(range(1000))
+	u1 = FeasibleInput1[index]
+	u2 = FeasibleInput2[index]
 	return([u1,u2])
 def plot_MA_values(Time,x1):
 	import matplotlib.pyplot as plt
@@ -3223,70 +2946,86 @@ def plot_inputs(t,u1,u2,Return=False):
 		return(fig)
 	else:
 		plt.show()
-x1_1,x2_1 = [Base],[Amp*Freq]
-u1_1,u2_1 = [100],[10]
 
-x1_2,x2_2,x3_2,x4_2= [Base],[Amp*Freq],[100],[70]
-u1_2,u2_2 = [0.01],[0.01]
+AttemptNumber = 0
+while True:
+	x1_1,x2_1 = [Base],[Amp*Freq]
+	U1 = return_initial_U_tension_driven(Time[1],[x1_1[0],x2_1[0]],Tension_Bounds)
+	u1_1 = [U1[0]]
+	u2_1 = [U1[1]]
 
-x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3= [Base],[Amp*Freq],[100],[70],\
-											[0.9*lo1],[0.9*lo2],[-0.1],[0.1]
-u1_3,u2_3 = [0.01],[0.01]
+	x1_2,x2_2,x3_2,x4_2= [Base],[Amp*Freq],[U1[0]],[U1[1]]
+	U2 = return_initial_U_muscle_velocity_driven(\
+				Time[1],[x1_2[0],x2_2[0],x3_2[0],x4_2[0]],MuscleVelocity_Bounds)
+	u1_2 = [U2[0]]
+	u2_2 = [U2[1]]
 
-CocontractionIndex = 2
+	x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3= [Base],[Amp*Freq],[400],[400],\
+												[lo1],[lo2],[0.1],[0.1]
+	# x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3= [Base],[Amp*Freq],[U1[0]],[U1[1]],\
+	# 											[0.8*lo1],[1.2*lo2],[U2[0]],[U2[1]]
+	U3 = return_initial_U_muscle_activation_driven(\
+			Time[1],[x1_3[0],x2_3[0],x3_3[0],x4_3[0],x5_3[0],x6_3[0],x7_3[0],x8_3[0]],Activation_Bounds)
+	u1_3 = [U3[0]]
+	u2_3 = [U3[1]]
+	# u1_3 = [0.01]
+	# u2_3 = [0.01]
 
-AddNoise = False
-if AddNoise == True:
-    np.random.seed(seed=None)
-    NoiseArray = np.random.normal(loc=0.0,scale=0.2,size=(2,len(Time)))
-else:
-    NoiseArray = np.zeros((2,len(Time)))
+	AddNoise = False
+	if AddNoise == True:
+	    np.random.seed(seed=None)
+	    NoiseArray = np.random.normal(loc=0.0,scale=0.2,size=(2,len(Time)))
+	else:
+	    NoiseArray = np.zeros((2,len(Time)))
 
-def update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray):
-	import numpy as np
-	Method = "Tension"
-	X = [x1_1[-1],x2_1[-1]]
-	U = [u1_1[-1],u2_1[-1]]
-	U = return_U_tension_driven(t,X,U,dt,MaxStep_Tension,Tension_Bounds,NoiseArray[:,int(t/dt)])
-	u1_1.append(U[0])
-	u2_1.append(U[1])
-	x2_1.append(x2_1[-1] + dX2_dt(X,U=U)*dt)
-	x1_1.append(x1_1[-1] + dX1_dt(X)*dt)
-def update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray):
-	import numpy as np
-	Method = "Muscle Velocity"
-	X = [x1_2[-1],x2_2[-1],x3_2[-1],x4_2[-1]]
-	U = [u1_2[-1],u2_2[-1]]
-	U = return_U_muscle_velocity_driven(t,X,U,dt,MaxStep_MuscleVelocity,MuscleVelocity_Bounds,NoiseArray[:,int(t/dt)])
-	u1_2.append(U[0])
-	u2_2.append(U[1])
-	x4_2.append(x4_2[-1] + dX4_dt(X,U=U)*dt)
-	x3_2.append(x3_2[-1] + dX3_dt(X,U=U)*dt)
-	x2_2.append(x2_2[-1] + dX2_dt(X)*dt)
-	x1_2.append(x1_2[-1] + dX1_dt(X)*dt)
-def update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,dt,NoiseArray):
-	import numpy as np
-	Method = "Muscle Act."
-	X = [x1_3[-1],x2_3[-1],x3_3[-1],x4_3[-1],x5_3[-1],x6_3[-1],x7_3[-1],x8_3[-1]]
-	U = [u1_3[-1],u2_3[-1]]
-	U = return_U_muscle_activation_driven(t,X,U,dt,MaxStep_Activation,Activation_Bounds,NoiseArray[:,int(t/dt)])
-	u1_3.append(U[0])
-	u2_3.append(U[1])
-	x8_3.append(x8_3[-1] + dX8_dt(X,U)*dt)
-	x7_3.append(x7_3[-1] + dX7_dt(X,U)*dt)
-	x6_3.append(x6_3[-1] + dX6_dt(X)*dt)
-	x5_3.append(x5_3[-1] + dX5_dt(X)*dt)
-	x4_3.append(x4_3[-1] + dX4_dt(X)*dt)
-	x3_3.append(x3_3[-1] + dX3_dt(X)*dt)
-	x2_3.append(x2_3[-1] + dX2_dt(X)*dt)
-	x1_3.append(x1_3[-1] + dX1_dt(X)*dt)
-
-StartTime = time.time()
-for t in Time[1:]:
-	update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray)
-	update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray)
-	# update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,dt,NoiseArray)
-	statusbar(int(t/dt),len(Time),StartTime=StartTime,Title="Forced-Pendulum")
+	def update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray):
+		import numpy as np
+		Method = "Tension"
+		X = [x1_1[-1],x2_1[-1]]
+		U = [u1_1[-1],u2_1[-1]]
+		U = return_U_tension_driven(t,X,U,dt,MaxStep_Tension,Tension_Bounds,NoiseArray[:,int(t/dt)])
+		u1_1.append(U[0])
+		u2_1.append(U[1])
+		x2_1.append(x2_1[-1] + dX2_dt(X,U=U)*dt)
+		x1_1.append(x1_1[-1] + dX1_dt(X)*dt)
+	def update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray):
+		import numpy as np
+		Method = "Muscle Velocity"
+		X = [x1_2[-1],x2_2[-1],x3_2[-1],x4_2[-1]]
+		U = [u1_2[-1],u2_2[-1]]
+		U = return_U_muscle_velocity_driven(t,X,U,dt,MaxStep_MuscleVelocity,MuscleVelocity_Bounds,NoiseArray[:,int(t/dt)])
+		u1_2.append(U[0])
+		u2_2.append(U[1])
+		x4_2.append(x4_2[-1] + dX4_dt(X,U=U)*dt)
+		x3_2.append(x3_2[-1] + dX3_dt(X,U=U)*dt)
+		x2_2.append(x2_2[-1] + dX2_dt(X)*dt)
+		x1_2.append(x1_2[-1] + dX1_dt(X)*dt)
+	def update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,dt,NoiseArray):
+		import numpy as np
+		Method = "Muscle Act."
+		X = [x1_3[-1],x2_3[-1],x3_3[-1],x4_3[-1],x5_3[-1],x6_3[-1],x7_3[-1],x8_3[-1]]
+		U = [u1_3[-1],u2_3[-1]]
+		U = return_U_muscle_activation_driven(t,X,U,dt,MaxStep_Activation,Activation_Bounds,NoiseArray[:,int(t/dt)])
+		u1_3.append(U[0])
+		u2_3.append(U[1])
+		x8_3.append(x8_3[-1] + dX8_dt(X,U)*dt)
+		x7_3.append(x7_3[-1] + dX7_dt(X,U)*dt)
+		x6_3.append(x6_3[-1] + dX6_dt(X)*dt)
+		x5_3.append(x5_3[-1] + dX5_dt(X)*dt)
+		x4_3.append(x4_3[-1] + dX4_dt(X)*dt)
+		x3_3.append(x3_3[-1] + dX3_dt(X)*dt)
+		x2_3.append(x2_3[-1] + dX2_dt(X)*dt)
+		x1_3.append(x1_3[-1] + dX1_dt(X)*dt)
+	try:
+		StartTime = time.time()
+		for t in Time[1:]:
+			# update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray)
+			# update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray)
+			update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,dt,NoiseArray)
+			statusbar(int(t/dt)-1,len(Time)-1,StartTime=StartTime,Title="Forced-Pendulum")
+	except:
+		AttemptNumber += 1
+		print("Attempt #" + str(int(AttemptNumber)) + " Failed.")
 
 fig1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time,x1_1)
 fig2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time,x1_2)
@@ -3320,10 +3059,10 @@ plt.ylabel("Tendon Tensions (N)")
 plt.legend(["Muscle 1","Muscle 2"])
 
 plt.figure()
-plt.plot(Time[:len(u1_2)],u1_2,'g',Time[:len(u2_2)],u2_2,'r')
+plt.plot(Time[:len(u1_2)],np.array(u1_2)/lo1,'g',Time[:len(u2_2)],np.array(u2_2)/lo2,'r')
 plt.title('Muscle Velocities vs. Time')
 plt.xlabel("Time (s)")
-plt.ylabel("Muscle Velocities (m/s)")
+plt.ylabel(r"Muscle Velocities ($\hat{l}_{o,i}/s$)")
 plt.legend(["Muscle 1","Muscle 2"])
 
 plt.figure()
