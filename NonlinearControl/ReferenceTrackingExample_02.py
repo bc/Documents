@@ -5,6 +5,8 @@ import sympy as sy
 from sympy.utilities import lambdify
 import time
 from collections import namedtuple
+from scipy import integrate
+import matplotlib._pylab_helpers
 
 def return_primary_source(Settings):
 	import numpy as np
@@ -1658,10 +1660,7 @@ u_1 &= \alpha_1 \\
 u_2 &= \alpha_2 \\
 
 """
-N_seconds = 5
-N = N_seconds*10000 + 1
-Time = np.linspace(0,N_seconds,N)
-dt = Time[1]-Time[0]
+N_seconds = 10
 
 AllMuscleSettings = return_muscle_settings(PreselectedMuscles=[5,6])
 
@@ -1716,14 +1715,14 @@ R_Transpose, dR_Transpose, d2R_Transpose = \
 """
 R_Transpose, dR_Transpose, and d2R_Transpose are of the form (n,m), where n is the number of muscles and m in the number of joints. In order to unpack the two muscles used in this model, we first must get the elbow MA functions R_Transpose[:,1], then change to a 1xn matrix (by the transpose), and then change to an array to reduce the ndmin from 2 to 1.
 """
+
 r1,r2 = np.array(R_Transpose[:,1].T)[0]
 dr1_dθ, dr2_dθ = np.array(dR_Transpose[:,1].T)[0]
 d2r1_dθ2, d2r2_dθ2 = np.array(d2R_Transpose[:,1].T)[0]
 
 PCSA1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["PCSA"]))
 PCSA2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["PCSA"]))
-# SpecificTension = 330 #kPa (Garner & Pandy; 2003)
-# kPa_To_N = 0.1
+
 F_MAX1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Maximum Isometric Force"]))
 F_MAX2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Maximum Isometric Force"]))
 
@@ -1930,11 +1929,10 @@ def d3A1(t,X):
 	return(d4r(t) + k1*d3Z1(t,X))
 def Z2(t,X):
 	return(X[1] - A1(t,X))
-"""
-def dZ2(t,X,U):
-	return(c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1] - dA1(t,X))
-"""
 def dZ2(t,X):
+	"""
+	dZ2(t,X,U) = c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1] - dA1(t,X)
+	"""
 	return(dX2_dt(X) - dA1(t,X))
 def d2Z2(t,X):
 	return(d2X2_dt2(X) - d2A1(t,X))
@@ -1946,14 +1944,13 @@ def d2A2(t,X):
 	return(d2Z1(t,X) + d3A1(t,X) + c1*np.sin(X[0])*(dX1_dt(X)**2) - c1*np.cos(X[0])*d2X1_dt2(X) - k2*d2Z2(t,X))
 def Z3(t,X):
 	return(c2*R1(X)*X[2] + c2*R2(X)*X[3] - A2(t,X))
-"""
 def dZ3(t,X):
-	return(c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
-					+ c2*R1(X)*KT_1(X)*v_MTU1(X) - c2*c3*R1(X)*KT_1(X)*U[0] \
-						+ c2*R2(X)*KT_2(X)*v_MTU2(X) - c2*c4*R2(X)*KT_2(X)*U[1] \
-							- dA2(t,X))
-"""
-def dZ3(t,X):
+	"""
+	dZ3(t,X) = c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
+						+ c2*R1(X)*KT_1(X)*v_MTU1(X) - c2*c3*R1(X)*KT_1(X)*U[0] \
+							+ c2*R2(X)*KT_2(X)*v_MTU2(X) - c2*c4*R2(X)*KT_2(X)*U[1] \
+								- dA2(t,X)
+	"""
 	return(c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
 					+ c2*R1(X)*KT_1(X)*v_MTU1(X) - c2*c3*R1(X)*KT_1(X)*X[6] \
 						+ c2*R2(X)*KT_2(X)*v_MTU2(X) - c2*c4*R2(X)*KT_2(X)*X[7] \
@@ -1962,7 +1959,6 @@ def A3(t,X):
 	return(Z2(t,X) - dA2(t,X) + k3*Z3(t,X) \
 		+ c2*dR1_dx1(X)*dX1_dt(X)*X[2] + 	c2*dR2_dx1(X)*dX1_dt(X)*X[3] \
 			+ c2*R1(X)*KT_1(X)*v_MTU1(X) + c2*R2(X)*KT_2(X)*v_MTU2(X))
-
 def dA3(t,X):
 	return(dZ2(t,X) - d2A2(t,X) + k3*dZ3(t,X) \
 		+ c2*d2R1_dx12(X)*(dX1_dt(X)**2)*X[2] \
@@ -2017,6 +2013,7 @@ def A4(t,X):
 			 	+ c2*c4*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*X[7] \
 					+ c2*c4*R2(X)*KT_2(X)*(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5]) \
 			- dA3(t,X) - Z3(t,X) + k4*Z4(t,X))
+
 def return_constraint_variables_tension_driven(t,X):
 	Coefficient1 = c2*R1(X)
 	Coefficient2 = c2*R2(X)
@@ -2032,6 +2029,7 @@ def return_constraint_variables_muscle_activation_driven(t,X):
 	Coefficient2 = c2*c4*c10*R2(X)*KT_2(X)*FLV_2(X)
 	Constraint = A4(t,X)
 	return(Coefficient1,Coefficient2,Constraint)
+
 def return_U_tension_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	import random
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_tension_driven(t,X)
@@ -2110,6 +2108,7 @@ def return_initial_U_tension_driven(t,X,Bounds):
 	u1 = FeasibleInput1[index]
 	u2 = FeasibleInput2[index]
 	return([u1,u2])
+
 def return_U_muscle_velocity_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	"""
 	Enforcing a hyperbolic domain constraint to allow for realistic lengthening/shortenting relationships.
@@ -2220,7 +2219,6 @@ def return_U_muscle_velocity_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 		MaxStep = 10*MaxStep
 	feasible_index = np.where(euclid_dist<=MaxStep)
 
-	if len(feasible_index[0]) == 0: import ipdb; ipdb.set_trace()
 	next_index = random.choice(feasible_index[0])
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
@@ -2319,6 +2317,7 @@ def return_initial_U_muscle_velocity_driven(t,X,Bounds):
 	u1 = FeasibleInput1[index]
 	u2 = FeasibleInput2[index]
 	return([u1,u2])
+
 def return_U_muscle_activation_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	"""
 	First attempt will see what happens when the activations are restricted to the positive real domain.
@@ -2359,7 +2358,7 @@ def return_U_muscle_activation_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	Checking to see which inputs have the appropriate allowable step size.
 	"""
 	euclid_dist = np.array(list(map(lambda u1,u2: \
-						np.sqrt(((U[0]-u1)/Bounds[0][1])**2 + ((U[1]-u2)/Bounds[1][1])**2),\
+						np.sqrt((U[0]-u1)**2 + (U[1]-u2)**2),\
 																	FeasibleInput1,FeasibleInput2)))
 
 	if t<10*dt: MaxStep = 10*MaxStep
@@ -2410,14 +2409,63 @@ def return_initial_U_muscle_activation_driven(t,X,Bounds):
 	u1 = FeasibleInput1[index]
 	u2 = FeasibleInput2[index]
 	return([u1,u2])
-def plot_MA_values(Time,x1):
+
+def update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray):
+	import numpy as np
+	Method = "Tension"
+	X = [x1_1[-1],x2_1[-1]]
+	U = [u1_1[-1],u2_1[-1]]
+	U = return_U_tension_driven(t,X,U,dt,MaxStep_Tension,Tension_Bounds,NoiseArray[:,int(t/dt)])
+	u1_1.append(U[0])
+	u2_1.append(U[1])
+	x2_1.append(x2_1[-1] + dX2_dt(X,U=U)*dt)
+	x1_1.append(x1_1[-1] + dX1_dt(X)*dt)
+def update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray):
+	import numpy as np
+	Method = "Muscle Velocity"
+	X = [x1_2[-1],x2_2[-1],x3_2[-1],x4_2[-1]]
+	U = [u1_2[-1],u2_2[-1]]
+	U = return_U_muscle_velocity_driven(t,X,U,dt,MaxStep_MuscleVelocity,\
+											MuscleVelocity_Bounds,NoiseArray[:,int(t/dt)])
+	u1_2.append(U[0])
+	u2_2.append(U[1])
+	x4_2.append(x4_2[-1] + dX4_dt(X,U=U)*dt)
+	x3_2.append(x3_2[-1] + dX3_dt(X,U=U)*dt)
+	x2_2.append(x2_2[-1] + dX2_dt(X)*dt)
+	x1_2.append(x1_2[-1] + dX1_dt(X)*dt)
+def update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,\
+												dt,NoiseArray):
+	import numpy as np
+	Method = "Muscle Act."
+	X = [x1_3[-1],x2_3[-1],x3_3[-1],x4_3[-1],x5_3[-1],x6_3[-1],x7_3[-1],x8_3[-1]]
+	U = [u1_3[-1],u2_3[-1]]
+	U = return_U_muscle_activation_driven(t,X,U,dt,MaxStep_Activation,\
+											Activation_Bounds,NoiseArray[:,int(t/dt)])
+	u1_3.append(U[0])
+	u2_3.append(U[1])
+	x8_3.append(x8_3[-1] + dX8_dt(X,U)*dt)
+	x7_3.append(x7_3[-1] + dX7_dt(X,U)*dt)
+	x6_3.append(x6_3[-1] + dX6_dt(X)*dt)
+	x5_3.append(x5_3[-1] + dX5_dt(X)*dt)
+	x4_3.append(x4_3[-1] + dX4_dt(X)*dt)
+	x3_3.append(x3_3[-1] + dX3_dt(X)*dt)
+	x2_3.append(x2_3[-1] + dX2_dt(X)*dt)
+	x1_3.append(x1_3[-1] + dX1_dt(X)*dt)
+
+def plot_MA_values(Time,x1,InputString=None):
 	import matplotlib.pyplot as plt
 	import numpy as np
 
 	fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2,figsize=(8,6))
-	plt.subplots_adjust(hspace=0.1,bottom=0.1)
+	plt.subplots_adjust(left = 0.15,hspace=0.1,bottom=0.1)
 
-	plt.suptitle("Moment arm equations")
+	if InputString == None:
+		DescriptiveTitle = "Moment arm equations"
+	else:
+		assert type(InputString)==str, "InputString must be a string"
+		DescriptiveTitle = "Moment arm equations\n(" + InputString + " Driven)"
+
+	plt.suptitle(DescriptiveTitle)
 	ax1.plot(np.linspace(0,np.pi*(160/180),1001),\
 				np.array(list(map(lambda x1: R1([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
 				'0.70')
@@ -2451,23 +2499,25 @@ def plot_MA_values(Time,x1):
 	ax4.set_yticklabels([""]*len(ax3.get_yticks()))
 	ax4.set_xlabel("Time (s)")
 	return(fig,[ax1,ax2,ax3,ax4])
-def animate_test_2(response,t,x1,x2,x3,x4,u1,u2,dt,Bounds):
+
+def animate_muscle_velocity_driven(response,t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bounds):
 	assert type(response)==bool, "Input must be either True or False."
 
 	if response == True:
 		import numpy as np
 		import matplotlib.pyplot as plt
 		import matplotlib.animation as animation
+		import matplotlib.patches as patches
 		import time
 
 		fig = plt.figure(figsize=(10,8))
 		ax1 = plt.gca()
 
-		DescriptiveTitle = "Plotting Constraints vs. Time"
+		DescriptiveTitle = "Plotting Constraints vs. Time\nMuscle Velocity Driven"
 
 		ax1.set_title(DescriptiveTitle,Fontsize=20,y=0.975)
 
-		#Hyperbolic Constraint
+		#Hyperbolic Constraint/Bounding Constraints
 		Input1 = list(np.linspace(Bounds[0][0],Bounds[0][1],1000001))
 		Input1.remove(0)
 		Input1 = np.array(Input1)
@@ -2476,6 +2526,12 @@ def animate_test_2(response,t,x1,x2,x3,x4,u1,u2,dt,Bounds):
 		Input2.remove(0)
 		Input2 = np.array(Input2)
 		ax1.plot(lo1*lo2*0.001**2/Input2,Input2,'r',lw=2)
+
+		ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
+		ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
+		ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
+		ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
+
 		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],[x1[0],x2[0],x3[0],x4[0]])
 		if abs(Coefficient1) <= 1e-7:
 			LowerBound = Bounds[0][0]
@@ -2553,6 +2609,8 @@ def animate_test_2(response,t,x1,x2,x3,x4,u1,u2,dt,Bounds):
 				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 										for el in FeasibleInput1])
+		feasible, = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
+		ax1.add_patch(feasible)
 		cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
 		TimeText = plt.text(0.1,0.1,"t = " + str(t[0]),fontsize=16)
 		chosenpoint, = plt.plot(u1[0],u2[0],c='k',marker='o')
@@ -2640,17 +2698,26 @@ def animate_test_2(response,t,x1,x2,x3,x4,u1,u2,dt,Bounds):
 					FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 					FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 											for el in FeasibleInput1])
+			feasible.center((u1[i],u2[i]))
+			if i<10:
+				feasible.radius(10*MaxStep)
+			else:
+				feasible.radius(MaxStep)
 			cline.set_xdata(FeasibleInput1)
 			cline.set_ydata(FeasibleInput2)
 			chosenpoint.set_xdata(u1[i])
 			chosenpoint.set_ydata(u2[i])
 			TimeText.set_text("t = " + str(t[i]))
-			return cline,chosenpoint,TimeText,
+			return feasible,cline,chosenpoint,TimeText,
 
 
 		# Init only required for blitting to give a clean slate.
 		def init():
 			ax1.plot(Input1,lo1*lo2*0.001**2/Input1,'r',lw=2)
+			ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
+			ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
+			ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
+			ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
 			Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],[x1[0],x2[0],x3[0],x4[0]])
 			if abs(Coefficient1) <= 1e-7:
 				LowerBound = Bounds[0][0]
@@ -2728,21 +2795,23 @@ def animate_test_2(response,t,x1,x2,x3,x4,u1,u2,dt,Bounds):
 					FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 					FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 											for el in FeasibleInput1])
+			feasible, = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
+			feasible.set_visible(False)
 			cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
 			cline.set_visible(False)
 			chosenpoint, = plt.plot(u1[0],u2[0],c='k',marker='o')
 			chosenpoint.set_visible(False)
 			TimeText = plt.text(0.75,0.75,"t = " + str(t[0]),fontsize=16)
 			TimeText.set_visible(False)
-			return cline,chosenpoint,TimeText,
+			return feasible,cline,chosenpoint,TimeText,
 
-		ani = animation.FuncAnimation(fig, animate, np.arange(1, len(t),1), init_func=init,interval=1, blit=False)
+		ani = animation.FuncAnimation(fig, animate, np.arange(1, len(x1),1), init_func=init,interval=1, blit=False)
 		plt.show()
-def plot_individual_constraint_versus_time_test_2(t,x1,x2,x3,x4,Return = False):
+def plot_individual_constraint_versus_time_muscle_velocity_driven(t,x1,x2,x3,x4,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
 
-	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
+	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time\nMuscle Velocity Driven"
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
 	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
 
@@ -2781,7 +2850,7 @@ def plot_individual_constraint_versus_time_test_2(t,x1,x2,x3,x4,Return = False):
 		return(fig)
 	else:
 		plt.show()
-def plot_individual_coefficient2_versus_time_test_2(t,x1,x2,x3,x4,Return = False):
+def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,x1,x2,x3,x4,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
 
@@ -2824,7 +2893,7 @@ def plot_individual_coefficient2_versus_time_test_2(t,x1,x2,x3,x4,Return = False
 		return(fig)
 	else:
 		plt.show()
-def plot_individual_coefficient1_versus_time_test_2(t,x1,x2,x3,x4,Return = False):
+def plot_individual_coefficient1_versus_time_muscle_velocity_driven(t,x1,x2,x3,x4,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
 
@@ -2868,7 +2937,289 @@ def plot_individual_coefficient1_versus_time_test_2(t,x1,x2,x3,x4,Return = False
 		return(fig)
 	else:
 		plt.show()
-def plot_states(t,X,Return=False):
+
+def animate_muscle_activation_driven(response,t,x1,x2,x3,x4,x5,x6,x7,x8,u1,u2,dt,MaxStep,Bounds):
+	assert type(response)==bool, "Input must be either True or False."
+
+	if response == True:
+		import numpy as np
+		import matplotlib.pyplot as plt
+		import matplotlib.animation as animation
+		import matplotlib.patches as patches
+		import time
+
+		fig = plt.figure(figsize=(10,8))
+		ax1 = plt.gca()
+
+		DescriptiveTitle = "Plotting Constraints vs. Time\nMuscle Activation Driven"
+
+		ax1.set_title(DescriptiveTitle,Fontsize=20,y=0.975)
+
+		#Bound Constraints
+		ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
+		ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
+		ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
+		ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
+
+		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[0],[x1[0],x2[0],x3[0],x4[0],x5[0],x6[0],x7[0],x8[0]])
+		if Coefficient1 == 0:
+			LowerBound = Bounds[0][0]
+			UpperBound = Bounds[0][1]
+			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+		elif Coefficient2 == 0:
+			LowerBound = Constraint1/Coefficient1
+			UpperBound = Constraint1/Coefficient1
+			FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+			FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
+		else:
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1])
+			# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
+			assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
+			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+									for el in FeasibleInput1])
+
+		feasible, = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
+		ax1.add_patch(feasible)
+		cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
+		TimeText = plt.text(0.1,0.1,"t = " + str(t[0]),fontsize=16)
+		chosenpoint, = plt.plot(u1[0],u2[0],c='k',marker='o')
+		ax1.set_xlim(Bounds[0])
+		ax1.set_ylim(Bounds[1])
+		ax1.spines['right'].set_visible(False)
+		ax1.spines['top'].set_visible(False)
+		ax1.set_aspect('equal')
+
+		def animate(i):
+			Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[i],[x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]])
+			if Coefficient1 == 0:
+				LowerBound = Bounds[0][0]
+				UpperBound = Bounds[0][1]
+				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+				FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+			elif Coefficient2 == 0:
+				LowerBound = Constraint1/Coefficient1
+				UpperBound = Constraint1/Coefficient1
+				FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+				FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
+			else:
+				SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+											(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+				LowerBound = max(Bounds[0][0], SortedBounds[0])
+				UpperBound = min(Bounds[0][1], SortedBounds[1])
+				# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
+				assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
+				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+										for el in FeasibleInput1])
+			feasible.center((u1[i],u2[i]))
+			if i<10:
+				feasible.radius(10*MaxStep)
+			else:
+				feasible.radius(MaxStep)
+			cline.set_xdata(FeasibleInput1)
+			cline.set_ydata(FeasibleInput2)
+			chosenpoint.set_xdata(u1[i])
+			chosenpoint.set_ydata(u2[i])
+			TimeText.set_text("t = " + str(t[i]))
+			return feasible,cline,chosenpoint,TimeText,
+
+
+		# Init only required for blitting to give a clean slate.
+		def init():
+			ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
+			ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
+			ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
+			ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
+			Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[0],[x1[0],x2[0],x3[0],x4[0],x5[0],x6[0],x7[0],x8[0]])
+			if Coefficient1 == 0:
+				LowerBound = Bounds[0][0]
+				UpperBound = Bounds[0][1]
+				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+				FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+			elif Coefficient2 == 0:
+				LowerBound = Constraint1/Coefficient1
+				UpperBound = Constraint1/Coefficient1
+				FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+				FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
+			else:
+				SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+											(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+				LowerBound = max(Bounds[0][0], SortedBounds[0])
+				UpperBound = min(Bounds[0][1], SortedBounds[1])
+				# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
+				assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
+				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+										for el in FeasibleInput1])
+
+			feasible, = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
+			feasible.set_visible(False)
+			cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
+			cline.set_visible(False)
+			chosenpoint, = plt.plot(u1[0],u2[0],c='k',marker='o')
+			chosenpoint.set_visible(False)
+			TimeText = plt.text(0.75,0.75,"t = " + str(t[0]),fontsize=16)
+			TimeText.set_visible(False)
+			return feasible,cline,chosenpoint,TimeText,
+
+		ani = animation.FuncAnimation(fig, animate, np.arange(1, len(x1),1), init_func=init,interval=1, blit=False)
+		plt.show()
+def plot_individual_constraint_versus_time_muscle_activation_driven(\
+					t,x1,x2,x3,x4,x5,x6,x7,x8,Return = False):
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
+	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
+	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
+
+	"""
+	A⋅u₁ + B⋅u₂ = C
+	"""
+
+	A,B,C = [],[],[]
+	for i in range(len(x1)):
+		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[i],[x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]])
+		A.append(Coefficient1)
+		B.append(Coefficient2)
+		C.append(Constraint1)
+
+	ax1.plot(t[:len(x1)],A,'r',lw=2)
+	ax1.spines['right'].set_visible(False)
+	ax1.spines['top'].set_visible(False)
+	ax1.set_ylabel(r"$1^{st}$ Coefficient")
+	ax1.set_xlabel("Time (s)")
+
+	ax2.plot(t[:len(x1)],B,'b',lw=2)
+	ax2.spines['right'].set_visible(False)
+	ax2.spines['top'].set_visible(False)
+	ax2.set_ylabel(r"$2^{nd}$ Coefficient")
+	ax2.set_xticks(ax1.get_xticks())
+	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	ax3.plot(t[:len(x1)],C,'k',lw=2)
+	ax3.spines['right'].set_visible(False)
+	ax3.spines['top'].set_visible(False)
+	ax3.set_ylabel("Constraint")
+	ax3.set_xticks(ax1.get_xticks())
+	ax3.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	if Return == True:
+		return(fig)
+	else:
+		plt.show()
+def plot_individual_coefficient2_versus_time_muscle_activation_driven(\
+														t,x1,x2,x3,x4,x5,x6,x7,x8,Return = False):
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	fig, (ax1,ax2,ax3,ax4) = plt.subplots(1,4,figsize=(12,5))
+	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
+	plt.suptitle(r"Plotting $2^{nd}$ Coefficient vs. Time",Fontsize=20,y=0.975)
+
+	"""
+	B = c2⋅c4⋅c10⋅R2(X)⋅KT_2(X)⋅FLV_2(X)
+	"""
+
+	r2,kt_2,flv_2,B = [],[],[],[]
+	for i in range(len(x1)):
+		_,Coefficient2,_ = return_constraint_variables_muscle_activation_driven(t[i],[x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]])
+		B.append(Coefficient2)
+		r2.append(R2([x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]]))
+		kt_2.append(G5([x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]]))
+		flv_2.append(FLV_2([x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]]))
+
+	ax1.plot(t[:len(x1)],r2,'b--',lw=2)
+	ax1.spines['right'].set_visible(False)
+	ax1.spines['top'].set_visible(False)
+	ax1.set_ylabel(r"$R_{2}(\vec{x}(t))$")
+	ax1.set_xlabel("Time (s)")
+
+	ax2.plot(t[:len(x1)],kt_2,'b:',lw=2)
+	ax2.spines['right'].set_visible(False)
+	ax2.spines['top'].set_visible(False)
+	ax2.set_ylabel(r"$K_{T,2}(\vec{x}(t))$")
+	ax2.set_xticks(ax1.get_xticks())
+	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	ax3.plot(t[:len(x1)],flv_2,'b',lw=2)
+	ax3.spines['right'].set_visible(False)
+	ax3.spines['top'].set_visible(False)
+	ax3.set_ylabel(r"$2^{nd}$ Coefficient")
+	ax3.set_xticks(ax1.get_xticks())
+	ax3.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	ax4.plot(t[:len(x1)],B,'b',lw=2)
+	ax4.spines['right'].set_visible(False)
+	ax4.spines['top'].set_visible(False)
+	ax4.set_ylabel(r"$F_{LV,2}(\vec{x}(t))$")
+	ax4.set_xticks(ax1.get_xticks())
+	ax4.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	if Return == True:
+		return(fig)
+	else:
+		plt.show()
+def plot_individual_coefficient1_versus_time_muscle_activation_driven(\
+														t,x1,x2,x3,x4,x5,x6,x7,x8,Return = False):
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
+	fig, (ax1,ax2,ax3,ax4) = plt.subplots(1,4,figsize=(12,5))
+	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
+	plt.suptitle(r"Plotting $1^{st}$ Coefficient vs. Time",Fontsize=20,y=0.975)
+
+	"""
+	A = c2⋅c3⋅c6⋅R1(X)⋅KT_1(X)⋅FLV_1(X)
+	"""
+
+	r1,kt_1,flv_1,A = [],[],[],[]
+	for i in range(len(x1)):
+		Coefficient1,_,_ = return_constraint_variables_muscle_activation_driven(t[i],[x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]])
+		A.append(Coefficient1)
+		r1.append(R1([x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]]))
+		kt_1.append(KT_1([x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]]))
+		flv_1.append(FLV_1([x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]]))
+
+	ax1.plot(t[:len(x1)],r1,'r--',lw=2)
+	ax1.spines['right'].set_visible(False)
+	ax1.spines['top'].set_visible(False)
+	ax1.set_ylabel(r"$R_{1}(\vec{x}(t))$")
+	ax1.set_xlabel("Time (s)")
+
+	ax2.plot(t[:len(x1)],kt_1,'r:',lw=2)
+	ax2.spines['right'].set_visible(False)
+	ax2.spines['top'].set_visible(False)
+	ax2.set_ylabel(r"$K_{T,1}(\vec{x}(t))$")
+	ax2.set_xticks(ax1.get_xticks())
+	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	ax3.plot(t[:len(x1)],flv_1,'r-.',lw=2)
+	ax3.spines['right'].set_visible(False)
+	ax3.spines['top'].set_visible(False)
+	ax3.set_ylabel(r"$F_{LV,1}(\vec{x}(t))$")
+	ax3.set_xticks(ax1.get_xticks())
+	ax3.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	ax4.plot(t[:len(x1)],A,'r',lw=2)
+	ax4.spines['right'].set_visible(False)
+	ax4.spines['top'].set_visible(False)
+	ax4.set_ylabel(r"$1^{nd}$ Coefficient")
+	ax4.set_xticks(ax1.get_xticks())
+	ax4.set_xticklabels([""]*len(ax1.get_xticks()))
+
+	if Return == True:
+		return(fig)
+	else:
+		plt.show()
+
+def plot_states(t,X,Return=False,InputString=None):
 	import numpy as np
 	import matplotlib.pyplot as plt
 
@@ -2881,11 +3232,15 @@ def plot_states(t,X,Return=False):
 
 	ColumnNumber = [el%5 for el in np.arange(0,NumStates,1)]
 	RowNumber = [int(el/5) for el in np.arange(0,NumStates,1)]
-
-	DescriptiveTitle = "Plotting States vs. Time"
+	Units = ["(Rads)","(Rads/s)","(N)","(N)","(m)","(m)","(m/s)","(m/s)"]
+	if InputString == None:
+		DescriptiveTitle = "Plotting States vs. Time"
+	else:
+		assert type(InputString)==str, "InputString must be a string"
+		DescriptiveTitle = InputString + " Driven"
 	fig, axes = plt.subplots(NumRows,NumColumns,figsize=(3*NumColumns,2*NumRows + 2))
-	plt.subplots_adjust(top=0.85,hspace=0.4,bottom=0.15,left=0.075,right=0.975)
-	plt.suptitle(r"Plotting $1^{st}$ Coefficient vs. Time",Fontsize=20,y=0.975)
+	plt.subplots_adjust(top=0.85,bottom=0.15,left=0.075,right=0.975)
+	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
 	if NumStates <=5:
 		for j in range(NumStates):
 			axes[ColumnNumber[j]].spines['right'].set_visible(False)
@@ -2896,7 +3251,7 @@ def plot_states(t,X,Return=False):
 									[""]*len(axes[ColumnNumber[j]].get_xticks()))
 			else:
 				axes[ColumnNumber[j]].set_xlabel("Time (s)")
-			axes[ColumnNumber[j]].set_title(r"$x_{" + str(j+1) + "}$")
+			axes[ColumnNumber[j]].set_title(r"$x_{" + str(j+1) + "}$ " + Units[j])
 
 	else:
 		for j in range(NumStates):
@@ -2916,16 +3271,19 @@ def plot_states(t,X,Return=False):
 		return(fig)
 	else:
 		plt.show()
-def plot_inputs(t,u1,u2,Return=False):
+def plot_inputs(t,u1,u2,Return=False,InputString=None):
 	import numpy as np
 	import matplotlib.pyplot as plt
-
-	DescriptiveTitle = "Plotting Inputs vs. Time"
-	fig, (ax1,ax2) = plt.subplots(1,2,figsize=(8,5))
+	if InputString == None:
+		DescriptiveTitle = "Plotting Inputs vs. Time"
+	else:
+		assert type(InputString)==str, "InputString must be a string"
+		DescriptiveTitle = InputString + " vs. Time"
+	fig, (ax1,ax2) = plt.subplots(1,2,figsize=(13,5))
 	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
-	plt.suptitle("Plotting Inputs vs. Time",Fontsize=20,y=0.975)
+	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
 
-	ax1.plot(t[:len(u1)],u1,'c',lw=2)
+	ax1.plot(t[:len(u1)],u1,'r',lw=2)
 	ax1.plot([-1,t[len(u1)-1]+1],[0,0],'k--',lw=0.5)
 	ax1.set_xlim([t[0],t[len(u1)-1]])
 	ax1.spines['right'].set_visible(False)
@@ -2933,7 +3291,7 @@ def plot_inputs(t,u1,u2,Return=False):
 	ax1.set_ylabel(r"$u_1$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(u2)],u2,'m',lw=2)
+	ax2.plot(t[:len(u2)],u2,'g',lw=2)
 	ax2.plot([-1,t[len(u2)-1]+1],[0,0],'k--',lw=0.5)
 	ax2.set_xlim([t[0],t[len(u1)-1]])
 	ax2.spines['right'].set_visible(False)
@@ -2946,165 +3304,267 @@ def plot_inputs(t,u1,u2,Return=False):
 		return(fig)
 	else:
 		plt.show()
+def plot_l_m_comparison(t,x1,x2,l_m1 = None, l_m2 = None,\
+						v_m1 = None, v_m2 = None, Return=False, InputString=None):
+	import numpy as np
+	import matplotlib.pyplot as plt
+	assert (l_m1 != None and l_m2 != None) or (v_m1 != None and v_m2 != None), "Error! Need to input some length/velocity measurement for the muscles."
+	if InputString == None:
+		DescriptiveTitle = "Muscle vs. Musculotendon Lengths"
+	else:
+		assert type(InputString)==str, "InputString must be a string"
+		DescriptiveTitle = "Muscle vs. Musculotendon Lengths\n" + InputString + " Driven"
 
-AttemptNumber = 0
-AnotherIteration = True
-while AnotherIteration == True:
+	fig,[[ax1,ax2],[ax3,ax4]] = plt.subplots(2,2,figsize = (14,7))
+	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
+
+	if (l_m1 == None or l_m2 == None):
+		"""
+		This is for the muscle velocity driven controller. These values of initial muscle length are estimates taken to be the optimal muscle lengths. We will need to run some sensitivity analysis to ensure that this does not drastically effect the deviations from the MTU estimate.
+		"""
+		l_m1 = integrate.cumtrapz(v_m1,t[:len(x1)],initial = 0) + np.ones(len(x1))*lo1
+		l_m2 = integrate.cumtrapz(v_m2,t[:len(x1)],initial = 0) + np.ones(len(x1))*lo2
+
+	ax1.plot(t[:len(x1)],l_m1,'r',\
+				t[:len(x1)],integrate.cumtrapz(np.array(list(map(lambda x1,x2:\
+							 						v_MTU1([x1,x2]),x1,x2)))\
+														,t[:len(x1)], initial = 0)\
+														 	+ np.ones(len(x1))*l_m1[0],'b')
+	ax1.set_ylabel(r"$l_{m,1}/l_{MTU,1}$ (m)")
+	ax1.set_xlabel("Time (s)")
+
+	ax2.plot(t[:len(x1)],l_m1-integrate.cumtrapz(np.array(list(\
+														map(lambda x1,x2: v_MTU1([x1,x2]),x1,x2)))\
+															,t[:len(x1)], initial = 0)\
+															 	- np.ones(len(x1))*l_m1[0],'k')
+	ax2.set_ylabel("Error (m)")
+	ax2.set_xlabel("Time (s)")
+
+	ax3.plot(t[:len(x1)],l_m2,'r',\
+				t[:len(x1)],integrate.cumtrapz(np.array(list(map(lambda x1,x2:\
+							 						v_MTU2([x1,x2]),x1,x2)))\
+														,t[:len(x1)], initial = 0)\
+														 	+ np.ones(len(x1))*l_m2[0],'b')
+	ax3.set_ylabel(r"$l_{m,2}/l_{MTU,2}$ (m)")
+	ax3.set_xlabel("Time (s)")
+
+	ax4.plot(t[:len(x1)],l_m2-integrate.cumtrapz(np.array(list(\
+														map(lambda x1,x2: v_MTU2([x1,x2]),x1,x2)))\
+															,t[:len(x1)], initial = 0)\
+															 	- np.ones(len(x1))*l_m2[0],'k')
+	ax4.set_ylabel("Error (m)")
+	ax4.set_xlabel("Time (s)")
+
+	if Return == True:
+		return(fig)
+	else:
+		plt.show()
+
+def save_figures(BaseFileName,figs):
+	import os.path
+	from matplotlib.backends.backend_pdf import PdfPages
+	i = 1
+	FileName = BaseFileName + "_" + "{:0>2d}".format(i) + ".pdf"
+	if os.path.exists(FileName) == True:
+		while os.path.exists(FileName) == True:
+			i += 1
+			FileName = BaseFileName + "_" + "{:0>2d}".format(i) + ".pdf"
+	PDFFile = PdfPages(FileName)
+	if len(figs)==1:
+		PDFFile.savefig(figs[0])
+	else:
+		[PDFFile.savefig(fig) for fig in figs]
+	PDFFile.close()
+
+AttemptNumber1 = 0
+AnotherIteration1 = True
+while AnotherIteration1 == True:
+	N1 = N_seconds*100 + 1
+	Time1 = np.linspace(0,N_seconds,N1)
+	dt = Time1[1]-Time1[0]
+
 	x1_1,x2_1 = [Base],[Amp*Freq]
-	U1 = return_initial_U_tension_driven(Time[1],[x1_1[0],x2_1[0]],Tension_Bounds)
+	U1 = return_initial_U_tension_driven(Time1[1],[x1_1[0],x2_1[0]],Tension_Bounds)
 	u1_1 = [U1[0]]
 	u2_1 = [U1[1]]
 
-	x1_2,x2_2,x3_2,x4_2= [Base],[Amp*Freq],[U1[0]],[U1[1]]
+	AddNoise1 = False
+	if AddNoise1 == True:
+	    np.random.seed(seed=None)
+	    NoiseArray1 = np.random.normal(loc=0.0,scale=0.2,size=(2,len(Time1)))
+	else:
+	    NoiseArray1 = np.zeros((2,len(Time1)))
+
+	try:
+		StartTime = time.time()
+		for t in Time1[1:]:
+			update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray1)
+			statusbar(int(t/dt)-1,len(Time1)-1,StartTime=StartTime,Title="Tension Controlled")
+		AnotherIteration1 = False
+	except:
+		AttemptNumber1 += 1
+		print("\n")
+		print("Attempt #" + str(int(AttemptNumber1)) + " Failed.\n")
+		if AttemptNumber1 == 10: AnotherIteration1 = False
+print('\n')
+
+AnotherIteration2 = True
+AttemptNumber2 = 0
+while AnotherIteration2 == True:
+	N2 = N_seconds*100 + 1
+	Time2 = np.linspace(0,N_seconds,N2)
+	dt = Time2[1]-Time2[0]
+	"""
+	l_m1[0] = lo1 and l_m2[0] = lo2. This is a floating parameter that will need sensitivity analysis!
+	"""
+	temp_Tension = return_initial_U_tension_driven(Time1[1],[x1_1[0],x2_1[0]],Tension_Bounds)
+	x1_2,x2_2,x3_2,x4_2= [Base],[Amp*Freq],[temp_Tension[0]],[temp_Tension[1]]
 	U2 = return_initial_U_muscle_velocity_driven(\
-				Time[1],[x1_2[0],x2_2[0],x3_2[0],x4_2[0]],MuscleVelocity_Bounds)
+				Time2[1],[x1_2[0],x2_2[0],x3_2[0],x4_2[0]],MuscleVelocity_Bounds)
 	u1_2 = [U2[0]]
 	u2_2 = [U2[1]]
 
+	AddNoise2 = False
+	if AddNoise2 == True:
+	    np.random.seed(seed=None)
+	    NoiseArray2 = np.random.normal(loc=0.0,scale=0.2,size=(2,len(Time2)))
+	else:
+	    NoiseArray2 = np.zeros((2,len(Time2)))
+
+	try:
+		StartTime = time.time()
+		for t in Time2[1:]:
+			update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray2)
+			statusbar(int(t/dt)-1,len(Time2)-1,StartTime=StartTime,Title="Vm Controlled")
+		AnotherIteration2 = False
+	except:
+		AttemptNumber2 += 1
+		print("\n")
+		print("Attempt #" + str(int(AttemptNumber2)) + " Failed.\n")
+		if AttemptNumber2 == 20: AnotherIteration2 = False
+print('\n')
+
+AnotherIteration3 = True
+AttemptNumber3 = 0
+while AnotherIteration3 == True:
+	N3 = N_seconds*10000 + 1
+	Time3 = np.linspace(0,N_seconds,N3)
+	dt = Time3[1]-Time3[0]
 	x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3= [Base],[Amp*Freq],[400],[400],\
 												[lo1],[lo2],[0.1],[0.1]
-	# x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3= [Base],[Amp*Freq],[U1[0]],[U1[1]],\
-	# 											[0.8*lo1],[1.2*lo2],[U2[0]],[U2[1]]
+	# temp_Tension = return_initial_U_tension_driven(Time3[1],[x1_1[0],x2_1[0]],Tension_Bounds)
+	# temp_Vm = return_initial_U_muscle_velocity_driven(\
+	# 			Time3[1],[x1_2[0],x2_2[0],x3_2[0],x4_2[0]],MuscleVelocity_Bounds)
+	# x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3= [Base],[Amp*Freq],\
+	# 											[temp_Tension[0]],[temp_Tension[1]],\
+	# 											[0.8*lo1],[1.2*lo2],[temp_Vm[0]],[temp_Vm[1]]
 	U3 = return_initial_U_muscle_activation_driven(\
-			Time[1],[x1_3[0],x2_3[0],x3_3[0],x4_3[0],x5_3[0],x6_3[0],x7_3[0],x8_3[0]],Activation_Bounds)
+			Time3[1],[x1_3[0],x2_3[0],x3_3[0],x4_3[0],x5_3[0],x6_3[0],x7_3[0],x8_3[0]],Activation_Bounds)
 	u1_3 = [U3[0]]
 	u2_3 = [U3[1]]
 	# u1_3 = [0.01]
 	# u2_3 = [0.01]
 
-	AddNoise = False
-	if AddNoise == True:
+	AddNoise3 = False
+	if AddNoise3 == True:
 	    np.random.seed(seed=None)
-	    NoiseArray = np.random.normal(loc=0.0,scale=0.2,size=(2,len(Time)))
+	    NoiseArray3 = np.random.normal(loc=0.0,scale=0.2,size=(2,len(Time3)))
 	else:
-	    NoiseArray = np.zeros((2,len(Time)))
+	    NoiseArray3 = np.zeros((2,len(Time3)))
 
-	def update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray):
-		import numpy as np
-		Method = "Tension"
-		X = [x1_1[-1],x2_1[-1]]
-		U = [u1_1[-1],u2_1[-1]]
-		U = return_U_tension_driven(t,X,U,dt,MaxStep_Tension,Tension_Bounds,NoiseArray[:,int(t/dt)])
-		u1_1.append(U[0])
-		u2_1.append(U[1])
-		x2_1.append(x2_1[-1] + dX2_dt(X,U=U)*dt)
-		x1_1.append(x1_1[-1] + dX1_dt(X)*dt)
-	def update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray):
-		import numpy as np
-		Method = "Muscle Velocity"
-		X = [x1_2[-1],x2_2[-1],x3_2[-1],x4_2[-1]]
-		U = [u1_2[-1],u2_2[-1]]
-		U = return_U_muscle_velocity_driven(t,X,U,dt,MaxStep_MuscleVelocity,MuscleVelocity_Bounds,NoiseArray[:,int(t/dt)])
-		u1_2.append(U[0])
-		u2_2.append(U[1])
-		x4_2.append(x4_2[-1] + dX4_dt(X,U=U)*dt)
-		x3_2.append(x3_2[-1] + dX3_dt(X,U=U)*dt)
-		x2_2.append(x2_2[-1] + dX2_dt(X)*dt)
-		x1_2.append(x1_2[-1] + dX1_dt(X)*dt)
-	def update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,dt,NoiseArray):
-		import numpy as np
-		Method = "Muscle Act."
-		X = [x1_3[-1],x2_3[-1],x3_3[-1],x4_3[-1],x5_3[-1],x6_3[-1],x7_3[-1],x8_3[-1]]
-		U = [u1_3[-1],u2_3[-1]]
-		U = return_U_muscle_activation_driven(t,X,U,dt,MaxStep_Activation,Activation_Bounds,NoiseArray[:,int(t/dt)])
-		u1_3.append(U[0])
-		u2_3.append(U[1])
-		x8_3.append(x8_3[-1] + dX8_dt(X,U)*dt)
-		x7_3.append(x7_3[-1] + dX7_dt(X,U)*dt)
-		x6_3.append(x6_3[-1] + dX6_dt(X)*dt)
-		x5_3.append(x5_3[-1] + dX5_dt(X)*dt)
-		x4_3.append(x4_3[-1] + dX4_dt(X)*dt)
-		x3_3.append(x3_3[-1] + dX3_dt(X)*dt)
-		x2_3.append(x2_3[-1] + dX2_dt(X)*dt)
-		x1_3.append(x1_3[-1] + dX1_dt(X)*dt)
 	try:
 		StartTime = time.time()
-		for t in Time[1:]:
-			# update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray)
-			# update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray)
-			update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,dt,NoiseArray)
-			statusbar(int(t/dt)-1,len(Time)-1,StartTime=StartTime,Title="Forced-Pendulum")
-		AnotherIteration = False
+		for t in Time3[1:]:
+			update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,dt,NoiseArray3)
+			statusbar(int(t/dt)-1,len(Time3)-1,StartTime=StartTime,Title="Act. Controlled")
+		AnotherIteration3 = False
 	except:
-		AttemptNumber += 1
-		print("Attempt #" + str(int(AttemptNumber)) + " Failed.")
+		AttemptNumber3 += 1
+		print("\n")
+		print("Attempt #" + str(int(AttemptNumber3)) + " Failed.\n")
+		if AttemptNumber3 == 10: AnotherIteration3 = False
+print('\n')
 
-fig1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time,x1_1)
-fig2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time,x1_2)
-fig3,[ax1_3,ax2_3,ax3_3,ax4_3] = plot_MA_values(Time,x1_3)
+if len(x1_1)>50 or len(x1_2)>50 or len(x1_3)>50:
+	plt.figure(figsize = (9,7))
+	plt.title("Underdetermined Forced-Pendulum Example",\
+	                fontsize=16,color='gray')
+	if len(x1_1)>50:
+		plt.plot(Time1[:len(x1_1)],x1_1,'b',lw=2)
+	if len(x1_2)>50:
+		plt.plot(Time2[:len(x1_2)],x1_2,'g',lw=2)
+	if len(x1_3)>50:
+		plt.plot(Time3[:len(x1_3)],x1_3,'k',lw=2)
+	plt.plot(np.linspace(0,max([Time1[len(x1_1)-1],Time2[len(x1_2)-1],Time3[len(x1_3)-1]]),1001),\
+			r(np.linspace(0,max([Time1[len(x1_1)-1],Time2[len(x1_2)-1],Time3[len(x1_3)-1]]),1001)),\
+				'r--')
+	plt.xlabel("Time (s)")
+	plt.ylabel("Desired Measure")
+	if len(x1_1)>50 and len(x1_2)>50 and len(x1_3)>50:
+		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (mm Velocity)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
+	elif len(x1_1)>50 and len(x1_2)>50:
+		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (mm Velocity)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
+	elif len(x1_2)>50 and len(x1_3)>50:
+		plt.legend([r"Output $y = x_{1}$ (mm Velocity)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
+	elif len(x1_1)>50 and len(x1_3)>50:
+		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
+	elif len(x1_1)>50:
+		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
+	elif len(x1_2)>50:
+		plt.legend([r"Output $y = x_{1}$ (mm Velocity)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
+	elif len(x1_3)>50:
+		plt.legend([r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
+if len(x1_1)>50 or len(x1_2)>50 or len(x1_3)>50:
+	plt.figure(figsize = (9,7))
+	plt.title('Error vs. Time')
+	if len(x1_1)>50:
+		plt.plot(Time1[:len(x1_1)], r(Time1[:len(x1_1)])-x1_1,color='b')
+	if len(x1_2)>50:
+		plt.plot(Time2[:len(x1_2)], r(Time2[:len(x1_2)])-x1_2,color='g')
+	if len(x1_3)>50:
+		plt.plot(Time3[:len(x1_3)], r(Time3[:len(x1_3)])-x1_3,color='k')
+	plt.xlabel("Time (s)")
+	plt.ylabel("Error")
+	if len(x1_1)>50 and len(x1_2)>50 and len(x1_3)>50:
+		plt.legend(["Tension Driven","Muscle Velocity Driven","Muscle Activation"],loc='best')
+	elif len(x1_1)>50 and len(x1_2)>50:
+		plt.legend(["Tension Driven","Muscle Velocity Driven"],loc='best')
+	elif len(x1_2)>50 and len(x1_3)>50:
+		plt.legend(["Muscle Velocity Driven","Muscle Activation"],loc='best')
+	elif len(x1_1)>50 and len(x1_3)>50:
+		plt.legend(["Tension Driven","Muscle Activation"],loc='best')
+	elif len(x1_1)>50:
+		plt.legend(["Tension Driven"],loc='best')
+	elif len(x1_2)>50:
+		plt.legend(["Muscle Velocity Driven"],loc='best')
+	elif len(x1_3)>50:
+		plt.legend(["Muscle Activation"],loc='best')
+if len(x1_1)>50:
+	fig1_1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time1,x1_1,InputString = "Tendon Tension")
+	fig2_1 = plot_states(Time1,[x1_1,x2_1],Return=True,InputString = "Tendon Tension")
+	fig3_1 = plot_inputs(Time1,u1_1,u2_1,Return=True,InputString = "Tendon Tension")
+if len(x1_2)>50:
+	fig1_2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time2,x1_2,\
+							InputString = "Normalized Muscle Velocities")
+	fig2_2 = plot_states(Time2,[x1_2,x2_2,x3_2,x4_2],\
+							Return=True,InputString = "Normalized Muscle Velocities")
+	fig3_2 = plot_inputs(Time2,np.array(u1_2)/lo1,np.array(u2_2)/lo2,\
+							Return=True,InputString = "Normalized Muscle Velocities")
+	fig4_2 = plot_l_m_comparison(Time2,x1_2,x2_2,v_m1 = u1_2,v_m2 = u2_2,\
+									Return=True, InputString = "Muscle Velocity")
+if len(x1_3)>50:
+	fig1_3,[ax1_3,ax2_3,ax3_3,ax4_3] = plot_MA_values(Time3,x1_3,\
+							InputString = "Muscle Activations")
+	fig2_3 = plot_states(Time3,[x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3],\
+							Return=True,InputString = "Muscle Activations")
+	fig3_3 = plot_inputs(Time3,u1_3,u2_3,Return=True,InputString = "Muscle Activations")
+	fig4_3 = plot_l_m_comparison(Time3,x1_3,x2_3,l_m1 = x5_3,l_m2 = x6_3,\
+									Return=True,InputString = "Muscle Activation")
 
-plt.figure()
-plt.title("Underdetermined Tendon-Tension-Driven\nForced Pendulum Example",\
-                fontsize=16,color='gray')
-plt.plot(Time[:len(x1_1)],x1_1,'b',lw=2)
-plt.plot(Time[:len(x1_2)],x1_2,'g',lw=2)
-plt.plot(Time[:len(x1_3)],x1_3,'k',lw=2)
-plt.plot(Time[:len(x1_1)],r(Time[:len(x1_1)]),'r--')
-plt.xlabel("Time (s)")
-plt.ylabel("Desired Measure")
-plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (mm Velocity)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-
-plt.figure()
-plt.title('Error vs. Time')
-plt.plot(Time[:len(x1_1)], r(Time[:len(x1_1)])-x1_1,color='b')
-plt.plot(Time[:len(x1_2)], r(Time[:len(x1_2)])-x1_2,color='g')
-plt.plot(Time[:len(x1_3)], r(Time[:len(x1_3)])-x1_3,color='k')
-plt.legend(["Tension Driven","Muscle Velocity Driven"," Muscle Activation"],loc='best')
-plt.xlabel("Time (s)")
-plt.ylabel("Error")
-
-plt.figure()
-plt.plot(Time[:len(u1_1)],u1_1,'g',Time[:len(u2_1)],u2_1,'r')
-plt.title('Tendon Tensions vs. Time')
-plt.xlabel("Time (s)")
-plt.ylabel("Tendon Tensions (N)")
-plt.legend(["Muscle 1","Muscle 2"])
-
-plt.figure()
-plt.plot(Time[:len(u1_2)],np.array(u1_2)/lo1,'g',Time[:len(u2_2)],np.array(u2_2)/lo2,'r')
-plt.title('Muscle Velocities vs. Time')
-plt.xlabel("Time (s)")
-plt.ylabel(r"Muscle Velocities ($\hat{l}_{o,i}/s$)")
-plt.legend(["Muscle 1","Muscle 2"])
-
-plt.figure()
-plt.plot(Time[:len(u1_3)],u1_3,'g',Time[:len(u2_3)],u2_3,'r')
-plt.title('Muscle Activation vs. Time')
-plt.xlabel("Time (s)")
-plt.ylabel("Muscle Activation")
-plt.legend(["Muscle 1","Muscle 2"])
-
-from scipy import integrate
-fig4 = plot_states(Time,[x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3],Return=True)
-fig5 = plot_inputs(Time,u1_3,u2_3,Return=True)
-fig6,[[ax1_4,ax2_4],[ax3_4,ax4_4]] = plt.subplots(2,2,figsize = (7,7))
-
-ax1_4.plot(Time,x5_3,'r',\
-			Time,integrate.cumtrapz(np.array(list(map(lambda x1,x2: v_MTU1([x1,x2]),x1_3,x2_3)))\
-										,Time, initial = 0)\
-										 	+ np.ones(len(Time))*x5_3[0],'b')
-ax1_4.set_ylabel(r"$l_{m,1}/l_{MTU,1}$ (m)")
-ax1_4.set_xlabel("Time (s)")
-
-ax2_4.plot(Time,x5_3-integrate.cumtrapz(np.array(list(\
-													map(lambda x1,x2: v_MTU1([x1,x2]),x1_3,x2_3)))\
-														,Time, initial = 0)\
-														 	- np.ones(len(Time))*x5_3[0],'k')
-ax2_4.set_ylabel("Error")
-ax2_4.set_xlabel("Time (s)")
-
-ax3_4.plot(Time,x6_3,'r',\
-			Time,integrate.cumtrapz(np.array(list(map(lambda x1,x2: v_MTU2([x1,x2]),x1_3,x2_3)))\
-										,Time, initial = 0)\
-										 	+ np.ones(len(Time))*x6_3[0],'b')
-ax3_4.set_ylabel(r"$l_{m,2}/l_{MTU,2}$ (m)")
-ax3_4.set_xlabel("Time (s)")
-
-ax4_4.plot(Time,x6_3-integrate.cumtrapz(np.array(list(\
-													map(lambda x1,x2: v_MTU2([x1,x2]),x1_3,x2_3)))\
-														,Time, initial = 0)\
-														 	- np.ones(len(Time))*x6_3[0],'k')
-ax4_4.set_ylabel("Error")
-ax4_4.set_xlabel("Time (s)")
-
-plt.show()
+BaseFileName = "ReferenceTracking_ForcedPendulumExample"
+figs=[manager.canvas.figure
+         for manager in matplotlib._pylab_helpers.Gcf.get_all_fig_managers()]
+if len(figs)>=1:
+	save_figures(BaseFileName,figs)
+plt.close('all')
+# plt.show()
