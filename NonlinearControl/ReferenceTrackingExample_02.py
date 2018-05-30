@@ -2925,17 +2925,17 @@ def plot_inputs(t,u1,u2,Return=False):
 	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
 	plt.suptitle("Plotting Inputs vs. Time",Fontsize=20,y=0.975)
 
-	ax1.plot(t[:len(u1)],u1,'g--',lw=2)
-	ax1.plot([-1,t[len(u1)]+1],[0,0],'k--',lw=0.5)
-	ax1.set_xlim([t[0],t[len(u1)]])
+	ax1.plot(t[:len(u1)],u1,'c',lw=2)
+	ax1.plot([-1,t[len(u1)-1]+1],[0,0],'k--',lw=0.5)
+	ax1.set_xlim([t[0],t[len(u1)-1]])
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_ylabel(r"$u_1$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(u2)],u2,'g',lw=2)
-	ax2.plot([-1,t[len(u2)]+1],[0,0],'k--',lw=0.5)
-	ax2.set_xlim([t[0],t[len(u1)]])
+	ax2.plot(t[:len(u2)],u2,'m',lw=2)
+	ax2.plot([-1,t[len(u2)-1]+1],[0,0],'k--',lw=0.5)
+	ax2.set_xlim([t[0],t[len(u1)-1]])
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
 	ax2.set_ylabel(r"$u_2$")
@@ -2948,7 +2948,8 @@ def plot_inputs(t,u1,u2,Return=False):
 		plt.show()
 
 AttemptNumber = 0
-while True:
+AnotherIteration = True
+while AnotherIteration == True:
 	x1_1,x2_1 = [Base],[Amp*Freq]
 	U1 = return_initial_U_tension_driven(Time[1],[x1_1[0],x2_1[0]],Tension_Bounds)
 	u1_1 = [U1[0]]
@@ -3023,6 +3024,7 @@ while True:
 			# update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray)
 			update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,dt,NoiseArray)
 			statusbar(int(t/dt)-1,len(Time)-1,StartTime=StartTime,Title="Forced-Pendulum")
+		AnotherIteration = False
 	except:
 		AttemptNumber += 1
 		print("Attempt #" + str(int(AttemptNumber)) + " Failed.")
@@ -3071,5 +3073,38 @@ plt.title('Muscle Activation vs. Time')
 plt.xlabel("Time (s)")
 plt.ylabel("Muscle Activation")
 plt.legend(["Muscle 1","Muscle 2"])
+
+from scipy import integrate
+fig4 = plot_states(Time,[x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3],Return=True)
+fig5 = plot_inputs(Time,u1_3,u2_3,Return=True)
+fig6,[[ax1_4,ax2_4],[ax3_4,ax4_4]] = plt.subplots(2,2,figsize = (7,7))
+
+ax1_4.plot(Time,x5_3,'r',\
+			Time,integrate.cumtrapz(np.array(list(map(lambda x1,x2: v_MTU1([x1,x2]),x1_3,x2_3)))\
+										,Time, initial = 0)\
+										 	+ np.ones(len(Time))*x5_3[0],'b')
+ax1_4.set_ylabel(r"$l_{m,1}/l_{MTU,1}$ (m)")
+ax1_4.set_xlabel("Time (s)")
+
+ax2_4.plot(Time,x5_3-integrate.cumtrapz(np.array(list(\
+													map(lambda x1,x2: v_MTU1([x1,x2]),x1_3,x2_3)))\
+														,Time, initial = 0)\
+														 	- np.ones(len(Time))*x5_3[0],'k')
+ax2_4.set_ylabel("Error")
+ax2_4.set_xlabel("Time (s)")
+
+ax3_4.plot(Time,x6_3,'r',\
+			Time,integrate.cumtrapz(np.array(list(map(lambda x1,x2: v_MTU2([x1,x2]),x1_3,x2_3)))\
+										,Time, initial = 0)\
+										 	+ np.ones(len(Time))*x6_3[0],'b')
+ax3_4.set_ylabel(r"$l_{m,2}/l_{MTU,2}$ (m)")
+ax3_4.set_xlabel("Time (s)")
+
+ax4_4.plot(Time,x6_3-integrate.cumtrapz(np.array(list(\
+													map(lambda x1,x2: v_MTU2([x1,x2]),x1_3,x2_3)))\
+														,Time, initial = 0)\
+														 	- np.ones(len(Time))*x6_3[0],'k')
+ax4_4.set_ylabel("Error")
+ax4_4.set_xlabel("Time (s)")
 
 plt.show()
