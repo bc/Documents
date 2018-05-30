@@ -3376,8 +3376,8 @@ def save_figures(BaseFileName,figs):
 		[PDFFile.savefig(fig) for fig in figs]
 	PDFFile.close()
 
-AttemptNumber1 = 0
 AnotherIteration1 = True
+AttemptNumber1 = 0
 while AnotherIteration1 == True:
 	N1 = N_seconds*100 + 1
 	Time1 = np.linspace(0,N_seconds,N1)
