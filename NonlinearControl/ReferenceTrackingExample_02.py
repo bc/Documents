@@ -2542,7 +2542,7 @@ def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2):
 	Input1.remove(0)
 	Input1 = np.array(Input1)
 	ax1.plot(Input1,lo1*lo2*0.001**2/Input1,'r',lw=2)
-	Input2 = list(np.linspace(MuscleVelocity_Bounds[0][0],MuscleVelocity_Bounds[0][1],1000001))
+	Input2 = list(np.linspace(MuscleVelocity_Bounds[1][0],MuscleVelocity_Bounds[1][1],1000001))
 	Input2.remove(0)
 	Input2 = np.array(Input2)
 	ax1.plot(lo1*lo2*0.001**2/Input2,Input2,'r',lw=2)
