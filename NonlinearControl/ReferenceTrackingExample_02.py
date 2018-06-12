@@ -2535,7 +2535,7 @@ def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2):
 
 	DescriptiveTitle = "Plotting Constraints vs. Time\nMuscle Velocity Driven"
 
-	ax1.set_title(DescriptiveTitle,Fontsize=20,y=0.975)
+	ax1.set_title(DescriptiveTitle,Fontsize=20,y=1)
 
 	#Hyperbolic Constraint/Bounding Constraints
 	Input1 = list(np.linspace(MuscleVelocity_Bounds[0][0],MuscleVelocity_Bounds[0][1],1000001))
@@ -2634,8 +2634,10 @@ def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2):
 	cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
 	TimeText = plt.text(0.1,0.1,"t = " + str(t[0]),fontsize=16)
 	chosenpoint, = plt.plot(u1[0],u2[0],c='k',marker='o')
-	ax1.set_xlim(MuscleVelocity_Bounds[0])
-	ax1.set_ylim(MuscleVelocity_Bounds[1])
+	ax1.set_xlim([MuscleVelocity_Bounds[0][0]-0.10*(np.diff(MuscleVelocity_Bounds[0])[0]/2),\
+					MuscleVelocity_Bounds[0][1]+0.10*(np.diff(MuscleVelocity_Bounds[0])[0]/2)])
+	ax1.set_ylim([MuscleVelocity_Bounds[1][0]-0.10*(np.diff(MuscleVelocity_Bounds[1])[0]/2),\
+					MuscleVelocity_Bounds[1][1]+0.10*(np.diff(MuscleVelocity_Bounds[1])[0]/2)])
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_aspect('equal')
