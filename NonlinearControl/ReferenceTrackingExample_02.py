@@ -2517,7 +2517,7 @@ def plot_MA_values(Time,x1,InputString=None):
 	ax4.set_xlabel("Time (s)")
 	return(fig,[ax1,ax2,ax3,ax4])
 
-def animate_muscle_velocity_driven(response,t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bounds):
+def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bounds):
 	"""
 	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (4,N)), and the input array (U - numpy.ndarray of shape (2,N)) and animates constraint equation over time.
 	"""
@@ -2584,7 +2584,7 @@ def animate_muscle_velocity_driven(response,t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bound
 			UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
 		else:
 			UpperBound = Bounds[0][1]
-		assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+		assert UpperBound>=LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
 		HyperbolicBounds = np.sort([(Constraint1 - \
 										np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
 											/(2*Coefficient1), \
@@ -2606,7 +2606,7 @@ def animate_muscle_velocity_driven(response,t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bound
 			UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
 		else:
 			UpperBound = Bounds[0][1]
-		assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+		assert UpperBound>=LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
 		if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
 			HyperbolicBounds = np.sort([(Constraint1 - \
 											np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
@@ -2673,7 +2673,7 @@ def animate_muscle_velocity_driven(response,t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bound
 				UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
 			else:
 				UpperBound = Bounds[0][1]
-			assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+			assert UpperBound>=LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
 			HyperbolicBounds = np.sort([(Constraint1 - \
 											np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
 												/(2*Coefficient1), \
@@ -2695,7 +2695,7 @@ def animate_muscle_velocity_driven(response,t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bound
 				UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
 			else:
 				UpperBound = Bounds[0][1]
-			assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+			assert UpperBound>=LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
 			if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
 				HyperbolicBounds = np.sort([(Constraint1 - \
 												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
@@ -2792,7 +2792,7 @@ def animate_muscle_velocity_driven(response,t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bound
 				UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
 			else:
 				UpperBound = Bounds[0][1]
-			assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+			assert UpperBound>=LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
 			if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
 				HyperbolicBounds = np.sort([(Constraint1 - \
 												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
