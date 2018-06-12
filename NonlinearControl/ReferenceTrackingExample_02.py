@@ -2451,6 +2451,7 @@ def update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,
 	x3_3.append(x3_3[-1] + dX3_dt(X)*dt)
 	x2_3.append(x2_3[-1] + dX2_dt(X)*dt)
 	x1_3.append(x1_3[-1] + dX1_dt(X)*dt)
+
 def return_concatenated_arrays(t,XorU):
 	"""
 	Takes in a (M,N) list (M lists of length N) and returns an (M,N) array. Time (t) is included to make sure that all lists have the same length N. Make sure that t is a numpy.ndarray of shape (N,).
@@ -2517,7 +2518,7 @@ def plot_MA_values(Time,x1,InputString=None):
 	ax4.set_xlabel("Time (s)")
 	return(fig,[ax1,ax2,ax3,ax4])
 
-def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bounds):
+def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2,MaxStep,Bounds):
 	"""
 	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (4,N)), and the input array (U - numpy.ndarray of shape (2,N)) and animates constraint equation over time.
 	"""
