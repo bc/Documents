@@ -2609,7 +2609,7 @@ def animate_muscle_velocity_driven(response,t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bound
 				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 										for el in FeasibleInput1])
-		feasible, = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
+		feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
 		ax1.add_patch(feasible)
 		cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
 		TimeText = plt.text(0.1,0.1,"t = " + str(t[0]),fontsize=16)
@@ -2795,7 +2795,7 @@ def animate_muscle_velocity_driven(response,t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bound
 					FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 					FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 											for el in FeasibleInput1])
-			feasible, = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
+			feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
 			feasible.set_visible(False)
 			cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
 			cline.set_visible(False)
@@ -2983,7 +2983,7 @@ def animate_muscle_activation_driven(response,t,x1,x2,x3,x4,x5,x6,x7,x8,u1,u2,dt
 			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 									for el in FeasibleInput1])
 
-		feasible, = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
+		feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
 		ax1.add_patch(feasible)
 		cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
 		TimeText = plt.text(0.1,0.1,"t = " + str(t[0]),fontsize=16)
@@ -3057,7 +3057,7 @@ def animate_muscle_activation_driven(response,t,x1,x2,x3,x4,x5,x6,x7,x8,u1,u2,dt
 				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 										for el in FeasibleInput1])
 
-			feasible, = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
+			feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
 			feasible.set_visible(False)
 			cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
 			cline.set_visible(False)
