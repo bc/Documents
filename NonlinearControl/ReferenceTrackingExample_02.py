@@ -2451,6 +2451,23 @@ def update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,
 	x3_3.append(x3_3[-1] + dX3_dt(X)*dt)
 	x2_3.append(x2_3[-1] + dX2_dt(X)*dt)
 	x1_3.append(x1_3[-1] + dX1_dt(X)*dt)
+def return_concatenated_arrays(t,XorU):
+	"""
+	Takes in a (M,N) list (M lists of length N) and returns an (M,N) array. Time (t) is included to make sure that all lists have the same length N. Make sure that t is a numpy.ndarray of shape (N,).
+	"""
+	import numpy as np
+	assert str(type(t)) == "<class 'numpy.ndarray'>" and np.shape(t) == (len(t),), \
+			"t must be a (N,) numpy array."
+	if np.shape(XorU)[0] == 1:
+		return(np.array(XorU,ndmin=2))
+	else:
+		assert np.array([len(el) == len(t) for el in XorU]).all(), \
+			"State arrays must be the same length"
+		assert np.shape(XorU) == (len(XorU),len(t)), "XorU must be of the shape (M,N), where N is the length of t and M is the number of states."
+		newXorU = np.array([XorU[0]],ndmin=2)
+		for i in range(1,len(XorU)):
+			newXorU = np.concatenate([newXorU,np.array([XorU[i]],ndmin=2)],axis=0)
+		return(newXorU)
 
 def plot_MA_values(Time,x1,InputString=None):
 	import matplotlib.pyplot as plt
@@ -2501,37 +2518,225 @@ def plot_MA_values(Time,x1,InputString=None):
 	return(fig,[ax1,ax2,ax3,ax4])
 
 def animate_muscle_velocity_driven(response,t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bounds):
-	assert type(response)==bool, "Input must be either True or False."
+	"""
+	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (4,N)), and the input array (U - numpy.ndarray of shape (2,N)) and animates constraint equation over time.
+	"""
 
-	if response == True:
-		import numpy as np
-		import matplotlib.pyplot as plt
-		import matplotlib.animation as animation
-		import matplotlib.patches as patches
-		import time
+	import numpy as np
+	import matplotlib.pyplot as plt
+	import matplotlib.animation as animation
+	import matplotlib.patches as patches
+	import time
 
-		fig = plt.figure(figsize=(10,8))
-		ax1 = plt.gca()
+	dt = t[1]-t[0]
+	fig = plt.figure(figsize=(10,8))
+	ax1 = plt.gca()
 
-		DescriptiveTitle = "Plotting Constraints vs. Time\nMuscle Velocity Driven"
+	DescriptiveTitle = "Plotting Constraints vs. Time\nMuscle Velocity Driven"
 
-		ax1.set_title(DescriptiveTitle,Fontsize=20,y=0.975)
+	ax1.set_title(DescriptiveTitle,Fontsize=20,y=0.975)
 
-		#Hyperbolic Constraint/Bounding Constraints
-		Input1 = list(np.linspace(Bounds[0][0],Bounds[0][1],1000001))
-		Input1.remove(0)
-		Input1 = np.array(Input1)
+	#Hyperbolic Constraint/Bounding Constraints
+	Input1 = list(np.linspace(Bounds[0][0],Bounds[0][1],1000001))
+	Input1.remove(0)
+	Input1 = np.array(Input1)
+	ax1.plot(Input1,lo1*lo2*0.001**2/Input1,'r',lw=2)
+	Input2 = list(np.linspace(Bounds[0][0],Bounds[0][1],1000001))
+	Input2.remove(0)
+	Input2 = np.array(Input2)
+	ax1.plot(lo1*lo2*0.001**2/Input2,Input2,'r',lw=2)
+
+	ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
+	ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
+	ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
+	ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
+
+	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],[x1[0],x2[0],x3[0],x4[0]])
+	if abs(Coefficient1) <= 1e-7:
+		LowerBound = Bounds[0][0]
+		UpperBound = Bounds[0][1]
+		if Constraint1/Coefficient2 > 0:
+			LowerBound = Bounds[0][0]
+			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+		else:
+			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+			UpperBound = Bounds[0][1]
+		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+	elif abs(Coefficient2) <= 1e-7:
+		LowerBound = Constraint1/Coefficient1
+		UpperBound = Constraint1/Coefficient1
+		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+		if Constraint1/Coefficient1 < 0:
+			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+			UpperBound = Bounds[1][1]
+		else:
+			LowerBound = Bounds[1][0]
+			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+		FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+	elif np.sign(-Coefficient1) == np.sign(Coefficient2): # DIFFERENT SIGNS
+		if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
+			LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
+		else:
+			LowerBound = Bounds[0][0]
+
+		if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 > Bounds[1][1]:
+			UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
+		else:
+			UpperBound = Bounds[0][1]
+		assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+		HyperbolicBounds = np.sort([(Constraint1 - \
+										np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+											/(2*Coefficient1), \
+								 	(Constraint1 + \
+										np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+											/(2*Coefficient1)])
+		LowerBound = max([LowerBound,HyperbolicBounds[0]])
+		UpperBound = min([UpperBound,HyperbolicBounds[1]])
+		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+								for el in FeasibleInput1])
+	else: # np.sign(-Coefficient1) != np.sign(Coefficient2) SAME SIGN
+		if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 > Bounds[1][1]:
+			LowerBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
+		else:
+			LowerBound = Bounds[0][0]
+
+		if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 < Bounds[1][0]:
+			UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
+		else:
+			UpperBound = Bounds[0][1]
+		assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+		if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
+			HyperbolicBounds = np.sort([(Constraint1 - \
+											np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+												/(2*Coefficient1), \
+									 	(Constraint1 + \
+											np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+												/(2*Coefficient1)])
+
+			assert LowerBound < HyperbolicBounds[0] or HyperbolicBounds[1] < UpperBound, "No feasible solutions."
+
+			FeasibleInput1 = []
+			while len(FeasibleInput1)<1000:
+				Random1 = (UpperBound-LowerBound)*np.random.rand() + LowerBound
+				if Random1<HyperbolicBounds[0] or Random1>HyperbolicBounds[1]: FeasibleInput1.append(Random1)
+			FeasinbleInput1 = np.array(FeasibleInput1)
+			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+									for el in FeasibleInput1])
+		else:
+			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+									for el in FeasibleInput1])
+	feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
+	ax1.add_patch(feasible)
+	cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
+	TimeText = plt.text(0.1,0.1,"t = " + str(t[0]),fontsize=16)
+	chosenpoint, = plt.plot(u1[0],u2[0],c='k',marker='o')
+	ax1.set_xlim(Bounds[0])
+	ax1.set_ylim(Bounds[1])
+	ax1.spines['right'].set_visible(False)
+	ax1.spines['top'].set_visible(False)
+	ax1.set_aspect('equal')
+
+	def animate(i):
+		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[i],[x1[i],x2[i],x3[i],x4[i]])
+		if abs(Coefficient1) <= 1e-7:
+			LowerBound = Bounds[0][0]
+			UpperBound = Bounds[0][1]
+			if Constraint1/Coefficient2 > 0:
+				LowerBound = Bounds[0][0]
+				UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+			else:
+				LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
+				UpperBound = Bounds[0][1]
+			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+		elif abs(Coefficient2) <= 1e-7:
+			LowerBound = Constraint1/Coefficient1
+			UpperBound = Constraint1/Coefficient1
+			FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+			if Constraint1/Coefficient1 < 0:
+				LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+				UpperBound = Bounds[1][1]
+			else:
+				LowerBound = Bounds[1][0]
+				UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
+			FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		elif np.sign(-Coefficient1) == np.sign(Coefficient2): # DIFFERENT SIGNS
+			if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
+				LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
+			else:
+				LowerBound = Bounds[0][0]
+
+			if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 > Bounds[1][1]:
+				UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
+			else:
+				UpperBound = Bounds[0][1]
+			assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+			HyperbolicBounds = np.sort([(Constraint1 - \
+											np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+												/(2*Coefficient1), \
+									 	(Constraint1 + \
+											np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+												/(2*Coefficient1)])
+			LowerBound = max([LowerBound,HyperbolicBounds[0]])
+			UpperBound = min([UpperBound,HyperbolicBounds[1]])
+			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+									for el in FeasibleInput1])
+		else: # np.sign(-Coefficient1) != np.sign(Coefficient2) SAME SIGN
+			if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 > Bounds[1][1]:
+				LowerBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
+			else:
+				LowerBound = Bounds[0][0]
+
+			if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 < Bounds[1][0]:
+				UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
+			else:
+				UpperBound = Bounds[0][1]
+			assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
+			if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
+				HyperbolicBounds = np.sort([(Constraint1 - \
+												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+													/(2*Coefficient1), \
+										 	(Constraint1 + \
+												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
+													/(2*Coefficient1)])
+
+				assert LowerBound < HyperbolicBounds[0] or HyperbolicBounds[1] < UpperBound, "No feasible solutions."
+
+				FeasibleInput1 = []
+				while len(FeasibleInput1)<1000:
+					Random1 = (UpperBound-LowerBound)*np.random.rand() + LowerBound
+					if Random1<HyperbolicBounds[0] or Random1>HyperbolicBounds[1]: FeasibleInput1.append(Random1)
+				FeasinbleInput1 = np.array(FeasibleInput1)
+				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+										for el in FeasibleInput1])
+			else:
+				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+										for el in FeasibleInput1])
+		feasible.center = (u1[i],u2[i])
+		if i<10:
+			feasible.radius = 10*MaxStep
+		else:
+			feasible.radius = MaxStep
+		cline.set_xdata(FeasibleInput1)
+		cline.set_ydata(FeasibleInput2)
+		chosenpoint.set_xdata(u1[i])
+		chosenpoint.set_ydata(u2[i])
+		TimeText.set_text("t = " + str(t[i]))
+		return feasible,cline,chosenpoint,TimeText,
+
+
+	# Init only required for blitting to give a clean slate.
+	def init():
 		ax1.plot(Input1,lo1*lo2*0.001**2/Input1,'r',lw=2)
-		Input2 = list(np.linspace(Bounds[0][0],Bounds[0][1],1000001))
-		Input2.remove(0)
-		Input2 = np.array(Input2)
-		ax1.plot(lo1*lo2*0.001**2/Input2,Input2,'r',lw=2)
-
 		ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
 		ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
 		ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
 		ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
-
 		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],[x1[0],x2[0],x3[0],x4[0]])
 		if abs(Coefficient1) <= 1e-7:
 			LowerBound = Bounds[0][0]
@@ -2610,203 +2815,17 @@ def animate_muscle_velocity_driven(response,t,x1,x2,x3,x4,u1,u2,dt,MaxStep,Bound
 				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 										for el in FeasibleInput1])
 		feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
-		ax1.add_patch(feasible)
+		feasible.set_visible(False)
 		cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
-		TimeText = plt.text(0.1,0.1,"t = " + str(t[0]),fontsize=16)
+		cline.set_visible(False)
 		chosenpoint, = plt.plot(u1[0],u2[0],c='k',marker='o')
-		ax1.set_xlim(Bounds[0])
-		ax1.set_ylim(Bounds[1])
-		ax1.spines['right'].set_visible(False)
-		ax1.spines['top'].set_visible(False)
-		ax1.set_aspect('equal')
+		chosenpoint.set_visible(False)
+		TimeText = plt.text(0.75,0.75,"t = " + str(t[0]),fontsize=16)
+		TimeText.set_visible(False)
+		return feasible,cline,chosenpoint,TimeText,
 
-		def animate(i):
-			Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[i],[x1[i],x2[i],x3[i],x4[i]])
-			if abs(Coefficient1) <= 1e-7:
-				LowerBound = Bounds[0][0]
-				UpperBound = Bounds[0][1]
-				if Constraint1/Coefficient2 > 0:
-					LowerBound = Bounds[0][0]
-					UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
-				else:
-					LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
-					UpperBound = Bounds[0][1]
-				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-				FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
-			elif abs(Coefficient2) <= 1e-7:
-				LowerBound = Constraint1/Coefficient1
-				UpperBound = Constraint1/Coefficient1
-				FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-				if Constraint1/Coefficient1 < 0:
-					LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
-					UpperBound = Bounds[1][1]
-				else:
-					LowerBound = Bounds[1][0]
-					UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
-				FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-			elif np.sign(-Coefficient1) == np.sign(Coefficient2): # DIFFERENT SIGNS
-				if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
-					LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
-				else:
-					LowerBound = Bounds[0][0]
-
-				if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 > Bounds[1][1]:
-					UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
-				else:
-					UpperBound = Bounds[0][1]
-				assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
-				HyperbolicBounds = np.sort([(Constraint1 - \
-												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
-													/(2*Coefficient1), \
-										 	(Constraint1 + \
-												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
-													/(2*Coefficient1)])
-				LowerBound = max([LowerBound,HyperbolicBounds[0]])
-				UpperBound = min([UpperBound,HyperbolicBounds[1]])
-				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
-										for el in FeasibleInput1])
-			else: # np.sign(-Coefficient1) != np.sign(Coefficient2) SAME SIGN
-				if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 > Bounds[1][1]:
-					LowerBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
-				else:
-					LowerBound = Bounds[0][0]
-
-				if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 < Bounds[1][0]:
-					UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
-				else:
-					UpperBound = Bounds[0][1]
-				assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
-				if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
-					HyperbolicBounds = np.sort([(Constraint1 - \
-													np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
-														/(2*Coefficient1), \
-											 	(Constraint1 + \
-													np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
-														/(2*Coefficient1)])
-
-					assert LowerBound < HyperbolicBounds[0] or HyperbolicBounds[1] < UpperBound, "No feasible solutions."
-
-					FeasibleInput1 = []
-					while len(FeasibleInput1)<1000:
-						Random1 = (UpperBound-LowerBound)*np.random.rand() + LowerBound
-						if Random1<HyperbolicBounds[0] or Random1>HyperbolicBounds[1]: FeasibleInput1.append(Random1)
-					FeasinbleInput1 = np.array(FeasibleInput1)
-					FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
-											for el in FeasibleInput1])
-				else:
-					FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-					FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
-											for el in FeasibleInput1])
-			feasible.center((u1[i],u2[i]))
-			if i<10:
-				feasible.radius(10*MaxStep)
-			else:
-				feasible.radius(MaxStep)
-			cline.set_xdata(FeasibleInput1)
-			cline.set_ydata(FeasibleInput2)
-			chosenpoint.set_xdata(u1[i])
-			chosenpoint.set_ydata(u2[i])
-			TimeText.set_text("t = " + str(t[i]))
-			return feasible,cline,chosenpoint,TimeText,
-
-
-		# Init only required for blitting to give a clean slate.
-		def init():
-			ax1.plot(Input1,lo1*lo2*0.001**2/Input1,'r',lw=2)
-			ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
-			ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
-			ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
-			ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
-			Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],[x1[0],x2[0],x3[0],x4[0]])
-			if abs(Coefficient1) <= 1e-7:
-				LowerBound = Bounds[0][0]
-				UpperBound = Bounds[0][1]
-				if Constraint1/Coefficient2 > 0:
-					LowerBound = Bounds[0][0]
-					UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
-				else:
-					LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
-					UpperBound = Bounds[0][1]
-				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-				FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
-			elif abs(Coefficient2) <= 1e-7:
-				LowerBound = Constraint1/Coefficient1
-				UpperBound = Constraint1/Coefficient1
-				FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-				if Constraint1/Coefficient1 < 0:
-					LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
-					UpperBound = Bounds[1][1]
-				else:
-					LowerBound = Bounds[1][0]
-					UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
-				FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-			elif np.sign(-Coefficient1) == np.sign(Coefficient2): # DIFFERENT SIGNS
-				if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
-					LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
-				else:
-					LowerBound = Bounds[0][0]
-
-				if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 > Bounds[1][1]:
-					UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
-				else:
-					UpperBound = Bounds[0][1]
-				assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
-				HyperbolicBounds = np.sort([(Constraint1 - \
-												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
-													/(2*Coefficient1), \
-										 	(Constraint1 + \
-												np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
-													/(2*Coefficient1)])
-				LowerBound = max([LowerBound,HyperbolicBounds[0]])
-				UpperBound = min([UpperBound,HyperbolicBounds[1]])
-				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
-										for el in FeasibleInput1])
-			else: # np.sign(-Coefficient1) != np.sign(Coefficient2) SAME SIGN
-				if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 > Bounds[1][1]:
-					LowerBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
-				else:
-					LowerBound = Bounds[0][0]
-
-				if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 < Bounds[1][0]:
-					UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
-				else:
-					UpperBound = Bounds[0][1]
-				assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
-				if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
-					HyperbolicBounds = np.sort([(Constraint1 - \
-													np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
-														/(2*Coefficient1), \
-											 	(Constraint1 + \
-													np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
-														/(2*Coefficient1)])
-
-					assert LowerBound < HyperbolicBounds[0] or HyperbolicBounds[1] < UpperBound, "No feasible solutions."
-
-					FeasibleInput1 = []
-					while len(FeasibleInput1)<1000:
-						Random1 = (UpperBound-LowerBound)*np.random.rand() + LowerBound
-						if Random1<HyperbolicBounds[0] or Random1>HyperbolicBounds[1]: FeasibleInput1.append(Random1)
-					FeasinbleInput1 = np.array(FeasibleInput1)
-					FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
-											for el in FeasibleInput1])
-				else:
-					FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-					FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
-											for el in FeasibleInput1])
-			feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
-			feasible.set_visible(False)
-			cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
-			cline.set_visible(False)
-			chosenpoint, = plt.plot(u1[0],u2[0],c='k',marker='o')
-			chosenpoint.set_visible(False)
-			TimeText = plt.text(0.75,0.75,"t = " + str(t[0]),fontsize=16)
-			TimeText.set_visible(False)
-			return feasible,cline,chosenpoint,TimeText,
-
-		ani = animation.FuncAnimation(fig, animate, np.arange(1, len(x1),1), init_func=init,interval=1, blit=False)
-		plt.show()
+	ani = animation.FuncAnimation(fig, animate, np.arange(1, len(x1),1), init_func=init,interval=1, blit=False)
+	plt.show()
 def plot_individual_constraint_versus_time_muscle_velocity_driven(t,x1,x2,x3,x4,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
@@ -3016,11 +3035,11 @@ def animate_muscle_activation_driven(response,t,x1,x2,x3,x4,x5,x6,x7,x8,u1,u2,dt
 				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 										for el in FeasibleInput1])
-			feasible.center((u1[i],u2[i]))
+			feasible.center = (u1[i],u2[i])
 			if i<10:
-				feasible.radius(10*MaxStep)
+				feasible.radius = 10*MaxStep
 			else:
-				feasible.radius(MaxStep)
+				feasible.radius = MaxStep
 			cline.set_xdata(FeasibleInput1)
 			cline.set_ydata(FeasibleInput2)
 			chosenpoint.set_xdata(u1[i])
@@ -3444,7 +3463,7 @@ while AnotherIteration2 == True:
 		if AttemptNumber2 == 20: AnotherIteration2 = False
 print('\n')
 
-AnotherIteration3 = True
+AnotherIteration3 = False
 AttemptNumber3 = 0
 while AnotherIteration3 == True:
 	N3 = N_seconds*10000 + 1
