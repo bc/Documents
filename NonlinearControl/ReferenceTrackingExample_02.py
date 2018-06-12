@@ -2518,7 +2518,7 @@ def plot_MA_values(Time,x1,InputString=None):
 	ax4.set_xlabel("Time (s)")
 	return(fig,[ax1,ax2,ax3,ax4])
 
-def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2,MaxStep,Bounds):
+def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2,Bounds):
 	"""
 	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (4,N)), and the input array (U - numpy.ndarray of shape (2,N)) and animates constraint equation over time.
 	"""
@@ -2629,7 +2629,7 @@ def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2,MaxStep,Bounds):
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 									for el in FeasibleInput1])
-	feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
+	feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep_MuscleVelocity,Color='b',alpha=0.5)
 	ax1.add_patch(feasible)
 	cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
 	TimeText = plt.text(0.1,0.1,"t = " + str(t[0]),fontsize=16)
@@ -2720,9 +2720,9 @@ def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2,MaxStep,Bounds):
 										for el in FeasibleInput1])
 		feasible.center = (u1[i],u2[i])
 		if i<10:
-			feasible.radius = 10*MaxStep
+			feasible.radius = 10*MaxStep_MuscleVelocity
 		else:
-			feasible.radius = MaxStep
+			feasible.radius = MaxStep_MuscleVelocity
 		cline.set_xdata(FeasibleInput1)
 		cline.set_ydata(FeasibleInput2)
 		chosenpoint.set_xdata(u1[i])
@@ -2815,7 +2815,7 @@ def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2,MaxStep,Bounds):
 				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 										for el in FeasibleInput1])
-		feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
+		feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep_MuscleVelocity,Color='b',alpha=0.5)
 		feasible.set_visible(False)
 		cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
 		cline.set_visible(False)
