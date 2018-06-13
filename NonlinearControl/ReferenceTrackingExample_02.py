@@ -2879,7 +2879,7 @@ def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,X,Return =
 	import matplotlib.pyplot as plt
 
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
-	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975,wspace=0.4)
+	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.1,right=0.975,wspace=0.4)
 	plt.suptitle(r"Plotting $2^{nd}$ Coefficient vs. Time",Fontsize=20,y=0.975)
 
 	"""
