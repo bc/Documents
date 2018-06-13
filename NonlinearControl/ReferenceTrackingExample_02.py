@@ -2836,6 +2836,7 @@ def plot_individual_constraint_versus_time_muscle_velocity_driven(t,X,Return = F
 
 	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time\nMuscle Velocity Driven"
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
+	plt.subplots_adjust(wspace=0.4)
 	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
 
 	"""
@@ -2878,7 +2879,7 @@ def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,X,Return =
 	import matplotlib.pyplot as plt
 
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
-	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
+	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975,wspace=0.4)
 	plt.suptitle(r"Plotting $2^{nd}$ Coefficient vs. Time",Fontsize=20,y=0.975)
 
 	"""
@@ -2892,16 +2893,16 @@ def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,X,Return =
 		r2.append(R2(X[:,i]))
 		kt_2.append(KT_2(X[:,i]))
 
-	ax1.plot(t[:np.shape(X)[1]],r2,'b--',lw=2)
+	ax1.plot(t[:np.shape(X)[1]],r2,'b',lw=2)
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
-	ax1.set_ylabel(r"$g_{2}(\vec{x}(t))$")
+	ax1.set_ylabel(r"$R_{2}(\vec{x}(t))$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:np.shape(X)[1]],kt_2,'b:',lw=2)
+	ax2.plot(t[:np.shape(X)[1]],kt_2,'b',lw=2)
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
-	ax2.set_ylabel(r"$g_{5}(\vec{x}(t))$")
+	ax2.set_ylabel(r"$K_{T,2}(\vec{x}(t))$")
 	ax2.set_xticks(ax1.get_xticks())
 	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
 
@@ -2922,7 +2923,7 @@ def plot_individual_coefficient1_versus_time_muscle_velocity_driven(t,X,Return =
 
 	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
-	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
+	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975,wspace=0.4)
 	plt.suptitle(r"Plotting $1^{st}$ Coefficient vs. Time",Fontsize=20,y=0.975)
 
 	"""
@@ -2936,23 +2937,23 @@ def plot_individual_coefficient1_versus_time_muscle_velocity_driven(t,X,Return =
 		r1.append(R1(X[:,i]))
 		kt_1.append(KT_1(X[:,i]))
 
-	ax1.plot(t[:np.shape(X)[1]],r1,'r--',lw=2)
+	ax1.plot(t[:np.shape(X)[1]],r1,'r',lw=2)
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
-	ax1.set_ylabel(r"$g_{2}(\vec{x}(t))$")
+	ax1.set_ylabel(r"$R_{1}(\vec{x}(t))$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:np.shape(X)[1]],kt_1,'r:',lw=2)
+	ax2.plot(t[:np.shape(X)[1]],kt_1,'r',lw=2)
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
-	ax2.set_ylabel(r"$g_{5}(\vec{x}(t))$")
+	ax2.set_ylabel(r"$K_{T,1}(\vec{x}(t))$")
 	ax2.set_xticks(ax1.get_xticks())
 	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
 
 	ax3.plot(t[:np.shape(X)[1]],B,'r',lw=2)
 	ax3.spines['right'].set_visible(False)
 	ax3.spines['top'].set_visible(False)
-	ax3.set_ylabel(r"$2^{nd}$ Coefficient")
+	ax3.set_ylabel(r"$1^{st}$ Coefficient")
 	ax3.set_xticks(ax1.get_xticks())
 	ax3.set_xticklabels([""]*len(ax1.get_xticks()))
 
