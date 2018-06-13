@@ -2518,7 +2518,7 @@ def plot_MA_values(Time,x1,InputString=None):
 	ax4.set_xlabel("Time (s)")
 	return(fig,[ax1,ax2,ax3,ax4])
 
-def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2):
+def animate_muscle_velocity_driven(t,X,u1,u2):
 	"""
 	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (4,N)), and the input array (U - numpy.ndarray of shape (2,N)) and animates constraint equation over time.
 	"""
@@ -2529,6 +2529,7 @@ def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2):
 	import matplotlib.patches as patches
 	import time
 
+	assert np.shape(X) == (4,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (4,N) numpy.ndarray"
 	dt = t[1]-t[0]
 	fig = plt.figure(figsize=(10,8))
 	ax1 = plt.gca()
@@ -2552,7 +2553,7 @@ def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2):
 	ax1.plot([MuscleVelocity_Bounds[0][0],MuscleVelocity_Bounds[0][0]],[MuscleVelocity_Bounds[1][0],MuscleVelocity_Bounds[1][1]],'k--')
 	ax1.plot([MuscleVelocity_Bounds[0][1],MuscleVelocity_Bounds[0][1]],[MuscleVelocity_Bounds[1][0],MuscleVelocity_Bounds[1][1]],'k--')
 
-	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],[x1[0],x2[0],x3[0],x4[0]])
+	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],X[:,0])
 	if abs(Coefficient1) <= 1e-7:
 		LowerBound = MuscleVelocity_Bounds[0][0]
 		UpperBound = MuscleVelocity_Bounds[0][1]
@@ -2643,7 +2644,7 @@ def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2):
 	ax1.set_aspect('equal')
 
 	def animate(i):
-		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[i],[x1[i],x2[i],x3[i],x4[i]])
+		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[i],X[:,i])
 		if abs(Coefficient1) <= 1e-7:
 			LowerBound = MuscleVelocity_Bounds[0][0]
 			UpperBound = MuscleVelocity_Bounds[0][1]
@@ -2740,7 +2741,7 @@ def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2):
 		ax1.plot([MuscleVelocity_Bounds[0][0],MuscleVelocity_Bounds[0][1]],[MuscleVelocity_Bounds[1][1],MuscleVelocity_Bounds[1][1]],'k--')
 		ax1.plot([MuscleVelocity_Bounds[0][0],MuscleVelocity_Bounds[0][0]],[MuscleVelocity_Bounds[1][0],MuscleVelocity_Bounds[1][1]],'k--')
 		ax1.plot([MuscleVelocity_Bounds[0][1],MuscleVelocity_Bounds[0][1]],[MuscleVelocity_Bounds[1][0],MuscleVelocity_Bounds[1][1]],'k--')
-		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],[x1[0],x2[0],x3[0],x4[0]])
+		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],X[:,0])
 		if abs(Coefficient1) <= 1e-7:
 			LowerBound = MuscleVelocity_Bounds[0][0]
 			UpperBound = MuscleVelocity_Bounds[0][1]
@@ -2827,7 +2828,7 @@ def animate_muscle_velocity_driven(t,x1,x2,x3,x4,u1,u2):
 		TimeText.set_visible(False)
 		return feasible,cline,chosenpoint,TimeText,
 
-	ani = animation.FuncAnimation(fig, animate, np.arange(1, len(x1),1), init_func=init,interval=1, blit=False)
+	ani = animation.FuncAnimation(fig, animate, np.arange(1, len(t),1), init_func=init,interval=1, blit=False)
 	plt.show()
 def plot_individual_constraint_versus_time_muscle_velocity_driven(t,x1,x2,x3,x4,Return = False):
 	import numpy as np
