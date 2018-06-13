@@ -2835,6 +2835,7 @@ def animate_muscle_velocity_driven(t,X,U):
 def plot_individual_constraint_versus_time_muscle_velocity_driven(t,X,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
+	assert np.shape(X) == (4,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (4,N) numpy.ndarray"
 
 	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time\nMuscle Velocity Driven"
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
@@ -2879,6 +2880,7 @@ def plot_individual_constraint_versus_time_muscle_velocity_driven(t,X,Return = F
 def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,X,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
+	assert np.shape(X) == (4,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (4,N) numpy.ndarray"
 
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
 	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.1,right=0.975,wspace=0.4)
@@ -2922,6 +2924,7 @@ def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,X,Return =
 def plot_individual_coefficient1_versus_time_muscle_velocity_driven(t,X,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
+	assert np.shape(X) == (4,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (4,N) numpy.ndarray"
 
 	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
@@ -3098,40 +3101,41 @@ def animate_muscle_activation_driven(t,X,U):
 
 	ani = animation.FuncAnimation(fig, animate, np.arange(1, np.shape(X)[1],1), init_func=init,interval=1, blit=False)
 	plt.show()
-def plot_individual_constraint_versus_time_muscle_activation_driven(\
-					t,x1,x2,x3,x4,x5,x6,x7,x8,Return = False):
+def plot_individual_constraint_versus_time_muscle_activation_driven(t,X,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
+	assert np.shape(X) == (8,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,N) numpy.ndarray"
 
 	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
 	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
+	plt.subplots_adjust(wspace = 0.4)
 
 	"""
 	A⋅u₁ + B⋅u₂ = C
 	"""
 
 	A,B,C = [],[],[]
-	for i in range(len(x1)):
-		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[i],[x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]])
+	for i in range(np.shape(X)[1]):
+		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[i],X[:,i])
 		A.append(Coefficient1)
 		B.append(Coefficient2)
 		C.append(Constraint1)
 
-	ax1.plot(t[:len(x1)],A,'r',lw=2)
+	ax1.plot(t[:np.shape(X)[1]],A,'r',lw=2)
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_ylabel(r"$1^{st}$ Coefficient")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(x1)],B,'b',lw=2)
+	ax2.plot(t[:np.shape(X)[1]],B,'b',lw=2)
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
 	ax2.set_ylabel(r"$2^{nd}$ Coefficient")
 	ax2.set_xticks(ax1.get_xticks())
 	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
 
-	ax3.plot(t[:len(x1)],C,'k',lw=2)
+	ax3.plot(t[:np.shape(X)[1]],C,'k',lw=2)
 	ax3.spines['right'].set_visible(False)
 	ax3.spines['top'].set_visible(False)
 	ax3.set_ylabel("Constraint")
@@ -3142,13 +3146,13 @@ def plot_individual_constraint_versus_time_muscle_activation_driven(\
 		return(fig)
 	else:
 		plt.show()
-def plot_individual_coefficient2_versus_time_muscle_activation_driven(\
-														t,x1,x2,x3,x4,x5,x6,x7,x8,Return = False):
+def plot_individual_coefficient2_versus_time_muscle_activation_driven(t,X,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
+	assert np.shape(X) == (8,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,N) numpy.ndarray"
 
-	fig, (ax1,ax2,ax3,ax4) = plt.subplots(1,4,figsize=(12,5))
-	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
+	fig, (ax1,ax2,ax3,ax4) = plt.subplots(1,4,figsize=(15,5))
+	plt.subplots_adjust(top=0.9,bottom=0.1,left=0.1,right=0.975,wspace=0.4)
 	plt.suptitle(r"Plotting $2^{nd}$ Coefficient vs. Time",Fontsize=20,y=0.975)
 
 	"""
@@ -3156,37 +3160,37 @@ def plot_individual_coefficient2_versus_time_muscle_activation_driven(\
 	"""
 
 	r2,kt_2,flv_2,B = [],[],[],[]
-	for i in range(len(x1)):
-		_,Coefficient2,_ = return_constraint_variables_muscle_activation_driven(t[i],[x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]])
+	for i in range(np.shape(X)[1]):
+		_,Coefficient2,_ = return_constraint_variables_muscle_activation_driven(t[i],X[:,i])
 		B.append(Coefficient2)
-		r2.append(R2([x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]]))
-		kt_2.append(G5([x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]]))
-		flv_2.append(FLV_2([x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]]))
+		r2.append(R2(X[:,i]))
+		kt_2.append(KT_2(X[:,i]))
+		flv_2.append(FLV_2(X[:,i]))
 
-	ax1.plot(t[:len(x1)],r2,'b--',lw=2)
+	ax1.plot(t[:np.shape(X)[1]],r2,'b',lw=2)
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_ylabel(r"$R_{2}(\vec{x}(t))$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(x1)],kt_2,'b:',lw=2)
+	ax2.plot(t[:np.shape(X)[1]],kt_2,'b',lw=2)
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
 	ax2.set_ylabel(r"$K_{T,2}(\vec{x}(t))$")
 	ax2.set_xticks(ax1.get_xticks())
 	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
 
-	ax3.plot(t[:len(x1)],flv_2,'b',lw=2)
+	ax3.plot(t[:np.shape(X)[1]],flv_2,'b',lw=2)
 	ax3.spines['right'].set_visible(False)
 	ax3.spines['top'].set_visible(False)
-	ax3.set_ylabel(r"$2^{nd}$ Coefficient")
+	ax3.set_ylabel(r"$F_{LV,2}(\vec{x}(t))$")
 	ax3.set_xticks(ax1.get_xticks())
 	ax3.set_xticklabels([""]*len(ax1.get_xticks()))
 
-	ax4.plot(t[:len(x1)],B,'b',lw=2)
+	ax4.plot(t[:np.shape(X)[1]],B,'b',lw=2)
 	ax4.spines['right'].set_visible(False)
 	ax4.spines['top'].set_visible(False)
-	ax4.set_ylabel(r"$F_{LV,2}(\vec{x}(t))$")
+	ax4.set_ylabel(r"$2^{nd}$ Coefficient")
 	ax4.set_xticks(ax1.get_xticks())
 	ax4.set_xticklabels([""]*len(ax1.get_xticks()))
 
@@ -3194,14 +3198,14 @@ def plot_individual_coefficient2_versus_time_muscle_activation_driven(\
 		return(fig)
 	else:
 		plt.show()
-def plot_individual_coefficient1_versus_time_muscle_activation_driven(\
-														t,x1,x2,x3,x4,x5,x6,x7,x8,Return = False):
+def plot_individual_coefficient1_versus_time_muscle_activation_driven(t,X,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
+	assert np.shape(X) == (8,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,N) numpy.ndarray"
 
 	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
-	fig, (ax1,ax2,ax3,ax4) = plt.subplots(1,4,figsize=(12,5))
-	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
+	fig, (ax1,ax2,ax3,ax4) = plt.subplots(1,4,figsize=(15,5))
+	plt.subplots_adjust(top=0.9,bottom=0.1,left=0.1,right=0.975,wspace=0.4)
 	plt.suptitle(r"Plotting $1^{st}$ Coefficient vs. Time",Fontsize=20,y=0.975)
 
 	"""
@@ -3209,37 +3213,37 @@ def plot_individual_coefficient1_versus_time_muscle_activation_driven(\
 	"""
 
 	r1,kt_1,flv_1,A = [],[],[],[]
-	for i in range(len(x1)):
-		Coefficient1,_,_ = return_constraint_variables_muscle_activation_driven(t[i],[x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]])
+	for i in range(np.shape(X)[1]):
+		Coefficient1,_,_ = return_constraint_variables_muscle_activation_driven(t[i],X[:,i])
 		A.append(Coefficient1)
-		r1.append(R1([x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]]))
-		kt_1.append(KT_1([x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]]))
-		flv_1.append(FLV_1([x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]]))
+		r1.append(R1(X[:,i]))
+		kt_1.append(KT_1(X[:,i]))
+		flv_1.append(FLV_1(X[:,i]))
 
-	ax1.plot(t[:len(x1)],r1,'r--',lw=2)
+	ax1.plot(t[:np.shape(X)[1]],r1,'r',lw=2)
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_ylabel(r"$R_{1}(\vec{x}(t))$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(x1)],kt_1,'r:',lw=2)
+	ax2.plot(t[:np.shape(X)[1]],kt_1,'r',lw=2)
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
 	ax2.set_ylabel(r"$K_{T,1}(\vec{x}(t))$")
 	ax2.set_xticks(ax1.get_xticks())
 	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
 
-	ax3.plot(t[:len(x1)],flv_1,'r-.',lw=2)
+	ax3.plot(t[:np.shape(X)[1]],flv_1,'r',lw=2)
 	ax3.spines['right'].set_visible(False)
 	ax3.spines['top'].set_visible(False)
 	ax3.set_ylabel(r"$F_{LV,1}(\vec{x}(t))$")
 	ax3.set_xticks(ax1.get_xticks())
 	ax3.set_xticklabels([""]*len(ax1.get_xticks()))
 
-	ax4.plot(t[:len(x1)],A,'r',lw=2)
+	ax4.plot(t[:np.shape(X)[1]],A,'r',lw=2)
 	ax4.spines['right'].set_visible(False)
 	ax4.spines['top'].set_visible(False)
-	ax4.set_ylabel(r"$1^{nd}$ Coefficient")
+	ax4.set_ylabel(r"$1^{st}$ Coefficient")
 	ax4.set_xticks(ax1.get_xticks())
 	ax4.set_xticklabels([""]*len(ax1.get_xticks()))
 
@@ -3590,10 +3594,10 @@ if len(x1_3)>50:
 	fig4_3 = plot_l_m_comparison(Time3,x1_3,x2_3,l_m1 = x5_3,l_m2 = x6_3,\
 									Return=True,InputString = "Muscle Activation")
 
-# BaseFileName = "ReferenceTracking_ForcedPendulumExample"
-# figs=[manager.canvas.figure
-#          for manager in matplotlib._pylab_helpers.Gcf.get_all_fig_managers()]
-# if len(figs)>=1:
-# 	save_figures(BaseFileName,figs)
+BaseFileName = "ReferenceTracking_ForcedPendulumExample"
+figs=[manager.canvas.figure
+         for manager in matplotlib._pylab_helpers.Gcf.get_all_fig_managers()]
+if len(figs)>=1:
+	save_figures(BaseFileName,figs)
 plt.close('all')
 # plt.show()
