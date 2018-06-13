@@ -2635,6 +2635,8 @@ def animate_muscle_velocity_driven(t,X,U):
 	cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
 	TimeText = plt.text(0.1,0.1,"t = " + str(t[0]),fontsize=16)
 	chosenpoint, = plt.plot(U[:,0],c='k',marker='o')
+	ax1.set_xlabel(r'$v_{m,1}$',fontsize=14)
+	ax1.set_ylabel(r'$v_{m,2}$',fontsize=14)
 	ax1.set_xlim([MuscleVelocity_Bounds[0][0]-0.10*(np.diff(MuscleVelocity_Bounds[0])[0]/2),\
 					MuscleVelocity_Bounds[0][1]+0.10*(np.diff(MuscleVelocity_Bounds[0])[0]/2)])
 	ax1.set_ylim([MuscleVelocity_Bounds[1][0]-0.10*(np.diff(MuscleVelocity_Bounds[1])[0]/2),\
@@ -2828,7 +2830,7 @@ def animate_muscle_velocity_driven(t,X,U):
 		TimeText.set_visible(False)
 		return feasible,cline,chosenpoint,TimeText,
 
-	ani = animation.FuncAnimation(fig, animate, np.arange(1, len(t),1), init_func=init,interval=1, blit=False)
+	ani = animation.FuncAnimation(fig, animate, np.arange(1, np.shape(X)[1],1), init_func=init,interval=1, blit=False)
 	plt.show()
 def plot_individual_constraint_versus_time_muscle_velocity_driven(t,X,Return = False):
 	import numpy as np
@@ -2962,137 +2964,140 @@ def plot_individual_coefficient1_versus_time_muscle_velocity_driven(t,X,Return =
 	else:
 		plt.show()
 
-def animate_muscle_activation_driven(response,t,x1,x2,x3,x4,x5,x6,x7,x8,u1,u2,dt,MaxStep,Bounds):
-	assert type(response)==bool, "Input must be either True or False."
+def animate_muscle_activation_driven(t,X,U):
+	import numpy as np
+	import matplotlib.pyplot as plt
+	import matplotlib.animation as animation
+	import matplotlib.patches as patches
+	import time
+	assert np.shape(X) == (8,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,N) numpy.ndarray"
 
-	if response == True:
-		import numpy as np
-		import matplotlib.pyplot as plt
-		import matplotlib.animation as animation
-		import matplotlib.patches as patches
-		import time
+	dt = t[1]-t[0]
+	fig = plt.figure(figsize=(10,8))
+	ax1 = plt.gca()
 
-		fig = plt.figure(figsize=(10,8))
-		ax1 = plt.gca()
+	DescriptiveTitle = "Plotting Constraints vs. Time\nMuscle Activation Driven"
 
-		DescriptiveTitle = "Plotting Constraints vs. Time\nMuscle Activation Driven"
+	ax1.set_title(DescriptiveTitle,Fontsize=20,y=1)
 
-		ax1.set_title(DescriptiveTitle,Fontsize=20,y=0.975)
+	#Bound Constraints
+	ax1.plot([Activation_Bounds[0][0],Activation_Bounds[0][1]],[Activation_Bounds[1][0],Activation_Bounds[1][0]],'k--')
+	ax1.plot([Activation_Bounds[0][0],Activation_Bounds[0][1]],[Activation_Bounds[1][1],Activation_Bounds[1][1]],'k--')
+	ax1.plot([Activation_Bounds[0][0],Activation_Bounds[0][0]],[Activation_Bounds[1][0],Activation_Bounds[1][1]],'k--')
+	ax1.plot([Activation_Bounds[0][1],Activation_Bounds[0][1]],[Activation_Bounds[1][0],Activation_Bounds[1][1]],'k--')
 
-		#Bound Constraints
-		ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
-		ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
-		ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
-		ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
+	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[0],X[:,0])
+	if Coefficient1 == 0:
+		LowerBound = Activation_Bounds[0][0]
+		UpperBound = Activation_Bounds[0][1]
+		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+	elif Coefficient2 == 0:
+		LowerBound = Constraint1/Coefficient1
+		UpperBound = Constraint1/Coefficient1
+		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+		FeasibleInput2 = (Activation_Bounds[1][1]-Activation_Bounds[1][0])*np.random.rand(1000) + Activation_Bounds[1][0]
+	else:
+		SortedBounds = np.sort([(Constraint1-Coefficient2*Activation_Bounds[1][0])/Coefficient1,\
+									(Constraint1-Coefficient2*Activation_Bounds[1][1])/Coefficient1])
+		LowerBound = max(Activation_Bounds[0][0], SortedBounds[0])
+		UpperBound = min(Activation_Bounds[0][1], SortedBounds[1])
+		# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
+		assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
+		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+								for el in FeasibleInput1])
 
-		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[0],[x1[0],x2[0],x3[0],x4[0],x5[0],x6[0],x7[0],x8[0]])
+	feasible = plt.Circle((U[:,0]),radius=MaxStep_Activation,Color='b',alpha=0.5)
+	ax1.add_patch(feasible)
+	cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
+	TimeText = plt.text(0.1,0.1,"t = " + str(t[0]),fontsize=16)
+	chosenpoint, = plt.plot(U[:,0],c='k',marker='o')
+	ax1.set_xlabel(r'$\alpha_{1}$',fontsize=14)
+	ax1.set_ylabel(r'$\alpha_{2}$',fontsize=14)
+	ax1.set_xlim([Activation_Bounds[0][0]-0.10*(np.diff(Activation_Bounds[0])[0]/2),\
+					Activation_Bounds[0][1]+0.10*(np.diff(Activation_Bounds[0])[0]/2)])
+	ax1.set_ylim([Activation_Bounds[1][0]-0.10*(np.diff(Activation_Bounds[1])[0]/2),\
+					Activation_Bounds[1][1]+0.10*(np.diff(Activation_Bounds[1])[0]/2)])
+	ax1.spines['right'].set_visible(False)
+	ax1.spines['top'].set_visible(False)
+	ax1.set_aspect('equal')
+
+	def animate(i):
+		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[i],X[:,i])
 		if Coefficient1 == 0:
-			LowerBound = Bounds[0][0]
-			UpperBound = Bounds[0][1]
+			LowerBound = Activation_Bounds[0][0]
+			UpperBound = Activation_Bounds[0][1]
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 			FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 		elif Coefficient2 == 0:
 			LowerBound = Constraint1/Coefficient1
 			UpperBound = Constraint1/Coefficient1
 			FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-			FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
+			FeasibleInput2 = (Activation_Bounds[1][1]-Activation_Bounds[1][0])*np.random.rand(1000) + Activation_Bounds[1][0]
 		else:
-			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
-										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
-			LowerBound = max(Bounds[0][0], SortedBounds[0])
-			UpperBound = min(Bounds[0][1], SortedBounds[1])
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Activation_Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Activation_Bounds[1][1])/Coefficient1])
+			LowerBound = max(Activation_Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Activation_Bounds[0][1], SortedBounds[1])
+			# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
+			assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
+			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
+									for el in FeasibleInput1])
+		feasible.center = (U[:,i])
+		if i<10:
+			feasible.radius = 10*MaxStep_Activation
+		else:
+			feasible.radius = MaxStep_Activation
+		cline.set_xdata(FeasibleInput1)
+		cline.set_ydata(FeasibleInput2)
+		chosenpoint.set_xdata(U[0,i])
+		chosenpoint.set_ydata(U[1,i])
+		TimeText.set_text("t = " + str(t[i]))
+		return feasible,cline,chosenpoint,TimeText,
+
+
+	# Init only required for blitting to give a clean slate.
+	def init():
+		ax1.plot([Activation_Bounds[0][0],Activation_Bounds[0][1]],[Activation_Bounds[1][0],Activation_Bounds[1][0]],'k--')
+		ax1.plot([Activation_Bounds[0][0],Activation_Bounds[0][1]],[Activation_Bounds[1][1],Activation_Bounds[1][1]],'k--')
+		ax1.plot([Activation_Bounds[0][0],Activation_Bounds[0][0]],[Activation_Bounds[1][0],Activation_Bounds[1][1]],'k--')
+		ax1.plot([Activation_Bounds[0][1],Activation_Bounds[0][1]],[Activation_Bounds[1][0],Activation_Bounds[1][1]],'k--')
+		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[0],X[:,0])
+		if Coefficient1 == 0:
+			LowerBound = Activation_Bounds[0][0]
+			UpperBound = Activation_Bounds[0][1]
+			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
+			FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
+		elif Coefficient2 == 0:
+			LowerBound = Constraint1/Coefficient1
+			UpperBound = Constraint1/Coefficient1
+			FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
+			FeasibleInput2 = (Activation_Bounds[1][1]-Activation_Bounds[1][0])*np.random.rand(1000) + Activation_Bounds[1][0]
+		else:
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Activation_Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Activation_Bounds[1][1])/Coefficient1])
+			LowerBound = max(Activation_Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Activation_Bounds[0][1], SortedBounds[1])
 			# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
 			assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 									for el in FeasibleInput1])
 
-		feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
-		ax1.add_patch(feasible)
+		feasible = plt.Circle((U[:,0]),radius=MaxStep_Activation,Color='b',alpha=0.5)
+		feasible.set_visible(False)
 		cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
-		TimeText = plt.text(0.1,0.1,"t = " + str(t[0]),fontsize=16)
-		chosenpoint, = plt.plot(u1[0],u2[0],c='k',marker='o')
-		ax1.set_xlim(Bounds[0])
-		ax1.set_ylim(Bounds[1])
-		ax1.spines['right'].set_visible(False)
-		ax1.spines['top'].set_visible(False)
-		ax1.set_aspect('equal')
+		cline.set_visible(False)
+		chosenpoint, = plt.plot(U[0,0],U[1,0],c='k',marker='o')
+		chosenpoint.set_visible(False)
+		TimeText = plt.text(0.75,0.75,"t = " + str(t[0]),fontsize=16)
+		TimeText.set_visible(False)
+		return feasible,cline,chosenpoint,TimeText,
 
-		def animate(i):
-			Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[i],[x1[i],x2[i],x3[i],x4[i],x5[i],x6[i],x7[i],x8[i]])
-			if Coefficient1 == 0:
-				LowerBound = Bounds[0][0]
-				UpperBound = Bounds[0][1]
-				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-				FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
-			elif Coefficient2 == 0:
-				LowerBound = Constraint1/Coefficient1
-				UpperBound = Constraint1/Coefficient1
-				FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-				FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
-			else:
-				SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
-											(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
-				LowerBound = max(Bounds[0][0], SortedBounds[0])
-				UpperBound = min(Bounds[0][1], SortedBounds[1])
-				# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
-				assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
-				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
-										for el in FeasibleInput1])
-			feasible.center = (u1[i],u2[i])
-			if i<10:
-				feasible.radius = 10*MaxStep
-			else:
-				feasible.radius = MaxStep
-			cline.set_xdata(FeasibleInput1)
-			cline.set_ydata(FeasibleInput2)
-			chosenpoint.set_xdata(u1[i])
-			chosenpoint.set_ydata(u2[i])
-			TimeText.set_text("t = " + str(t[i]))
-			return feasible,cline,chosenpoint,TimeText,
-
-
-		# Init only required for blitting to give a clean slate.
-		def init():
-			ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
-			ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
-			ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
-			ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
-			Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[0],[x1[0],x2[0],x3[0],x4[0],x5[0],x6[0],x7[0],x8[0]])
-			if Coefficient1 == 0:
-				LowerBound = Bounds[0][0]
-				UpperBound = Bounds[0][1]
-				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-				FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
-			elif Coefficient2 == 0:
-				LowerBound = Constraint1/Coefficient1
-				UpperBound = Constraint1/Coefficient1
-				FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-				FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
-			else:
-				SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
-											(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
-				LowerBound = max(Bounds[0][0], SortedBounds[0])
-				UpperBound = min(Bounds[0][1], SortedBounds[1])
-				# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
-				assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
-				FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
-				FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
-										for el in FeasibleInput1])
-
-			feasible = plt.Circle((u1[0],u2[0]),radius=MaxStep,Color='b',alpha=0.5)
-			feasible.set_visible(False)
-			cline, = plt.plot(FeasibleInput1,FeasibleInput2,'b',lw=2)
-			cline.set_visible(False)
-			chosenpoint, = plt.plot(u1[0],u2[0],c='k',marker='o')
-			chosenpoint.set_visible(False)
-			TimeText = plt.text(0.75,0.75,"t = " + str(t[0]),fontsize=16)
-			TimeText.set_visible(False)
-			return feasible,cline,chosenpoint,TimeText,
-
-		ani = animation.FuncAnimation(fig, animate, np.arange(1, len(x1),1), init_func=init,interval=1, blit=False)
-		plt.show()
+	ani = animation.FuncAnimation(fig, animate, np.arange(1, np.shape(X)[1],1), init_func=init,interval=1, blit=False)
+	plt.show()
 def plot_individual_constraint_versus_time_muscle_activation_driven(\
 					t,x1,x2,x3,x4,x5,x6,x7,x8,Return = False):
 	import numpy as np
@@ -3468,7 +3473,7 @@ while AnotherIteration2 == True:
 		if AttemptNumber2 == 20: AnotherIteration2 = False
 print('\n')
 
-AnotherIteration3 = False
+AnotherIteration3 = True
 AttemptNumber3 = 0
 while AnotherIteration3 == True:
 	N3 = N_seconds*10000 + 1
@@ -3585,10 +3590,10 @@ if len(x1_3)>50:
 	fig4_3 = plot_l_m_comparison(Time3,x1_3,x2_3,l_m1 = x5_3,l_m2 = x6_3,\
 									Return=True,InputString = "Muscle Activation")
 
-BaseFileName = "ReferenceTracking_ForcedPendulumExample"
-figs=[manager.canvas.figure
-         for manager in matplotlib._pylab_helpers.Gcf.get_all_fig_managers()]
-if len(figs)>=1:
-	save_figures(BaseFileName,figs)
+# BaseFileName = "ReferenceTracking_ForcedPendulumExample"
+# figs=[manager.canvas.figure
+#          for manager in matplotlib._pylab_helpers.Gcf.get_all_fig_managers()]
+# if len(figs)>=1:
+# 	save_figures(BaseFileName,figs)
 plt.close('all')
 # plt.show()
