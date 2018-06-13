@@ -2830,12 +2830,13 @@ def animate_muscle_velocity_driven(t,X,U):
 
 	ani = animation.FuncAnimation(fig, animate, np.arange(1, len(t),1), init_func=init,interval=1, blit=False)
 	plt.show()
-def plot_individual_constraint_versus_time_muscle_velocity_driven(t,x1,x2,x3,x4,Return = False):
+def plot_individual_constraint_versus_time_muscle_velocity_driven(t,X,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
 
 	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time\nMuscle Velocity Driven"
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
+	plt.subplots_adjust(wspace=0.4)
 	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
 
 	"""
@@ -2843,26 +2844,26 @@ def plot_individual_constraint_versus_time_muscle_velocity_driven(t,x1,x2,x3,x4,
 	"""
 
 	A,B,C = [],[],[]
-	for i in range(len(x1)):
-		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[i],[x1[i],x2[i],x3[i],x4[i]])
+	for i in range(np.shape(X)[1]):
+		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[i],X[:,i])
 		A.append(Coefficient1)
 		B.append(Coefficient2)
 		C.append(Constraint1)
 
-	ax1.plot(t[:len(x1)],A,'r',lw=2)
+	ax1.plot(t[:np.shape(X)[1]],A,'r',lw=2)
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_ylabel(r"$1^{st}$ Coefficient")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(x1)],B,'b',lw=2)
+	ax2.plot(t[:np.shape(X)[1]],B,'b',lw=2)
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
 	ax2.set_ylabel(r"$2^{nd}$ Coefficient")
 	ax2.set_xticks(ax1.get_xticks())
 	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
 
-	ax3.plot(t[:len(x1)],C,'k',lw=2)
+	ax3.plot(t[:np.shape(X)[1]],C,'k',lw=2)
 	ax3.spines['right'].set_visible(False)
 	ax3.spines['top'].set_visible(False)
 	ax3.set_ylabel("Constraint")
@@ -2873,12 +2874,12 @@ def plot_individual_constraint_versus_time_muscle_velocity_driven(t,x1,x2,x3,x4,
 		return(fig)
 	else:
 		plt.show()
-def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,x1,x2,x3,x4,Return = False):
+def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,X,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
 
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
-	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
+	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.1,right=0.975,wspace=0.4)
 	plt.suptitle(r"Plotting $2^{nd}$ Coefficient vs. Time",Fontsize=20,y=0.975)
 
 	"""
@@ -2886,26 +2887,26 @@ def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,x1,x2,x3,x
 	"""
 
 	r2,kt_2,B = [],[],[]
-	for i in range(len(x1)):
-		_,Coefficient2,_ = return_constraint_variables_muscle_velocity_driven(t[i],[x1[i],x2[i],x3[i],x4[i]])
+	for i in range(np.shape(X)[1]):
+		_,Coefficient2,_ = return_constraint_variables_muscle_velocity_driven(t[i],X[:,i])
 		B.append(Coefficient2)
-		r2.append(R2([x1[i],x2[i],x3[i],x4[i]]))
-		kt_2.append(G5([x1[i],x2[i],x3[i],x4[i]]))
+		r2.append(R2(X[:,i]))
+		kt_2.append(KT_2(X[:,i]))
 
-	ax1.plot(t[:len(x1)],r2,'b--',lw=2)
+	ax1.plot(t[:np.shape(X)[1]],r2,'b',lw=2)
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
-	ax1.set_ylabel(r"$g_{2}(\vec{x}(t))$")
+	ax1.set_ylabel(r"$R_{2}(\vec{x}(t))$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(x1)],kt_2,'b:',lw=2)
+	ax2.plot(t[:np.shape(X)[1]],kt_2,'b',lw=2)
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
-	ax2.set_ylabel(r"$g_{5}(\vec{x}(t))$")
+	ax2.set_ylabel(r"$K_{T,2}(\vec{x}(t))$")
 	ax2.set_xticks(ax1.get_xticks())
 	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
 
-	ax3.plot(t[:len(x1)],B,'b',lw=2)
+	ax3.plot(t[:np.shape(X)[1]],B,'b',lw=2)
 	ax3.spines['right'].set_visible(False)
 	ax3.spines['top'].set_visible(False)
 	ax3.set_ylabel(r"$2^{nd}$ Coefficient")
@@ -2916,13 +2917,13 @@ def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,x1,x2,x3,x
 		return(fig)
 	else:
 		plt.show()
-def plot_individual_coefficient1_versus_time_muscle_velocity_driven(t,x1,x2,x3,x4,Return = False):
+def plot_individual_coefficient1_versus_time_muscle_velocity_driven(t,X,Return = False):
 	import numpy as np
 	import matplotlib.pyplot as plt
 
 	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
-	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
+	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975,wspace=0.4)
 	plt.suptitle(r"Plotting $1^{st}$ Coefficient vs. Time",Fontsize=20,y=0.975)
 
 	"""
@@ -2930,29 +2931,29 @@ def plot_individual_coefficient1_versus_time_muscle_velocity_driven(t,x1,x2,x3,x
 	"""
 
 	r1,kt_1,B = [],[],[]
-	for i in range(len(x1)):
-		Coefficient1,_,_ = return_constraint_variables_muscle_velocity_driven(t[i],[x1[i],x2[i],x3[i],x4[i]])
+	for i in range(np.shape(X)[1]):
+		Coefficient1,_,_ = return_constraint_variables_muscle_velocity_driven(t[i],X[:,i])
 		B.append(Coefficient1)
-		r1.append(R1([x1[i],x2[i],x3[i],x4[i]]))
-		kt_1.append(KT_1([x1[i],x2[i],x3[i],x4[i]]))
+		r1.append(R1(X[:,i]))
+		kt_1.append(KT_1(X[:,i]))
 
-	ax1.plot(t[:len(x1)],r1,'r--',lw=2)
+	ax1.plot(t[:np.shape(X)[1]],r1,'r',lw=2)
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
-	ax1.set_ylabel(r"$g_{2}(\vec{x}(t))$")
+	ax1.set_ylabel(r"$R_{1}(\vec{x}(t))$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(x1)],kt_1,'r:',lw=2)
+	ax2.plot(t[:np.shape(X)[1]],kt_1,'r',lw=2)
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
-	ax2.set_ylabel(r"$g_{5}(\vec{x}(t))$")
+	ax2.set_ylabel(r"$K_{T,1}(\vec{x}(t))$")
 	ax2.set_xticks(ax1.get_xticks())
 	ax2.set_xticklabels([""]*len(ax1.get_xticks()))
 
-	ax3.plot(t[:len(x1)],B,'r',lw=2)
+	ax3.plot(t[:np.shape(X)[1]],B,'r',lw=2)
 	ax3.spines['right'].set_visible(False)
 	ax3.spines['top'].set_visible(False)
-	ax3.set_ylabel(r"$2^{nd}$ Coefficient")
+	ax3.set_ylabel(r"$1^{st}$ Coefficient")
 	ax3.set_xticks(ax1.get_xticks())
 	ax3.set_xticklabels([""]*len(ax1.get_xticks()))
 
