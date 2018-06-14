@@ -2090,7 +2090,6 @@ def return_U_tension_driven(t:float,X,U,**kwargs):
 	euclid_dist = np.array(list(map(lambda u1,u2: np.sqrt(((U[0]-u1)/Tension_Bounds[0][1])**2 + ((U[1]-u2)/Tension_Bounds[1][1])**2),\
 							FeasibleInput1,FeasibleInput2)))
 
-	# if t<10*dt: MaxStep_Tension = 10.0*MaxStep_Tension
 	feasible_index = np.where(euclid_dist <= \
 									(MaxStep_Tension*(t>=10*dt) + 10.0*MaxStep_Tension*(t<10*dt)))
 	if len(feasible_index[0]) == 0: import ipdb; ipdb.set_trace()
@@ -2393,16 +2392,40 @@ def return_initial_U_muscle_velocity_driven(t,X_o,**kwargs):
 	u2 = FeasibleInput2[index]
 	return(np.array([u1,u2]))
 
-def return_U_muscle_activation_driven(t,X,U,dt,MaxStep,Bounds,Noise):
+def return_U_muscle_activation_driven(t,X,U,**kwargs):
 	"""
+	Takes in time scalar (float) (t), state numpy.ndarray (X) of shape (8,), and previous input numpy.ndarray (U) of shape (2,) and returns the input for this time step.
+
 	First attempt will see what happens when the activations are restricted to the positive real domain.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Noise - must be an numpy.ndarray of shape (2,). Default is np.zeros((1,2)).
+
+	2) Seed - must be a scalar value. Default is None.
+
 	"""
 	import random
+	import numpy as np
+
+	assert np.shape(X) == (8,) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,) numpy.ndarray"
+	assert np.shape(U) == (2,) and str(type(U)) == "<class 'numpy.ndarray'>", "U must be a (2,) numpy.ndarray"
+
+	dt = Time3[1]-Time3[0]
+	Noise = kwargs.get("Noise",np.zeros((2,)))
+	assert np.shape(Noise) == (2,) and str(type(Noise)) == "<class 'numpy.ndarray'>", "Noise must be a (2,) numpy.ndarray"
+	Seed = kwargs.get("Seed",None)
+	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
+
+	np.random.seed(Seed)
+
 	Coefficient1,Coefficient2,Constraint1 =\
 	 			return_constraint_variables_muscle_activation_driven(t,X)
-	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
-	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
-	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+	assert np.shape(Activation_Bounds)==(2,2), "Bounds must be (2,2)."
+	assert Activation_Bounds[0][0]<Activation_Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Activation_Bounds[1][0]<Activation_Bounds[1][1],"Each set of bounds must be in ascending order."
 	assert Coefficient1!=0 and Coefficient2!=0, "Error with Coefficients. Shouldn't both be zero."
 	if Constraint1 < 0:
 		assert not(Coefficient1 > 0 and Coefficient2 > 0), "Infeasible activations. (Constraint1 < 0, Coefficient1 > 0, Coefficient2 > 0)"
@@ -2410,20 +2433,20 @@ def return_U_muscle_activation_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 		assert not(Coefficient1 < 0 and Coefficient2 < 0), "Infeasible activations. (Constraint1 > 0, Coefficient1 < 0, Coefficient2 < 0)"
 
 	if Coefficient1 == 0:
-		LowerBound = Bounds[0][0]
-		UpperBound = Bounds[0][1]
+		LowerBound = Activation_Bounds[0][0]
+		UpperBound = Activation_Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 	elif Coefficient2 == 0:
 		LowerBound = Constraint1/Coefficient1
 		UpperBound = Constraint1/Coefficient1
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
+		FeasibleInput2 = (Activation_Bounds[1][1]-Activation_Bounds[1][0])*np.random.rand(1000) + Activation_Bounds[1][0]
 	else:
-		SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
-									(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
-		LowerBound = max(Bounds[0][0], SortedBounds[0])
-		UpperBound = min(Bounds[0][1], SortedBounds[1])
+		SortedBounds = np.sort([(Constraint1-Coefficient2*Activation_Bounds[1][0])/Coefficient1,\
+									(Constraint1-Coefficient2*Activation_Bounds[1][1])/Coefficient1])
+		LowerBound = max(Activation_Bounds[0][0], SortedBounds[0])
+		UpperBound = min(Activation_Bounds[0][1], SortedBounds[1])
 		# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
 		assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
@@ -2436,24 +2459,39 @@ def return_U_muscle_activation_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 						np.sqrt((U[0]-u1)**2 + (U[1]-u2)**2),\
 																	FeasibleInput1,FeasibleInput2)))
 
-	if t<10*dt: MaxStep = 10*MaxStep
-	feasible_index = np.where(euclid_dist<=MaxStep)
+	feasible_index = np.where(euclid_dist <= \
+							(MaxStep_Activation*(t>=10*dt) + 10.0*MaxStep_Activation*(t<10*dt)))
 	if len(feasible_index[0]) == 0: \
 		return({"First Coefficient" : Coefficient1, "Second Coefficient" : Coefficient2, "Constraint" : Constraint1, "Lower Bounds" : LowerBound, "Upper Bounds" : UpperBound})
-	next_index = random.choice(feasible_index[0])
+	next_index = np.random.choice(feasible_index[0])
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
-	return([u1,u2])
-def return_initial_U_muscle_activation_driven(t,X,Bounds):
+	return(np.array([u1,u2]))
+def return_initial_U_muscle_activation_driven(t,X_o,**kwargs):
 	"""
+	Takes in time scalar (float) (t), initial state numpy.ndarray (X_o) of shape (8,) and returns an initial input (2,) numpy.ndarray.
+
 	First attempt will see what happens when the activations are restricted to the positive real domain.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Seed - must be a scalar value. Default is None.
+
 	"""
 	import random
+	import numpy as np
+	Seed = kwargs.get("Seed",None)
+	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
+	np.random.seed(Seed)
+	assert np.shape(X_o) == (8,) and str(type(X_o)) == "<class 'numpy.ndarray'>", "X_o must be a (2,) numpy.ndarray"
+
 	Coefficient1,Coefficient2,Constraint1 =\
-	 			return_constraint_variables_muscle_activation_driven(t,X)
-	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
-	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
-	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+	 							return_constraint_variables_muscle_activation_driven(t,X_o)
+	assert np.shape(Activation_Bounds)==(2,2), "Bounds must be (2,2)."
+	assert Activation_Bounds[0][0]<Activation_Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Activation_Bounds[1][0]<Activation_Bounds[1][1],"Each set of bounds must be in ascending order."
 	assert Coefficient1!=0 and Coefficient2!=0, "Error with Coefficients. Shouldn't both be zero."
 	if Constraint1 < 0:
 		assert not(Coefficient1 > 0 and Coefficient2 > 0), "Infeasible activations. (Constraint1 < 0, Coefficient1 > 0, Coefficient2 > 0)"
@@ -2461,29 +2499,29 @@ def return_initial_U_muscle_activation_driven(t,X,Bounds):
 		assert not(Coefficient1 < 0 and Coefficient2 < 0), "Infeasible activations. (Constraint1 > 0, Coefficient1 < 0, Coefficient2 < 0)"
 
 	if Coefficient1 == 0:
-		LowerBound = Bounds[0][0]
-		UpperBound = Bounds[0][1]
+		LowerBound = Activation_Bounds[0][0]
+		UpperBound = Activation_Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 	elif Coefficient2 == 0:
 		LowerBound = Constraint1/Coefficient1
 		UpperBound = Constraint1/Coefficient1
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
+		FeasibleInput2 = (Activation_Bounds[1][1]-Activation_Bounds[1][0])*np.random.rand(1000) + Activation_Bounds[1][0]
 	else:
-		SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
-									(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
-		LowerBound = max(Bounds[0][0], SortedBounds[0])
-		UpperBound = min(Bounds[0][1], SortedBounds[1])
+		SortedBounds = np.sort([(Constraint1-Coefficient2*Activation_Bounds[1][0])/Coefficient1,\
+									(Constraint1-Coefficient2*Activation_Bounds[1][1])/Coefficient1])
+		LowerBound = max(Activation_Bounds[0][0], SortedBounds[0])
+		UpperBound = min(Activation_Bounds[0][1], SortedBounds[1])
 		assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 								for el in FeasibleInput1])
 
-	index = random.choice(range(1000))
+	index = np.random.choice(range(1000))
 	u1 = FeasibleInput1[index]
 	u2 = FeasibleInput2[index]
-	return([u1,u2])
+	return(np.array([u1,u2]))
 
 def update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray):
 	import numpy as np
@@ -2511,10 +2549,9 @@ def update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,
 												dt,NoiseArray):
 	import numpy as np
 	Method = "Muscle Act."
-	X = [x1_3[-1],x2_3[-1],x3_3[-1],x4_3[-1],x5_3[-1],x6_3[-1],x7_3[-1],x8_3[-1]]
-	U = [u1_3[-1],u2_3[-1]]
-	U = return_U_muscle_activation_driven(t,X,U,dt,MaxStep_Activation,\
-											Activation_Bounds,NoiseArray[:,int(t/dt)])
+	X = np.array([x1_3[-1],x2_3[-1],x3_3[-1],x4_3[-1],x5_3[-1],x6_3[-1],x7_3[-1],x8_3[-1]])
+	U = np.array([u1_3[-1],u2_3[-1]])
+	U = return_U_muscle_activation_driven(t,X,U,Noise = NoiseArray[:,int(t/dt)])
 	u1_3.append(U[0])
 	u2_3.append(U[1])
 	x8_3.append(x8_3[-1] + dX8_dt(X,U)*dt)
@@ -3566,7 +3603,7 @@ while AnotherIteration3 == True:
 	# 											[temp_Tension[0]],[temp_Tension[1]],\
 	# 											[0.8*lo1],[1.2*lo2],[temp_Vm[0]],[temp_Vm[1]]
 	U3 = return_initial_U_muscle_activation_driven(\
-			Time3[1],[x1_3[0],x2_3[0],x3_3[0],x4_3[0],x5_3[0],x6_3[0],x7_3[0],x8_3[0]],Activation_Bounds)
+			Time3[1],np.array([x1_3[0],x2_3[0],x3_3[0],x4_3[0],x5_3[0],x6_3[0],x7_3[0],x8_3[0]]))
 	u1_3 = [U3[0]]
 	u2_3 = [U3[1]]
 	# u1_3 = [0.01]
