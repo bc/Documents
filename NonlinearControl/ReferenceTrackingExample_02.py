@@ -2030,32 +2030,49 @@ def return_constraint_variables_muscle_activation_driven(t,X):
 	Constraint = A4(t,X)
 	return(Coefficient1,Coefficient2,Constraint)
 
-def return_U_tension_driven(t,X,U,dt,MaxStep,Bounds,Noise):
+def return_U_tension_driven(t:float,X,U,**kwargs):
+	"""
+	Takes in time scalar (float) (t), state numpy.ndarray (X) of shape (2,), and previous input numpy.ndarray (U) of shape (2,) and returns the input for this time step.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Noise - must be an array of shape (2,). Default is np.zeros((1,2)).
+
+	"""
 	import random
+	import numpy as np
+
+	assert np.shape(X) == (2,) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (2,) numpy.ndarray"
+	assert np.shape(U) == (2,) and str(type(U)) == "<class 'numpy.ndarray'>", "U must be a (2,) numpy.ndarray"
+
+	dt = Time1[1]-Time1[0]
+	Noise = kwargs.get("Noise",np.zeros((2,)))
+
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_tension_driven(t,X)
-	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
-	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
-	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+	assert Tension_Bounds[0][0]<Tension_Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Tension_Bounds[1][0]<Tension_Bounds[1][1],"Each set of bounds must be in ascending order."
 	if Constraint1 != 0:
 		assert Coefficient1!=0 and Coefficient2!=0, "Error with Coefficients. Shouldn't be zero with nonzero constraint."
 	else:
 		assert Coefficient1!=0 and Coefficient2!=0, "Error with Constraint. 0 = 0 implies all inputs valid."
 
 	if Coefficient1 == 0:
-		LowerBound = Bounds[0][0]
-		UpperBound = Bounds[0][1]
+		LowerBound = Tension_Bounds[0][0]
+		UpperBound = Tension_Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 	elif Coefficient2 == 0:
 		LowerBound = Constraint1/Coefficient1
 		UpperBound = Constraint1/Coefficient1
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
+		FeasibleInput2 = (Tension_Bounds[1][1]-Tension_Bounds[1][0])*np.random.rand(1000) + Tension_Bounds[1][0]
 	else:
-		SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
-									(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
-		LowerBound = max(Bounds[0][0], SortedBounds[0])
-		UpperBound = min(Bounds[0][1], SortedBounds[1])
+		SortedBounds = np.sort([(Constraint1-Coefficient2*Tension_Bounds[1][0])/Coefficient1,\
+									(Constraint1-Coefficient2*Tension_Bounds[1][1])/Coefficient1])
+		LowerBound = max(Tension_Bounds[0][0], SortedBounds[0])
+		UpperBound = min(Tension_Bounds[0][1], SortedBounds[1])
 		assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
@@ -2064,16 +2081,16 @@ def return_U_tension_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	"""
 	Checking to see which inputs have the appropriate allowable step size.
 	"""
-	euclid_dist = np.array(list(map(lambda u1,u2: np.sqrt(((U[0]-u1)/Bounds[0][1])**2 + ((U[1]-u2)/Bounds[1][1])**2),\
+	euclid_dist = np.array(list(map(lambda u1,u2: np.sqrt(((U[0]-u1)/Tension_Bounds[0][1])**2 + ((U[1]-u2)/Tension_Bounds[1][1])**2),\
 							FeasibleInput1,FeasibleInput2)))
 
-	if t<10*dt: MaxStep = 10*MaxStep
-	feasible_index = np.where(euclid_dist<=MaxStep)
+	if t<10*dt: MaxStep_Tension = 10.0*MaxStep_Tension
+	feasible_index = np.where(euclid_dist<=MaxStep_Tension)
 	if len(feasible_index[0]) == 0: import ipdb; ipdb.set_trace()
 	next_index = random.choice(feasible_index[0])
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
-	return([u1,u2])
+	return(np.array([u1,u2],ndmin=1))
 def return_initial_U_tension_driven(t,X,Bounds):
 	import random
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_tension_driven(t,X)
