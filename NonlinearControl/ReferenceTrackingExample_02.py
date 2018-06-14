@@ -2042,6 +2042,10 @@ def return_U_tension_driven(t:float,X,U,**kwargs):
 
 	2) Seed - must be a scalar value. Default is None.
 
+	3) Bounds - must be a (2,2) list with each row in ascending order. Default is given by Tension_Bounds.
+
+	4) MaxStep - must be a scalar (int or float). Default is MaxStep_Tension.
+
 	"""
 	import random
 	import numpy as np
@@ -2050,35 +2054,44 @@ def return_U_tension_driven(t:float,X,U,**kwargs):
 	assert np.shape(U) == (2,) and str(type(U)) == "<class 'numpy.ndarray'>", "U must be a (2,) numpy.ndarray"
 
 	dt = Time1[1]-Time1[0]
+
 	Noise = kwargs.get("Noise",np.zeros((2,)))
 	assert np.shape(Noise) == (2,) and str(type(Noise)) == "<class 'numpy.ndarray'>", "Noise must be a (2,) numpy.ndarray"
+
 	Seed = kwargs.get("Seed",None)
 	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
-
 	np.random.seed(Seed)
+
+	Bounds = kwargs.get("Bounds",Tension_Bounds)
+	assert type(Bounds) == list and np.shape(Bounds) == (2,2), "Bounds for Tension Control must be a (2,2) list."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+
+	MaxStep = kwargs.get("MaxStep",MaxStep_Tension)
+	assert type(MaxStep) in [int,float], "MaxStep for Tension Controller should be an int or float."
+
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_tension_driven(t,X)
-	assert Tension_Bounds[0][0]<Tension_Bounds[0][1],"Each set of bounds must be in ascending order."
-	assert Tension_Bounds[1][0]<Tension_Bounds[1][1],"Each set of bounds must be in ascending order."
+
 	if Constraint1 != 0:
 		assert Coefficient1!=0 and Coefficient2!=0, "Error with Coefficients. Shouldn't be zero with nonzero constraint."
 	else:
 		assert Coefficient1!=0 and Coefficient2!=0, "Error with Constraint. 0 = 0 implies all inputs valid."
 
 	if Coefficient1 == 0:
-		LowerBound = Tension_Bounds[0][0]
-		UpperBound = Tension_Bounds[0][1]
+		LowerBound = Bounds[0][0]
+		UpperBound = Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 	elif Coefficient2 == 0:
 		LowerBound = Constraint1/Coefficient1
 		UpperBound = Constraint1/Coefficient1
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-		FeasibleInput2 = (Tension_Bounds[1][1]-Tension_Bounds[1][0])*np.random.rand(1000) + Tension_Bounds[1][0]
+		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
 	else:
-		SortedBounds = np.sort([(Constraint1-Coefficient2*Tension_Bounds[1][0])/Coefficient1,\
-									(Constraint1-Coefficient2*Tension_Bounds[1][1])/Coefficient1])
-		LowerBound = max(Tension_Bounds[0][0], SortedBounds[0])
-		UpperBound = min(Tension_Bounds[0][1], SortedBounds[1])
+		SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+									(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+		LowerBound = max(Bounds[0][0], SortedBounds[0])
+		UpperBound = min(Bounds[0][1], SortedBounds[1])
 		assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
@@ -2087,17 +2100,17 @@ def return_U_tension_driven(t:float,X,U,**kwargs):
 	"""
 	Checking to see which inputs have the appropriate allowable step size.
 	"""
-	euclid_dist = np.array(list(map(lambda u1,u2: np.sqrt(((U[0]-u1)/Tension_Bounds[0][1])**2 + ((U[1]-u2)/Tension_Bounds[1][1])**2),\
+	euclid_dist = np.array(list(map(lambda u1,u2: np.sqrt(((U[0]-u1)/Bounds[0][1])**2 + ((U[1]-u2)/Bounds[1][1])**2),\
 							FeasibleInput1,FeasibleInput2)))
 
 	feasible_index = np.where(euclid_dist <= \
-									(MaxStep_Tension*(t>=10*dt) + 10.0*MaxStep_Tension*(t<10*dt)))
+									(MaxStep*(t>=10*dt) + 10.0*MaxStep*(t<10*dt)))
 	if len(feasible_index[0]) == 0: import ipdb; ipdb.set_trace()
 	next_index = np.random.choice(feasible_index[0])
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
 	return(np.array([u1,u2],ndmin=1))
-def return_initial_U_tension_driven(t,X_o,**kwargs):
+def return_initial_U_tension_driven(t:float,X_o,**kwargs):
 	"""
 	Takes in time scalar (float) (t), initial state numpy.ndarray (X_o) of shape (2,) and returns an initial input (2,) numpy.ndarray.
 
@@ -2107,38 +2120,47 @@ def return_initial_U_tension_driven(t,X_o,**kwargs):
 
 	1) Seed - must be a scalar value. Default is None.
 
+	2) Bounds - must be a (2,2) list with each row in ascending order. Default is given by Tension_Bounds.
+
 	"""
 	import random
 	import numpy as np
+
 	Seed = kwargs.get("Seed",None)
 	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
 	np.random.seed(Seed)
+
+	Bounds = kwargs.get("Bounds",Tension_Bounds)
+	assert type(Bounds) == list and np.shape(Bounds) == (2,2), "Bounds for Tension Control must be a (2,2) list."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+
 	assert np.shape(X_o) == (2,) and str(type(X_o)) == "<class 'numpy.ndarray'>", "X_o must be a (2,) numpy.ndarray"
 
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_tension_driven(t,X_o)
-	assert np.shape(Tension_Bounds)==(2,2), "Bounds must be (2,2)."
-	assert Tension_Bounds[0][0]<Tension_Bounds[0][1],"Each set of bounds must be in ascending order."
-	assert Tension_Bounds[1][0]<Tension_Bounds[1][1],"Each set of bounds must be in ascending order."
+	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
 	if Constraint1 != 0:
 		assert Coefficient1!=0 and Coefficient2!=0, "Error with Coefficients. Shouldn't be zero with nonzero constraint."
 	else:
 		assert Coefficient1!=0 and Coefficient2!=0, "Error with Constraint. 0 = 0 implies all inputs valid."
 
 	if Coefficient1 == 0:
-		LowerBound = Tension_Bounds[0][0]
-		UpperBound = Tension_Bounds[0][1]
+		LowerBound = Bounds[0][0]
+		UpperBound = Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 	elif Coefficient2 == 0:
 		LowerBound = Constraint1/Coefficient1
 		UpperBound = Constraint1/Coefficient1
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-		FeasibleInput2 = (Tension_Bounds[1][1]-Tension_Bounds[1][0])*np.random.rand(1000) + Tension_Bounds[1][0]
+		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
 	else:
-		SortedBounds = np.sort([(Constraint1-Coefficient2*Tension_Bounds[1][0])/Coefficient1,\
-									(Constraint1-Coefficient2*Tension_Bounds[1][1])/Coefficient1])
-		LowerBound = max(Tension_Bounds[0][0], SortedBounds[0])
-		UpperBound = min(Tension_Bounds[0][1], SortedBounds[1])
+		SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+									(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+		LowerBound = max(Bounds[0][0], SortedBounds[0])
+		UpperBound = min(Bounds[0][1], SortedBounds[1])
 		assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
@@ -2148,7 +2170,7 @@ def return_initial_U_tension_driven(t,X_o,**kwargs):
 	u2 = FeasibleInput2[index]
 	return(np.array([u1,u2]))
 
-def return_U_muscle_velocity_driven(t,X,U,**kwargs):
+def return_U_muscle_velocity_driven(t:float,X,U,**kwargs):
 	"""
 	Takes in time scalar (float) (t), state numpy.ndarray (X) of shape (4,), and previous input numpy.ndarray (U) of shape (2,) and returns the input for this time step.
 
@@ -2163,6 +2185,10 @@ def return_U_muscle_velocity_driven(t,X,U,**kwargs):
 
 	2) Seed - must be a scalar value. Default is None.
 
+	3) Bounds - must be a (2,2) list with each row in ascending order. Default is given by MuscleVelocity_Bounds.
+
+	4) MaxStep - must be a scalar (int or float). Default is MaxStep_MuscleVelocity.
+
 	"""
 	import random
 	import numpy as np
@@ -2171,16 +2197,26 @@ def return_U_muscle_velocity_driven(t,X,U,**kwargs):
 	assert np.shape(U) == (2,) and str(type(U)) == "<class 'numpy.ndarray'>", "U must be a (2,) numpy.ndarray"
 
 	dt = Time2[1]-Time2[0]
+
 	Noise = kwargs.get("Noise",np.zeros((2,)))
 	assert np.shape(Noise) == (2,) and str(type(Noise)) == "<class 'numpy.ndarray'>", "Noise must be a (2,) numpy.ndarray"
+
 	Seed = kwargs.get("Seed",None)
 	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
 	np.random.seed(Seed)
 
+	Bounds = kwargs.get("Bounds",MuscleVelocity_Bounds)
+	assert type(Bounds) == list and np.shape(Bounds) == (2,2), "Bounds for Muscle Velocity Control must be a (2,2) list."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+
+	MaxStep = kwargs.get("MaxStep",MaxStep_MuscleVelocity)
+	assert type(MaxStep) in [int,float], "MaxStep for Muscle Velocity Controller should be an int or float."
+
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t,X)
-	assert np.shape(MuscleVelocity_Bounds)==(2,2), "Bounds must be (2,2)."
-	assert MuscleVelocity_Bounds[0][0]<MuscleVelocity_Bounds[0][1],"Each set of bounds must be in ascending order."
-	assert MuscleVelocity_Bounds[1][0]<MuscleVelocity_Bounds[1][1],"Each set of bounds must be in ascending order."
+	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
 	if Constraint1 != 0:
 		assert Coefficient1!=0 or Coefficient2!=0, "Error with Coefficients. Shouldn't be zero with nonzero constraint."
 	else:
@@ -2199,38 +2235,38 @@ def return_U_muscle_velocity_driven(t,X,U,**kwargs):
 
 	if Coefficient1 == 0:
 		if Constraint1/Coefficient2 > 0:
-			LowerBound = MuscleVelocity_Bounds[0][0]
+			LowerBound = Bounds[0][0]
 			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
 		else:
 			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
-			UpperBound = MuscleVelocity_Bounds[0][1]
+			UpperBound = Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 	elif Coefficient2 == 0:
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
 		if Constraint1/Coefficient1 < 0:
 			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
-			UpperBound = MuscleVelocity_Bounds[1][1]
+			UpperBound = Bounds[1][1]
 		else:
-			LowerBound = MuscleVelocity_Bounds[1][0]
+			LowerBound = Bounds[1][0]
 			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
 		FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 	else:
 		assert 0 not in Roots, "Zero should not be a root. (Implies Coefficient2 == 0)"
 		if len(Roots) in [0,1]:
-			SortedBounds = np.sort([(Constraint1-Coefficient2*MuscleVelocity_Bounds[1][0])/Coefficient1,\
-										(Constraint1-Coefficient2*MuscleVelocity_Bounds[1][1])/Coefficient1])
-			LowerBound = max(MuscleVelocity_Bounds[0][0], SortedBounds[0])
-			UpperBound = min(MuscleVelocity_Bounds[0][1], SortedBounds[1])
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1])
 			assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 									for el in FeasibleInput1])
 		elif (Roots<0).all() or (Roots>0).all():
-			SortedBounds = np.sort([(Constraint1-Coefficient2*MuscleVelocity_Bounds[1][0])/Coefficient1,\
-										(Constraint1-Coefficient2*MuscleVelocity_Bounds[1][1])/Coefficient1])
-			LowerBound = max(MuscleVelocity_Bounds[0][0], SortedBounds[0])
-			UpperBound = min(MuscleVelocity_Bounds[0][1], SortedBounds[1])
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1])
 			ConstraintLength1 = Coefficient1/(2*Coefficient2)*(LowerBound**2-Roots[0]**2) \
 									- Constraint1/Coefficient2*(LowerBound-Roots[0])
 			ConstraintLength1 = ConstraintLength1*(ConstraintLength1>0)
@@ -2247,10 +2283,10 @@ def return_U_muscle_velocity_driven(t,X,U,**kwargs):
 			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 									for el in FeasibleInput1])
 		else: # not((Roots<0).all()) and not((Roots>0).all()):
-			SortedBounds = np.sort([(Constraint1-Coefficient2*MuscleVelocity_Bounds[1][0])/Coefficient1,\
-					(Constraint1-Coefficient2*MuscleVelocity_Bounds[1][1])/Coefficient1])
-			LowerBound = max(MuscleVelocity_Bounds[0][0], SortedBounds[0],Roots[0])
-			UpperBound = min(MuscleVelocity_Bounds[0][1], SortedBounds[1],Roots[1])
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+					(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0],Roots[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1],Roots[1])
 			assert UpperBound >= LowerBound, "Error with Bounds. Infeasible!"
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
@@ -2265,7 +2301,7 @@ def return_U_muscle_velocity_driven(t,X,U,**kwargs):
 		plt.plot(Input1,Input2,'k--')
 		plt.plot(Input1, (lo1*0.001)*(lo2*0.001)/Input1,'r')
 		plt.scatter(FeasibleInput1,FeasibleInput2,c='g',marker = '.')
-		plt.ylim(MuscleVelocity_Bounds[1])
+		plt.ylim(Bounds[1])
 		plt.show()
 
 	"""
@@ -2275,14 +2311,14 @@ def return_U_muscle_velocity_driven(t,X,U,**kwargs):
 							FeasibleInput1,FeasibleInput2)))
 
 	feasible_index = np.where(euclid_dist <= \
-									(MaxStep_MuscleVelocity*(t>=100*dt) + \
-									 	10.0*MaxStep_MuscleVelocity*(50*dt<=t<100*dt) + \
-											50.0*MaxStep_MuscleVelocity*(t<50*dt)))
+									(MaxStep*(t>=100*dt) + \
+									 	10.0*MaxStep*(50*dt<=t<100*dt) + \
+											50.0*MaxStep*(t<50*dt)))
 	next_index = np.random.choice(feasible_index[0])
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
 	return(np.array([u1,u2]))
-def return_initial_U_muscle_velocity_driven(t,X_o,**kwargs):
+def return_initial_U_muscle_velocity_driven(t:float,X_o,**kwargs):
 	"""
 	Takes in time scalar (float) (t), initial state numpy.ndarray (X_o) of shape (4,) and returns an initial input (2,) numpy.ndarray.
 
@@ -2295,19 +2331,28 @@ def return_initial_U_muscle_velocity_driven(t,X_o,**kwargs):
 
 	1) Seed - must be a scalar value. Default is None.
 
+	2) Bounds - must be a (2,2) list with each row in ascending order. Default is given by MuscleVelocity_Bounds.
+
 	"""
 	import random
 	import numpy as np
+
 	Seed = kwargs.get("Seed",None)
 	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
 	np.random.seed(Seed)
+
+	Bounds = kwargs.get("Bounds",MuscleVelocity_Bounds)
+	assert type(Bounds) == list and np.shape(Bounds) == (2,2), "Bounds for Muscle Velocity Control must be a (2,2) list."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+
 	assert np.shape(X_o) == (4,) and str(type(X_o)) == "<class 'numpy.ndarray'>", "X_o must be a (2,) numpy.ndarray"
 
 	Coefficient1,Coefficient2,Constraint1 = \
 	 									return_constraint_variables_muscle_velocity_driven(t,X_o)
-	assert np.shape(MuscleVelocity_Bounds)==(2,2), "Bounds must be (2,2)."
-	assert MuscleVelocity_Bounds[0][0]<MuscleVelocity_Bounds[0][1],"Each set of bounds must be in ascending order."
-	assert MuscleVelocity_Bounds[1][0]<MuscleVelocity_Bounds[1][1],"Each set of bounds must be in ascending order."
+	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
 	if Constraint1 != 0:
 		assert Coefficient1!=0 or Coefficient2!=0, "Error with Coefficients. Shouldn't be zero with nonzero constraint."
 	else:
@@ -2325,14 +2370,14 @@ def return_initial_U_muscle_velocity_driven(t,X_o,**kwargs):
 	Roots = Roots[np.isreal(Roots)]
 
 	if Coefficient1 == 0:
-		LowerBound = MuscleVelocity_Bounds[0][0]
-		UpperBound = MuscleVelocity_Bounds[0][1]
+		LowerBound = Bounds[0][0]
+		UpperBound = Bounds[0][1]
 		if Constraint1/Coefficient2 > 0:
-			LowerBound = MuscleVelocity_Bounds[0][0]
+			LowerBound = Bounds[0][0]
 			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
 		else:
 			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
-			UpperBound = MuscleVelocity_Bounds[0][1]
+			UpperBound = Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 	elif Coefficient2 == 0:
@@ -2341,27 +2386,27 @@ def return_initial_U_muscle_velocity_driven(t,X_o,**kwargs):
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
 		if Constraint1/Coefficient1 < 0:
 			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
-			UpperBound = MuscleVelocity_Bounds[1][1]
+			UpperBound = Bounds[1][1]
 		else:
-			LowerBound = MuscleVelocity_Bounds[1][0]
+			LowerBound = Bounds[1][0]
 			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
 		FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 	else:
 		assert 0 not in Roots, "Zero should not be a root. (Implies Coefficient2 == 0)"
 		if len(Roots) in [0,1]:
-			SortedBounds = np.sort([(Constraint1-Coefficient2*MuscleVelocity_Bounds[1][0])/Coefficient1,\
-										(Constraint1-Coefficient2*MuscleVelocity_Bounds[1][1])/Coefficient1])
-			LowerBound = max(MuscleVelocity_Bounds[0][0], SortedBounds[0])
-			UpperBound = min(MuscleVelocity_Bounds[0][1], SortedBounds[1])
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1])
 			assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 									for el in FeasibleInput1])
 		elif (Roots<0).all() or (Roots>0).all():
-			SortedBounds = np.sort([(Constraint1-Coefficient2*MuscleVelocity_Bounds[1][0])/Coefficient1,\
-										(Constraint1-Coefficient2*MuscleVelocity_Bounds[1][1])/Coefficient1])
-			LowerBound = max(MuscleVelocity_Bounds[0][0], SortedBounds[0])
-			UpperBound = min(MuscleVelocity_Bounds[0][1], SortedBounds[1])
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1])
 			ConstraintLength1 = Coefficient1/(2*Coefficient2)*(LowerBound**2-Roots[0]**2) \
 									- Constraint1/Coefficient2*(LowerBound-Roots[0])
 			ConstraintLength1 = ConstraintLength1*(ConstraintLength1>0)
@@ -2378,10 +2423,10 @@ def return_initial_U_muscle_velocity_driven(t,X_o,**kwargs):
 			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 									for el in FeasibleInput1])
 		else: # not((Roots<0).all()) and not((Roots>0).all()):
-			SortedBounds = np.sort([(Constraint1-Coefficient2*MuscleVelocity_Bounds[1][0])/Coefficient1,\
-										(Constraint1-Coefficient2*MuscleVelocity_Bounds[1][1])/Coefficient1])
-			LowerBound = max(MuscleVelocity_Bounds[0][0], SortedBounds[0],Roots[0])
-			UpperBound = min(MuscleVelocity_Bounds[0][1], SortedBounds[1],Roots[1])
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0],Roots[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1],Roots[1])
 			assert UpperBound >= LowerBound, "Error with Bounds. Infeasible!"
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
@@ -2392,7 +2437,7 @@ def return_initial_U_muscle_velocity_driven(t,X_o,**kwargs):
 	u2 = FeasibleInput2[index]
 	return(np.array([u1,u2]))
 
-def return_U_muscle_activation_driven(t,X,U,**kwargs):
+def return_U_muscle_activation_driven(t:float,X,U,**kwargs):
 	"""
 	Takes in time scalar (float) (t), state numpy.ndarray (X) of shape (8,), and previous input numpy.ndarray (U) of shape (2,) and returns the input for this time step.
 
@@ -2406,6 +2451,10 @@ def return_U_muscle_activation_driven(t,X,U,**kwargs):
 
 	2) Seed - must be a scalar value. Default is None.
 
+	3) Bounds - must be a (2,2) list with each row in ascending order. Default is given by Activation_Bounds.
+
+	4) MaxStep - must be a scalar (int or float). Default is MaxStep_Activation.
+
 	"""
 	import random
 	import numpy as np
@@ -2414,18 +2463,27 @@ def return_U_muscle_activation_driven(t,X,U,**kwargs):
 	assert np.shape(U) == (2,) and str(type(U)) == "<class 'numpy.ndarray'>", "U must be a (2,) numpy.ndarray"
 
 	dt = Time3[1]-Time3[0]
+
 	Noise = kwargs.get("Noise",np.zeros((2,)))
 	assert np.shape(Noise) == (2,) and str(type(Noise)) == "<class 'numpy.ndarray'>", "Noise must be a (2,) numpy.ndarray"
+
 	Seed = kwargs.get("Seed",None)
 	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
-
 	np.random.seed(Seed)
+
+	Bounds = kwargs.get("Bounds",Activation_Bounds)
+	assert type(Bounds) == list and np.shape(Bounds) == (2,2), "Bounds for Muscle Activation Control must be a (2,2) list."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+
+	MaxStep = kwargs.get("MaxStep",MaxStep_Activation)
+	assert type(MaxStep) in [int,float], "MaxStep for Muscle Activation Controller should be an int or float."
 
 	Coefficient1,Coefficient2,Constraint1 =\
 	 			return_constraint_variables_muscle_activation_driven(t,X)
-	assert np.shape(Activation_Bounds)==(2,2), "Bounds must be (2,2)."
-	assert Activation_Bounds[0][0]<Activation_Bounds[0][1],"Each set of bounds must be in ascending order."
-	assert Activation_Bounds[1][0]<Activation_Bounds[1][1],"Each set of bounds must be in ascending order."
+	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
 	assert Coefficient1!=0 and Coefficient2!=0, "Error with Coefficients. Shouldn't both be zero."
 	if Constraint1 < 0:
 		assert not(Coefficient1 > 0 and Coefficient2 > 0), "Infeasible activations. (Constraint1 < 0, Coefficient1 > 0, Coefficient2 > 0)"
@@ -2433,20 +2491,20 @@ def return_U_muscle_activation_driven(t,X,U,**kwargs):
 		assert not(Coefficient1 < 0 and Coefficient2 < 0), "Infeasible activations. (Constraint1 > 0, Coefficient1 < 0, Coefficient2 < 0)"
 
 	if Coefficient1 == 0:
-		LowerBound = Activation_Bounds[0][0]
-		UpperBound = Activation_Bounds[0][1]
+		LowerBound = Bounds[0][0]
+		UpperBound = Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 	elif Coefficient2 == 0:
 		LowerBound = Constraint1/Coefficient1
 		UpperBound = Constraint1/Coefficient1
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-		FeasibleInput2 = (Activation_Bounds[1][1]-Activation_Bounds[1][0])*np.random.rand(1000) + Activation_Bounds[1][0]
+		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
 	else:
-		SortedBounds = np.sort([(Constraint1-Coefficient2*Activation_Bounds[1][0])/Coefficient1,\
-									(Constraint1-Coefficient2*Activation_Bounds[1][1])/Coefficient1])
-		LowerBound = max(Activation_Bounds[0][0], SortedBounds[0])
-		UpperBound = min(Activation_Bounds[0][1], SortedBounds[1])
+		SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+									(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+		LowerBound = max(Bounds[0][0], SortedBounds[0])
+		UpperBound = min(Bounds[0][1], SortedBounds[1])
 		# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
 		assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
@@ -2459,15 +2517,14 @@ def return_U_muscle_activation_driven(t,X,U,**kwargs):
 						np.sqrt((U[0]-u1)**2 + (U[1]-u2)**2),\
 																	FeasibleInput1,FeasibleInput2)))
 
-	feasible_index = np.where(euclid_dist <= \
-							(MaxStep_Activation*(t>=10*dt) + 10.0*MaxStep_Activation*(t<10*dt)))
+	feasible_index = np.where(euclid_dist <= (MaxStep*(t>=10*dt) + 10.0*MaxStep*(t<10*dt)))
 	if len(feasible_index[0]) == 0: \
 		return({"First Coefficient" : Coefficient1, "Second Coefficient" : Coefficient2, "Constraint" : Constraint1, "Lower Bounds" : LowerBound, "Upper Bounds" : UpperBound})
 	next_index = np.random.choice(feasible_index[0])
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
 	return(np.array([u1,u2]))
-def return_initial_U_muscle_activation_driven(t,X_o,**kwargs):
+def return_initial_U_muscle_activation_driven(t:float,X_o,**kwargs):
 	"""
 	Takes in time scalar (float) (t), initial state numpy.ndarray (X_o) of shape (8,) and returns an initial input (2,) numpy.ndarray.
 
@@ -2479,19 +2536,28 @@ def return_initial_U_muscle_activation_driven(t,X_o,**kwargs):
 
 	1) Seed - must be a scalar value. Default is None.
 
+	2) Bounds - must be a (2,2) list with each row in ascending order. Default is given by Activation_Bounds.
+
 	"""
 	import random
 	import numpy as np
+
 	Seed = kwargs.get("Seed",None)
 	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
 	np.random.seed(Seed)
+
+	Bounds = kwargs.get("Bounds",Activation_Bounds)
+	assert type(Bounds) == list and np.shape(Bounds) == (2,2), "Bounds for Muscle Activation Control must be a (2,2) list."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+
 	assert np.shape(X_o) == (8,) and str(type(X_o)) == "<class 'numpy.ndarray'>", "X_o must be a (2,) numpy.ndarray"
 
 	Coefficient1,Coefficient2,Constraint1 =\
 	 							return_constraint_variables_muscle_activation_driven(t,X_o)
-	assert np.shape(Activation_Bounds)==(2,2), "Bounds must be (2,2)."
-	assert Activation_Bounds[0][0]<Activation_Bounds[0][1],"Each set of bounds must be in ascending order."
-	assert Activation_Bounds[1][0]<Activation_Bounds[1][1],"Each set of bounds must be in ascending order."
+	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
 	assert Coefficient1!=0 and Coefficient2!=0, "Error with Coefficients. Shouldn't both be zero."
 	if Constraint1 < 0:
 		assert not(Coefficient1 > 0 and Coefficient2 > 0), "Infeasible activations. (Constraint1 < 0, Coefficient1 > 0, Coefficient2 > 0)"
@@ -2499,15 +2565,15 @@ def return_initial_U_muscle_activation_driven(t,X_o,**kwargs):
 		assert not(Coefficient1 < 0 and Coefficient2 < 0), "Infeasible activations. (Constraint1 > 0, Coefficient1 < 0, Coefficient2 < 0)"
 
 	if Coefficient1 == 0:
-		LowerBound = Activation_Bounds[0][0]
-		UpperBound = Activation_Bounds[0][1]
+		LowerBound = Bounds[0][0]
+		UpperBound = Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 	elif Coefficient2 == 0:
 		LowerBound = Constraint1/Coefficient1
 		UpperBound = Constraint1/Coefficient1
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-		FeasibleInput2 = (Activation_Bounds[1][1]-Activation_Bounds[1][0])*np.random.rand(1000) + Activation_Bounds[1][0]
+		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
 	else:
 		SortedBounds = np.sort([(Constraint1-Coefficient2*Activation_Bounds[1][0])/Coefficient1,\
 									(Constraint1-Coefficient2*Activation_Bounds[1][1])/Coefficient1])
@@ -2581,31 +2647,50 @@ def return_concatenated_arrays(t,XorU):
 			newXorU = np.concatenate([newXorU,np.array([XorU[i]],ndmin=2)],axis=0)
 		return(newXorU)
 
-def plot_MA_values(Time,x1,InputString=None):
+def plot_MA_values(t,X,**kwargs):
+	"""
+	Take the numpy.ndarray time array (t) of size (N,) and the state space numpy.ndarray (X) of size (2,x), (4,x), or (8,x) where x is less than or equal to N, and plots the moment are values of the two muscles versus time and along the moment arm functionself.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) InputString - must be a string. Used to alter the figure Title. Default is None.
+	"""
 	import matplotlib.pyplot as plt
 	import numpy as np
 
-	fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2,figsize=(8,6))
-	plt.subplots_adjust(left = 0.15,hspace=0.1,bottom=0.1)
+	assert np.shape(X)[0] in [2,4,8] and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (2,x), (4,x), or (8,x) numpy.ndarray, where x is less than or equal to the length of t."
 
+	assert np.shape(t) == (len(t),) and str(type(t)) == "<class 'numpy.ndarray'>", "t must be a (N,) numpy.ndarray."
+
+	InputString = kwargs.get("InputString",None)
+	assert InputString is None or type(InputString)==str, "InputString must either be a string or None."
 	if InputString == None:
 		DescriptiveTitle = "Moment arm equations"
 	else:
 		assert type(InputString)==str, "InputString must be a string"
 		DescriptiveTitle = "Moment arm equations\n(" + InputString + " Driven)"
 
+	fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2,figsize=(8,6))
+	plt.subplots_adjust(left = 0.15,hspace=0.1,bottom=0.1)
 	plt.suptitle(DescriptiveTitle)
+
 	ax1.plot(np.linspace(0,np.pi*(160/180),1001),\
 				np.array(list(map(lambda x1: R1([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
 				'0.70')
-	ax1.plot(np.linspace(min(x1),max(x1),101),\
-				np.array(list(map(lambda x1: R1([x1]),np.linspace(min(x1),max(x1),101)))),\
+	ax1.plot(np.linspace(min(X[0,:]),max(X[0,:]),101),\
+				np.array(list(map(lambda x1: R1([x1]),np.linspace(min(X[0,:]),max(X[0,:]),101)))),\
 				'g',lw=3)
 	ax1.set_xticks([0,np.pi/4,np.pi/2,3*np.pi/4,np.pi])
 	ax1.set_xticklabels([""]*len(ax1.get_xticks()))
 	ax1.set_ylabel("Moment Arm for\n Muscle 1 (m)")
 
-	ax2.plot(Time[:len(x1)],np.array(list(map(lambda x1: R1([x1]),x1))),'g')
+	"""
+	Note: Need to Transpose X in order for Map to work.
+	"""
+
+	ax2.plot(t[:np.shape(X)[1]],np.array(list(map(lambda X: R1(X),X.T))),'g')
 	ax2.set_ylim(ax1.get_ylim())
 	ax2.set_yticks(ax1.get_yticks())
 	ax2.set_yticklabels([""]*len(ax1.get_yticks()))
@@ -2614,24 +2699,31 @@ def plot_MA_values(Time,x1,InputString=None):
 	ax3.plot(np.linspace(0,np.pi*(160/180),1001),\
 				np.array(list(map(lambda x1: R2([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
 				'0.70')
-	ax3.plot(np.linspace(min(x1),max(x1),101),\
-				np.array(list(map(lambda x1: R2([x1]),np.linspace(min(x1),max(x1),101)))),\
+	ax3.plot(np.linspace(min(X[0,:]),max(X[0,:]),101),\
+				np.array(list(map(lambda x1: R2([x1]),np.linspace(min(X[0,:]),max(X[0,:]),101)))),\
 				'r',lw=3)
 	ax3.set_xticks([0,np.pi/4,np.pi/2,3*np.pi/4,np.pi])
 	ax3.set_xticklabels([r"$0$",r"$\frac{\pi}{4}$",r"$\frac{\pi}{2}$",r"$\frac{3\pi}{4}$",r"$\pi$"])
 	ax3.set_xlabel("Joint Angle (rads)")
 	ax3.set_ylabel("Moment Arm for\n Muscle 2 (m)")
 
-	ax4.plot(Time[:len(x1)],np.array(list(map(lambda x1: R2([x1]),x1))),'r')
+	ax4.plot(t[:np.shape(X)[1]],np.array(list(map(lambda X: R2(X),X.T))),'r')
 	ax4.set_ylim(ax3.get_ylim())
 	ax4.set_yticks(ax3.get_yticks())
 	ax4.set_yticklabels([""]*len(ax3.get_yticks()))
 	ax4.set_xlabel("Time (s)")
 	return(fig,[ax1,ax2,ax3,ax4])
 
-def animate_muscle_velocity_driven(t,X,U):
+def animate_muscle_velocity_driven(t,X,U,**kwargs):
 	"""
 	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (4,N)), and the input array (U - numpy.ndarray of shape (2,N)) and animates constraint equation over time.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Bounds - must be a (2,2) list with each row in ascending order. Default is given by MuscleVelocity_Bounds.
+
 	"""
 
 	import numpy as np
@@ -2641,6 +2733,12 @@ def animate_muscle_velocity_driven(t,X,U):
 	import time
 
 	assert np.shape(X) == (4,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (4,N) numpy.ndarray"
+
+	Bounds = kwargs.get("Bounds",MuscleVelocity_Bounds)
+	assert type(Bounds) == list and np.shape(Bounds) == (2,2), "Bounds for Muscle Velocity Control must be a (2,2) list."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+
 	dt = t[1]-t[0]
 	fig = plt.figure(figsize=(10,8))
 	ax1 = plt.gca()
@@ -2650,30 +2748,30 @@ def animate_muscle_velocity_driven(t,X,U):
 	ax1.set_title(DescriptiveTitle,Fontsize=20,y=1)
 
 	#Hyperbolic Constraint/Bounding Constraints
-	Input1 = list(np.linspace(MuscleVelocity_Bounds[0][0],MuscleVelocity_Bounds[0][1],1000001))
+	Input1 = list(np.linspace(Bounds[0][0],Bounds[0][1],1000001))
 	Input1.remove(0)
 	Input1 = np.array(Input1)
 	ax1.plot(Input1,lo1*lo2*0.001**2/Input1,'r',lw=2)
-	Input2 = list(np.linspace(MuscleVelocity_Bounds[1][0],MuscleVelocity_Bounds[1][1],1000001))
+	Input2 = list(np.linspace(Bounds[1][0],Bounds[1][1],1000001))
 	Input2.remove(0)
 	Input2 = np.array(Input2)
 	ax1.plot(lo1*lo2*0.001**2/Input2,Input2,'r',lw=2)
 
-	ax1.plot([MuscleVelocity_Bounds[0][0],MuscleVelocity_Bounds[0][1]],[MuscleVelocity_Bounds[1][0],MuscleVelocity_Bounds[1][0]],'k--')
-	ax1.plot([MuscleVelocity_Bounds[0][0],MuscleVelocity_Bounds[0][1]],[MuscleVelocity_Bounds[1][1],MuscleVelocity_Bounds[1][1]],'k--')
-	ax1.plot([MuscleVelocity_Bounds[0][0],MuscleVelocity_Bounds[0][0]],[MuscleVelocity_Bounds[1][0],MuscleVelocity_Bounds[1][1]],'k--')
-	ax1.plot([MuscleVelocity_Bounds[0][1],MuscleVelocity_Bounds[0][1]],[MuscleVelocity_Bounds[1][0],MuscleVelocity_Bounds[1][1]],'k--')
+	ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
+	ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
+	ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
+	ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
 
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],X[:,0])
 	if abs(Coefficient1) <= 1e-7:
-		LowerBound = MuscleVelocity_Bounds[0][0]
-		UpperBound = MuscleVelocity_Bounds[0][1]
+		LowerBound = Bounds[0][0]
+		UpperBound = Bounds[0][1]
 		if Constraint1/Coefficient2 > 0:
-			LowerBound = MuscleVelocity_Bounds[0][0]
+			LowerBound = Bounds[0][0]
 			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
 		else:
 			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
-			UpperBound = MuscleVelocity_Bounds[0][1]
+			UpperBound = Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 	elif abs(Coefficient2) <= 1e-7:
@@ -2682,21 +2780,21 @@ def animate_muscle_velocity_driven(t,X,U):
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
 		if Constraint1/Coefficient1 < 0:
 			LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
-			UpperBound = MuscleVelocity_Bounds[1][1]
+			UpperBound = Bounds[1][1]
 		else:
-			LowerBound = MuscleVelocity_Bounds[1][0]
+			LowerBound = Bounds[1][0]
 			UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
 		FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 	elif np.sign(-Coefficient1) == np.sign(Coefficient2): # DIFFERENT SIGNS
-		if (Constraint1 - Coefficient1*MuscleVelocity_Bounds[0][0])/Coefficient2 < MuscleVelocity_Bounds[1][0]:
-			LowerBound = (Constraint1-Coefficient2*MuscleVelocity_Bounds[1][0])/Coefficient1
+		if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
+			LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
 		else:
-			LowerBound = MuscleVelocity_Bounds[0][0]
+			LowerBound = Bounds[0][0]
 
-		if (Constraint1 - Coefficient1*MuscleVelocity_Bounds[0][1])/Coefficient2 > MuscleVelocity_Bounds[1][1]:
-			UpperBound = (Constraint1-Coefficient2*MuscleVelocity_Bounds[1][1])/Coefficient1
+		if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 > Bounds[1][1]:
+			UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
 		else:
-			UpperBound = MuscleVelocity_Bounds[0][1]
+			UpperBound = Bounds[0][1]
 		assert UpperBound>=LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
 		HyperbolicBounds = np.sort([(Constraint1 - \
 										np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
@@ -2710,15 +2808,15 @@ def animate_muscle_velocity_driven(t,X,U):
 		FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 								for el in FeasibleInput1])
 	else: # np.sign(-Coefficient1) != np.sign(Coefficient2) SAME SIGN
-		if (Constraint1 - Coefficient1*MuscleVelocity_Bounds[0][0])/Coefficient2 > MuscleVelocity_Bounds[1][1]:
-			LowerBound = (Constraint1-Coefficient2*MuscleVelocity_Bounds[1][1])/Coefficient1
+		if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 > Bounds[1][1]:
+			LowerBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
 		else:
-			LowerBound = MuscleVelocity_Bounds[0][0]
+			LowerBound = Bounds[0][0]
 
-		if (Constraint1 - Coefficient1*MuscleVelocity_Bounds[0][1])/Coefficient2 < MuscleVelocity_Bounds[1][0]:
-			UpperBound = (Constraint1-Coefficient2*MuscleVelocity_Bounds[1][0])/Coefficient1
+		if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 < Bounds[1][0]:
+			UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
 		else:
-			UpperBound = MuscleVelocity_Bounds[0][1]
+			UpperBound = Bounds[0][1]
 		assert UpperBound>=LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
 		if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
 			HyperbolicBounds = np.sort([(Constraint1 - \
@@ -2748,10 +2846,10 @@ def animate_muscle_velocity_driven(t,X,U):
 	chosenpoint, = plt.plot(U[:,0],c='k',marker='o')
 	ax1.set_xlabel(r'$v_{m,1}$',fontsize=14)
 	ax1.set_ylabel(r'$v_{m,2}$',fontsize=14)
-	ax1.set_xlim([MuscleVelocity_Bounds[0][0]-0.10*(np.diff(MuscleVelocity_Bounds[0])[0]/2),\
-					MuscleVelocity_Bounds[0][1]+0.10*(np.diff(MuscleVelocity_Bounds[0])[0]/2)])
-	ax1.set_ylim([MuscleVelocity_Bounds[1][0]-0.10*(np.diff(MuscleVelocity_Bounds[1])[0]/2),\
-					MuscleVelocity_Bounds[1][1]+0.10*(np.diff(MuscleVelocity_Bounds[1])[0]/2)])
+	ax1.set_xlim([Bounds[0][0]-0.10*(np.diff(Bounds[0])[0]/2),\
+					Bounds[0][1]+0.10*(np.diff(Bounds[0])[0]/2)])
+	ax1.set_ylim([Bounds[1][0]-0.10*(np.diff(Bounds[1])[0]/2),\
+					Bounds[1][1]+0.10*(np.diff(Bounds[1])[0]/2)])
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_aspect('equal')
@@ -2759,14 +2857,14 @@ def animate_muscle_velocity_driven(t,X,U):
 	def animate(i):
 		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[i],X[:,i])
 		if abs(Coefficient1) <= 1e-7:
-			LowerBound = MuscleVelocity_Bounds[0][0]
-			UpperBound = MuscleVelocity_Bounds[0][1]
+			LowerBound = Bounds[0][0]
+			UpperBound = Bounds[0][1]
 			if Constraint1/Coefficient2 > 0:
-				LowerBound = MuscleVelocity_Bounds[0][0]
+				LowerBound = Bounds[0][0]
 				UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
 			else:
 				LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
-				UpperBound = MuscleVelocity_Bounds[0][1]
+				UpperBound = Bounds[0][1]
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 			FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 		elif abs(Coefficient2) <= 1e-7:
@@ -2775,21 +2873,21 @@ def animate_muscle_velocity_driven(t,X,U):
 			FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
 			if Constraint1/Coefficient1 < 0:
 				LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
-				UpperBound = MuscleVelocity_Bounds[1][1]
+				UpperBound = Bounds[1][1]
 			else:
-				LowerBound = MuscleVelocity_Bounds[1][0]
+				LowerBound = Bounds[1][0]
 				UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
 			FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		elif np.sign(-Coefficient1) == np.sign(Coefficient2): # DIFFERENT SIGNS
-			if (Constraint1 - Coefficient1*MuscleVelocity_Bounds[0][0])/Coefficient2 < MuscleVelocity_Bounds[1][0]:
-				LowerBound = (Constraint1-Coefficient2*MuscleVelocity_Bounds[1][0])/Coefficient1
+			if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
+				LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
 			else:
-				LowerBound = MuscleVelocity_Bounds[0][0]
+				LowerBound = Bounds[0][0]
 
-			if (Constraint1 - Coefficient1*MuscleVelocity_Bounds[0][1])/Coefficient2 > MuscleVelocity_Bounds[1][1]:
-				UpperBound = (Constraint1-Coefficient2*MuscleVelocity_Bounds[1][1])/Coefficient1
+			if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 > Bounds[1][1]:
+				UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
 			else:
-				UpperBound = MuscleVelocity_Bounds[0][1]
+				UpperBound = Bounds[0][1]
 			assert UpperBound>=LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
 			HyperbolicBounds = np.sort([(Constraint1 - \
 											np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
@@ -2803,15 +2901,15 @@ def animate_muscle_velocity_driven(t,X,U):
 			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 									for el in FeasibleInput1])
 		else: # np.sign(-Coefficient1) != np.sign(Coefficient2) SAME SIGN
-			if (Constraint1 - Coefficient1*MuscleVelocity_Bounds[0][0])/Coefficient2 > MuscleVelocity_Bounds[1][1]:
-				LowerBound = (Constraint1-Coefficient2*MuscleVelocity_Bounds[1][1])/Coefficient1
+			if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 > Bounds[1][1]:
+				LowerBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
 			else:
-				LowerBound = MuscleVelocity_Bounds[0][0]
+				LowerBound = Bounds[0][0]
 
-			if (Constraint1 - Coefficient1*MuscleVelocity_Bounds[0][1])/Coefficient2 < MuscleVelocity_Bounds[1][0]:
-				UpperBound = (Constraint1-Coefficient2*MuscleVelocity_Bounds[1][0])/Coefficient1
+			if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 < Bounds[1][0]:
+				UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
 			else:
-				UpperBound = MuscleVelocity_Bounds[0][1]
+				UpperBound = Bounds[0][1]
 			assert UpperBound>=LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
 			if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
 				HyperbolicBounds = np.sort([(Constraint1 - \
@@ -2850,20 +2948,20 @@ def animate_muscle_velocity_driven(t,X,U):
 	# Init only required for blitting to give a clean slate.
 	def init():
 		ax1.plot(Input1,lo1*lo2*0.001**2/Input1,'r',lw=2)
-		ax1.plot([MuscleVelocity_Bounds[0][0],MuscleVelocity_Bounds[0][1]],[MuscleVelocity_Bounds[1][0],MuscleVelocity_Bounds[1][0]],'k--')
-		ax1.plot([MuscleVelocity_Bounds[0][0],MuscleVelocity_Bounds[0][1]],[MuscleVelocity_Bounds[1][1],MuscleVelocity_Bounds[1][1]],'k--')
-		ax1.plot([MuscleVelocity_Bounds[0][0],MuscleVelocity_Bounds[0][0]],[MuscleVelocity_Bounds[1][0],MuscleVelocity_Bounds[1][1]],'k--')
-		ax1.plot([MuscleVelocity_Bounds[0][1],MuscleVelocity_Bounds[0][1]],[MuscleVelocity_Bounds[1][0],MuscleVelocity_Bounds[1][1]],'k--')
+		ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
+		ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
+		ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
+		ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
 		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t[0],X[:,0])
 		if abs(Coefficient1) <= 1e-7:
-			LowerBound = MuscleVelocity_Bounds[0][0]
-			UpperBound = MuscleVelocity_Bounds[0][1]
+			LowerBound = Bounds[0][0]
+			UpperBound = Bounds[0][1]
 			if Constraint1/Coefficient2 > 0:
-				LowerBound = MuscleVelocity_Bounds[0][0]
+				LowerBound = Bounds[0][0]
 				UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
 			else:
 				LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient2)
-				UpperBound = MuscleVelocity_Bounds[0][1]
+				UpperBound = Bounds[0][1]
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 			FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 		elif abs(Coefficient2) <= 1e-7:
@@ -2872,21 +2970,21 @@ def animate_muscle_velocity_driven(t,X,U):
 			FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
 			if Constraint1/Coefficient1 < 0:
 				LowerBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
-				UpperBound = MuscleVelocity_Bounds[1][1]
+				UpperBound = Bounds[1][1]
 			else:
-				LowerBound = MuscleVelocity_Bounds[1][0]
+				LowerBound = Bounds[1][0]
 				UpperBound = (lo1*(0.001)*lo2*(0.001))/(Constraint1/Coefficient1)
 			FeasibleInput2 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		elif np.sign(-Coefficient1) == np.sign(Coefficient2): # DIFFERENT SIGNS
-			if (Constraint1 - Coefficient1*MuscleVelocity_Bounds[0][0])/Coefficient2 < MuscleVelocity_Bounds[1][0]:
-				LowerBound = (Constraint1-Coefficient2*MuscleVelocity_Bounds[1][0])/Coefficient1
+			if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 < Bounds[1][0]:
+				LowerBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
 			else:
-				LowerBound = MuscleVelocity_Bounds[0][0]
+				LowerBound = Bounds[0][0]
 
-			if (Constraint1 - Coefficient1*MuscleVelocity_Bounds[0][1])/Coefficient2 > MuscleVelocity_Bounds[1][1]:
-				UpperBound = (Constraint1-Coefficient2*MuscleVelocity_Bounds[1][1])/Coefficient1
+			if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 > Bounds[1][1]:
+				UpperBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
 			else:
-				UpperBound = MuscleVelocity_Bounds[0][1]
+				UpperBound = Bounds[0][1]
 			assert UpperBound>LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
 			HyperbolicBounds = np.sort([(Constraint1 - \
 											np.sqrt(Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001)))\
@@ -2900,15 +2998,15 @@ def animate_muscle_velocity_driven(t,X,U):
 			FeasibleInput2 = np.array([Constraint1/Coefficient2 - (Coefficient1/Coefficient2)*el \
 									for el in FeasibleInput1])
 		else: # np.sign(-Coefficient1) != np.sign(Coefficient2) SAME SIGN
-			if (Constraint1 - Coefficient1*MuscleVelocity_Bounds[0][0])/Coefficient2 > MuscleVelocity_Bounds[1][1]:
-				LowerBound = (Constraint1-Coefficient2*MuscleVelocity_Bounds[1][1])/Coefficient1
+			if (Constraint1 - Coefficient1*Bounds[0][0])/Coefficient2 > Bounds[1][1]:
+				LowerBound = (Constraint1-Coefficient2*Bounds[1][1])/Coefficient1
 			else:
-				LowerBound = MuscleVelocity_Bounds[0][0]
+				LowerBound = Bounds[0][0]
 
-			if (Constraint1 - Coefficient1*MuscleVelocity_Bounds[0][1])/Coefficient2 < MuscleVelocity_Bounds[1][0]:
-				UpperBound = (Constraint1-Coefficient2*MuscleVelocity_Bounds[1][0])/Coefficient1
+			if (Constraint1 - Coefficient1*Bounds[0][1])/Coefficient2 < Bounds[1][0]:
+				UpperBound = (Constraint1-Coefficient2*Bounds[1][0])/Coefficient1
 			else:
-				UpperBound = MuscleVelocity_Bounds[0][1]
+				UpperBound = Bounds[0][1]
 			assert UpperBound>=LowerBound, "Error creating bounds - UpperBound should always be greater than LowerBound."
 			if Constraint1**2 - 4*Coefficient1*Coefficient2*(lo1*0.001)*(lo2*0.001) > 0:
 				HyperbolicBounds = np.sort([(Constraint1 - \
@@ -2943,19 +3041,31 @@ def animate_muscle_velocity_driven(t,X,U):
 
 	ani = animation.FuncAnimation(fig, animate, np.arange(1, np.shape(X)[1],1), init_func=init,interval=1, blit=False)
 	plt.show()
-def plot_individual_constraint_versus_time_muscle_velocity_driven(t,X,Return = False):
-	import numpy as np
-	import matplotlib.pyplot as plt
-	assert np.shape(X) == (4,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (4,N) numpy.ndarray"
-
-	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time\nMuscle Velocity Driven"
-	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
-	plt.subplots_adjust(wspace=0.4)
-	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
-
+def plot_individual_constraint_versus_time_muscle_velocity_driven(t,X,**kwargs):
 	"""
 	A⋅u₁ + B⋅u₂ = C
+
+	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (4,N)) and plots the constraint equation and its coefficients over time.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Return - must be a bool. Determines whether or not a function handle is returned. Default is False.
+
 	"""
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	assert np.shape(X)[0] == 4 and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (4,N) numpy.ndarray"
+
+	Return = kwargs.get("Return",False)
+	assert type(Return) == bool, "Return must be either True or False."
+
+	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time\nMuscle Velocity Driven\n$A\cdot u_{1} + B\cdot u_{2} = C$"
+	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
+	plt.subplots_adjust(wspace=0.4,top=0.8)
+	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.95)
 
 	A,B,C = [],[],[]
 	for i in range(np.shape(X)[1]):
@@ -2988,18 +3098,31 @@ def plot_individual_constraint_versus_time_muscle_velocity_driven(t,X,Return = F
 		return(fig)
 	else:
 		plt.show()
-def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,X,Return = False):
-	import numpy as np
-	import matplotlib.pyplot as plt
-	assert np.shape(X) == (4,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (4,N) numpy.ndarray"
-
-	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
-	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.1,right=0.975,wspace=0.4)
-	plt.suptitle(r"Plotting $2^{nd}$ Coefficient vs. Time",Fontsize=20,y=0.975)
-
+def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,X,**kwargs):
 	"""
 	B = c2⋅c4⋅R2(X)⋅KT_2(X)
+
+	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (4,N)) and plots the 2nd Coefficient of the Constraint Equation over time as well as its components.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Return - must be a bool. Determines whether or not a function handle is returned. Default is False.
+
 	"""
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	assert np.shape(X)[0] == 4 and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (4,N) numpy.ndarray"
+
+	Return = kwargs.get("Return",False)
+	assert type(Return) == bool, "Return must be either True or False."
+
+	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
+	plt.subplots_adjust(top=0.8,hspace=0.4,bottom=0.1,left=0.1,right=0.975,wspace=0.4)
+	DescriptiveTitle = "Plotting $2^{nd}$ Coefficient vs. Time\n$B=c_{2}c_{4}R_{2}(\\vec{x}(t))K_{T,2}(\\vec{x}(t))$"
+	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.95)
 
 	r2,kt_2,B = [],[],[]
 	for i in range(np.shape(X)[1]):
@@ -3032,19 +3155,31 @@ def plot_individual_coefficient2_versus_time_muscle_velocity_driven(t,X,Return =
 		return(fig)
 	else:
 		plt.show()
-def plot_individual_coefficient1_versus_time_muscle_velocity_driven(t,X,Return = False):
-	import numpy as np
-	import matplotlib.pyplot as plt
-	assert np.shape(X) == (4,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (4,N) numpy.ndarray"
-
-	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
-	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
-	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975,wspace=0.4)
-	plt.suptitle(r"Plotting $1^{st}$ Coefficient vs. Time",Fontsize=20,y=0.975)
-
+def plot_individual_coefficient1_versus_time_muscle_velocity_driven(t,X,**kwargs):
 	"""
 	A = c2⋅c3⋅R1(X)⋅KT_1(X)
+
+	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (4,N)) and plots the 1st Coefficient of the Constraint Equation over time as well as its components.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Return - must be a bool. Determines whether or not a function handle is returned. Default is False.
+
 	"""
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	assert np.shape(X)[0] == 4 and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (4,N) numpy.ndarray"
+
+	Return = kwargs.get("Return",False)
+	assert type(Return) == bool, "Return must be either True or False."
+
+	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
+	plt.subplots_adjust(top=0.8,hspace=0.4,bottom=0.1,left=0.075,right=0.975,wspace=0.4)
+	DescriptiveTitle = "Plotting $1^{st}$ Coefficient vs. Time\n$A=c_{2}c_{3}R_{1}(\\vec{x}(t))K_{T,1}(\\vec{x}(t))$"
+	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.95)
 
 	r1,kt_1,B = [],[],[]
 	for i in range(np.shape(X)[1]):
@@ -3078,13 +3213,29 @@ def plot_individual_coefficient1_versus_time_muscle_velocity_driven(t,X,Return =
 	else:
 		plt.show()
 
-def animate_muscle_activation_driven(t,X,U):
+def animate_muscle_activation_driven(t,X,U,**kwargs):
+	"""
+	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (8,N)), and the input array (U - numpy.ndarray of shape (2,N)) and animates constraint equation over time.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Bounds - must be a (2,2) list with each row in ascending order. Default is given by MuscleVelocity_Bounds.
+
+	"""
 	import numpy as np
 	import matplotlib.pyplot as plt
 	import matplotlib.animation as animation
 	import matplotlib.patches as patches
 	import time
-	assert np.shape(X) == (8,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,N) numpy.ndarray"
+
+	assert np.shape(X)[0] == 8 and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,N) numpy.ndarray"
+
+	Bounds = kwargs.get("Bounds",Activation_Bounds)
+	assert type(Bounds) == list and np.shape(Bounds) == (2,2), "Bounds for Muscle Activation Control must be a (2,2) list."
+	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
+	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
 
 	dt = t[1]-t[0]
 	fig = plt.figure(figsize=(10,8))
@@ -3095,27 +3246,27 @@ def animate_muscle_activation_driven(t,X,U):
 	ax1.set_title(DescriptiveTitle,Fontsize=20,y=1)
 
 	#Bound Constraints
-	ax1.plot([Activation_Bounds[0][0],Activation_Bounds[0][1]],[Activation_Bounds[1][0],Activation_Bounds[1][0]],'k--')
-	ax1.plot([Activation_Bounds[0][0],Activation_Bounds[0][1]],[Activation_Bounds[1][1],Activation_Bounds[1][1]],'k--')
-	ax1.plot([Activation_Bounds[0][0],Activation_Bounds[0][0]],[Activation_Bounds[1][0],Activation_Bounds[1][1]],'k--')
-	ax1.plot([Activation_Bounds[0][1],Activation_Bounds[0][1]],[Activation_Bounds[1][0],Activation_Bounds[1][1]],'k--')
+	ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
+	ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
+	ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
+	ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
 
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[0],X[:,0])
 	if Coefficient1 == 0:
-		LowerBound = Activation_Bounds[0][0]
-		UpperBound = Activation_Bounds[0][1]
+		LowerBound = Bounds[0][0]
+		UpperBound = Bounds[0][1]
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 		FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 	elif Coefficient2 == 0:
 		LowerBound = Constraint1/Coefficient1
 		UpperBound = Constraint1/Coefficient1
 		FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-		FeasibleInput2 = (Activation_Bounds[1][1]-Activation_Bounds[1][0])*np.random.rand(1000) + Activation_Bounds[1][0]
+		FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
 	else:
-		SortedBounds = np.sort([(Constraint1-Coefficient2*Activation_Bounds[1][0])/Coefficient1,\
-									(Constraint1-Coefficient2*Activation_Bounds[1][1])/Coefficient1])
-		LowerBound = max(Activation_Bounds[0][0], SortedBounds[0])
-		UpperBound = min(Activation_Bounds[0][1], SortedBounds[1])
+		SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+									(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+		LowerBound = max(Bounds[0][0], SortedBounds[0])
+		UpperBound = min(Bounds[0][1], SortedBounds[1])
 		# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
 		assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 		FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
@@ -3129,10 +3280,10 @@ def animate_muscle_activation_driven(t,X,U):
 	chosenpoint, = plt.plot(U[:,0],c='k',marker='o')
 	ax1.set_xlabel(r'$\alpha_{1}$',fontsize=14)
 	ax1.set_ylabel(r'$\alpha_{2}$',fontsize=14)
-	ax1.set_xlim([Activation_Bounds[0][0]-0.10*(np.diff(Activation_Bounds[0])[0]/2),\
-					Activation_Bounds[0][1]+0.10*(np.diff(Activation_Bounds[0])[0]/2)])
-	ax1.set_ylim([Activation_Bounds[1][0]-0.10*(np.diff(Activation_Bounds[1])[0]/2),\
-					Activation_Bounds[1][1]+0.10*(np.diff(Activation_Bounds[1])[0]/2)])
+	ax1.set_xlim([Bounds[0][0]-0.10*(np.diff(Bounds[0])[0]/2),\
+					Bounds[0][1]+0.10*(np.diff(Bounds[0])[0]/2)])
+	ax1.set_ylim([Bounds[1][0]-0.10*(np.diff(Bounds[1])[0]/2),\
+					Bounds[1][1]+0.10*(np.diff(Bounds[1])[0]/2)])
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_aspect('equal')
@@ -3140,20 +3291,20 @@ def animate_muscle_activation_driven(t,X,U):
 	def animate(i):
 		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[i],X[:,i])
 		if Coefficient1 == 0:
-			LowerBound = Activation_Bounds[0][0]
-			UpperBound = Activation_Bounds[0][1]
+			LowerBound = Bounds[0][0]
+			UpperBound = Bounds[0][1]
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 			FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 		elif Coefficient2 == 0:
 			LowerBound = Constraint1/Coefficient1
 			UpperBound = Constraint1/Coefficient1
 			FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-			FeasibleInput2 = (Activation_Bounds[1][1]-Activation_Bounds[1][0])*np.random.rand(1000) + Activation_Bounds[1][0]
+			FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
 		else:
-			SortedBounds = np.sort([(Constraint1-Coefficient2*Activation_Bounds[1][0])/Coefficient1,\
-										(Constraint1-Coefficient2*Activation_Bounds[1][1])/Coefficient1])
-			LowerBound = max(Activation_Bounds[0][0], SortedBounds[0])
-			UpperBound = min(Activation_Bounds[0][1], SortedBounds[1])
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1])
 			# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
 			assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
@@ -3174,26 +3325,26 @@ def animate_muscle_activation_driven(t,X,U):
 
 	# Init only required for blitting to give a clean slate.
 	def init():
-		ax1.plot([Activation_Bounds[0][0],Activation_Bounds[0][1]],[Activation_Bounds[1][0],Activation_Bounds[1][0]],'k--')
-		ax1.plot([Activation_Bounds[0][0],Activation_Bounds[0][1]],[Activation_Bounds[1][1],Activation_Bounds[1][1]],'k--')
-		ax1.plot([Activation_Bounds[0][0],Activation_Bounds[0][0]],[Activation_Bounds[1][0],Activation_Bounds[1][1]],'k--')
-		ax1.plot([Activation_Bounds[0][1],Activation_Bounds[0][1]],[Activation_Bounds[1][0],Activation_Bounds[1][1]],'k--')
+		ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][0],Bounds[1][0]],'k--')
+		ax1.plot([Bounds[0][0],Bounds[0][1]],[Bounds[1][1],Bounds[1][1]],'k--')
+		ax1.plot([Bounds[0][0],Bounds[0][0]],[Bounds[1][0],Bounds[1][1]],'k--')
+		ax1.plot([Bounds[0][1],Bounds[0][1]],[Bounds[1][0],Bounds[1][1]],'k--')
 		Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_activation_driven(t[0],X[:,0])
 		if Coefficient1 == 0:
-			LowerBound = Activation_Bounds[0][0]
-			UpperBound = Activation_Bounds[0][1]
+			LowerBound = Bounds[0][0]
+			UpperBound = Bounds[0][1]
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
 			FeasibleInput2 = np.array([Constraint1/Coefficient2]*1000)
 		elif Coefficient2 == 0:
 			LowerBound = Constraint1/Coefficient1
 			UpperBound = Constraint1/Coefficient1
 			FeasibleInput1 = np.array([Constraint1/Coefficient1]*1000)
-			FeasibleInput2 = (Activation_Bounds[1][1]-Activation_Bounds[1][0])*np.random.rand(1000) + Activation_Bounds[1][0]
+			FeasibleInput2 = (Bounds[1][1]-Bounds[1][0])*np.random.rand(1000) + Bounds[1][0]
 		else:
-			SortedBounds = np.sort([(Constraint1-Coefficient2*Activation_Bounds[1][0])/Coefficient1,\
-										(Constraint1-Coefficient2*Activation_Bounds[1][1])/Coefficient1])
-			LowerBound = max(Activation_Bounds[0][0], SortedBounds[0])
-			UpperBound = min(Activation_Bounds[0][1], SortedBounds[1])
+			SortedBounds = np.sort([(Constraint1-Coefficient2*Bounds[1][0])/Coefficient1,\
+										(Constraint1-Coefficient2*Bounds[1][1])/Coefficient1])
+			LowerBound = max(Bounds[0][0], SortedBounds[0])
+			UpperBound = min(Bounds[0][1], SortedBounds[1])
 			# if UpperBound < LowerBound: import ipdb; ipdb.set_trace()
 			assert UpperBound >= LowerBound, "Error generating bounds. Not feasible!"
 			FeasibleInput1 = (UpperBound-LowerBound)*np.random.rand(1000) + LowerBound
@@ -3212,15 +3363,32 @@ def animate_muscle_activation_driven(t,X,U):
 
 	ani = animation.FuncAnimation(fig, animate, np.arange(1, np.shape(X)[1],1), init_func=init,interval=1, blit=False)
 	plt.show()
-def plot_individual_constraint_versus_time_muscle_activation_driven(t,X,Return = False):
+def plot_individual_constraint_versus_time_muscle_activation_driven(t,X,**kwargs):
+	"""
+	A⋅u₁ + B⋅u₂ = C
+
+	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (4,N)) and plots the constraint equation and its coefficients over time.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Return - must be a bool. Determines whether or not a function handle is returned. Default is False.
+
+	"""
 	import numpy as np
 	import matplotlib.pyplot as plt
-	assert np.shape(X) == (8,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,N) numpy.ndarray"
 
-	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
+	assert np.shape(X)[0] == 8 and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,N) numpy.ndarray"
+
+	Return = kwargs.get("Return",False)
+	assert type(Return) == bool, "Return must be either True or False."
+
+	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time\nMuscle Velocity Driven\n$A\cdot u_{1} + B\cdot u_{2} = C$"
+
 	fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(12,5))
-	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
-	plt.subplots_adjust(wspace = 0.4)
+	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.95)
+	plt.subplots_adjust(wspace = 0.4,top=0.8)
 
 	"""
 	A⋅u₁ + B⋅u₂ = C
@@ -3257,18 +3425,32 @@ def plot_individual_constraint_versus_time_muscle_activation_driven(t,X,Return =
 		return(fig)
 	else:
 		plt.show()
-def plot_individual_coefficient2_versus_time_muscle_activation_driven(t,X,Return = False):
-	import numpy as np
-	import matplotlib.pyplot as plt
-	assert np.shape(X) == (8,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,N) numpy.ndarray"
-
-	fig, (ax1,ax2,ax3,ax4) = plt.subplots(1,4,figsize=(15,5))
-	plt.subplots_adjust(top=0.9,bottom=0.1,left=0.1,right=0.975,wspace=0.4)
-	plt.suptitle(r"Plotting $2^{nd}$ Coefficient vs. Time",Fontsize=20,y=0.975)
-
+def plot_individual_coefficient2_versus_time_muscle_activation_driven(t,X,**kwargs):
 	"""
 	B = c2⋅c4⋅c10⋅R2(X)⋅KT_2(X)⋅FLV_2(X)
+
+	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (4,N)) and plots the 2nd Coefficient of the Constraint Equation over time as well as its components.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Return - must be a bool. Determines whether or not a function handle is returned. Default is False.
+
 	"""
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	assert np.shape(X)[0] == 8 and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,N) numpy.ndarray"
+
+	Return = kwargs.get("Return",False)
+	assert type(Return) == bool, "Return must be either True or False."
+
+	fig, (ax1,ax2,ax3,ax4) = plt.subplots(1,4,figsize=(15,5))
+	plt.subplots_adjust(top=0.8,bottom=0.1,left=0.1,right=0.975,wspace=0.4)
+	DescriptiveTitle = "Plotting $2^{nd}$ Coefficient vs. Time\n$B=c_{2}c_{4}c_{10}R_{2}(\\vec{x}(t))K_{T,2}(\\vec{x}(t))F_{LV,2}(\\vec{x}(t))$"
+	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.95)
+
 
 	r2,kt_2,flv_2,B = [],[],[],[]
 	for i in range(np.shape(X)[1]):
@@ -3309,19 +3491,32 @@ def plot_individual_coefficient2_versus_time_muscle_activation_driven(t,X,Return
 		return(fig)
 	else:
 		plt.show()
-def plot_individual_coefficient1_versus_time_muscle_activation_driven(t,X,Return = False):
-	import numpy as np
-	import matplotlib.pyplot as plt
-	assert np.shape(X) == (8,len(t)) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,N) numpy.ndarray"
-
-	DescriptiveTitle = "Plotting Coefficients/Constraints vs. Time"
-	fig, (ax1,ax2,ax3,ax4) = plt.subplots(1,4,figsize=(15,5))
-	plt.subplots_adjust(top=0.9,bottom=0.1,left=0.1,right=0.975,wspace=0.4)
-	plt.suptitle(r"Plotting $1^{st}$ Coefficient vs. Time",Fontsize=20,y=0.975)
-
+def plot_individual_coefficient1_versus_time_muscle_activation_driven(t,X,**kwargs):
 	"""
 	A = c2⋅c3⋅c6⋅R1(X)⋅KT_1(X)⋅FLV_1(X)
+
+	Takes in Time (t - numpy.ndarray of shape (N,)), the state array (X - numpy.ndarray of shape (4,N)) and plots the 1st Coefficient of the Constraint Equation over time as well as its components.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Return - must be a bool. Determines whether or not a function handle is returned. Default is False.
+
 	"""
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	assert np.shape(X)[0] == 8 and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,N) numpy.ndarray"
+
+	Return = kwargs.get("Return",False)
+	assert type(Return) == bool, "Return must be either True or False."
+
+	fig, (ax1,ax2,ax3,ax4) = plt.subplots(1,4,figsize=(15,5))
+	plt.subplots_adjust(top=0.8,bottom=0.1,left=0.1,right=0.975,wspace=0.4)
+	DescriptiveTitle = "Plotting $1^{st}$ Coefficient vs. Time\n$A=c_{2}c_{3}c_{6}R_{1}(\\vec{x}(t))K_{T,1}(\\vec{x}(t))F_{LV,1}(\\vec{x}(t))$"
+	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.95)
+
 
 	r1,kt_1,flv_1,A = [],[],[],[]
 	for i in range(np.shape(X)[1]):
@@ -3363,9 +3558,29 @@ def plot_individual_coefficient1_versus_time_muscle_activation_driven(t,X,Return
 	else:
 		plt.show()
 
-def plot_states(t,X,Return=False,InputString=None):
+def plot_states(t,X,**kwargs):
+	"""
+	Takes in a numpy.ndarray for time (t) of shape (N,) and the numpy.ndarray for the state space (X) (NOT NECESSARILY THE SAME LENGTH AS t). Returns a plot of the states.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Return - must be a bool. Determines if the function returns a function handle. Default is False.
+
+	2) InputString - must be a string. Input to the DescriptiveTitle that can be used to personalize the title. Default is None.
+
+	"""
 	import numpy as np
 	import matplotlib.pyplot as plt
+
+	assert np.shape(X)[0] in [2,4,8] and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a numpy.ndarray of shape (2,x), (4,x), or (8,x) where x is less than or equal to the length of time t."
+
+	Return = kwargs.get("Return",False)
+	assert type(Return)==bool, "Return must be either True or False."
+
+	InputString = kwargs.get("InputString",None)
+	assert InputString==None or type(InputString)==str, "InputString must either be None or a str."
 
 	NumStates = np.shape(X)[0]
 	NumRows = int(np.ceil(NumStates/5))
@@ -3389,7 +3604,7 @@ def plot_states(t,X,Return=False,InputString=None):
 		for j in range(NumStates):
 			axes[ColumnNumber[j]].spines['right'].set_visible(False)
 			axes[ColumnNumber[j]].spines['top'].set_visible(False)
-			axes[ColumnNumber[j]].plot(t[:np.shape(X)[1]],X[j])
+			axes[ColumnNumber[j]].plot(t[:np.shape(X)[1]],X[j,:])
 			if ColumnNumber[j]!=0:
 				axes[ColumnNumber[j]].set_xticklabels(\
 									[""]*len(axes[ColumnNumber[j]].get_xticks()))
@@ -3401,13 +3616,13 @@ def plot_states(t,X,Return=False,InputString=None):
 		for j in range(NumStates):
 			axes[RowNumber[j],ColumnNumber[j]].spines['right'].set_visible(False)
 			axes[RowNumber[j],ColumnNumber[j]].spines['top'].set_visible(False)
-			axes[RowNumber[j],ColumnNumber[j]].plot(t[:np.shape(X)[1]],X[j])
+			axes[RowNumber[j],ColumnNumber[j]].plot(t[:np.shape(X)[1]],X[j,:])
 			if not(RowNumber[j] == RowNumber[-1] and ColumnNumber[j]==0):
 				axes[RowNumber[j],ColumnNumber[j]].set_xticklabels(\
 									[""]*len(axes[RowNumber[j],ColumnNumber[j]].get_xticks()))
 			else:
 				axes[RowNumber[j],ColumnNumber[j]].set_xlabel("Time (s)")
-			axes[RowNumber[j],ColumnNumber[j]].set_title(r"$x_{" + str(j+1) + "}$")
+			axes[RowNumber[j],ColumnNumber[j]].set_title(r"$x_{" + str(j+1) + "}$ "+ Units[j])
 		if NumStates%5!=0:
 			[fig.delaxes(axes[RowNumber[-1],el]) for el in range(ColumnNumber[-1]+1,5)]
 
@@ -3415,9 +3630,30 @@ def plot_states(t,X,Return=False,InputString=None):
 		return(fig)
 	else:
 		plt.show()
-def plot_inputs(t,u1,u2,Return=False,InputString=None):
+def plot_inputs(t,U,**kwargs):
+	"""
+	Takes in a numpy.ndarray for time (t) of shape (N,) and the numpy.ndarray for the input (U) (NOT NECESSARILY THE SAME LENGTH AS t). Returns a plot of the states.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Return - must be a bool. Determines if the function returns a function handle. Default is False.
+
+	2) InputString - must be a string. Input to the DescriptiveTitle that can be used to personalize the title. Default is None.
+
+	"""
 	import numpy as np
 	import matplotlib.pyplot as plt
+
+	assert np.shape(U)[0] == 2 and str(type(U)) == "<class 'numpy.ndarray'>", "U must be a numpy.ndarray of size (2,x), where x must be less than or equal to the length of time t."
+
+	Return = kwargs.get("Return",False)
+	assert type(Return)==bool, "Return must be either True or False."
+
+	InputString = kwargs.get("InputString",None)
+	assert InputString==None or type(InputString)==str, "InputString must either be None or a str."
+
 	if InputString == None:
 		DescriptiveTitle = "Plotting Inputs vs. Time"
 	else:
@@ -3427,17 +3663,17 @@ def plot_inputs(t,u1,u2,Return=False,InputString=None):
 	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
 	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
 
-	ax1.plot(t[:len(u1)],u1,'r',lw=2)
-	ax1.plot([-1,t[len(u1)-1]+1],[0,0],'k--',lw=0.5)
-	ax1.set_xlim([t[0],t[len(u1)-1]])
+	ax1.plot(t[:np.shape(U)[1]],U[0,:],'r',lw=2)
+	ax1.plot([-1,t[np.shape(U)[1]-1]+1],[0,0],'k--',lw=0.5)
+	ax1.set_xlim([t[0],t[np.shape(U)[1]-1]])
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_ylabel(r"$u_1$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(u2)],u2,'g',lw=2)
-	ax2.plot([-1,t[len(u2)-1]+1],[0,0],'k--',lw=0.5)
-	ax2.set_xlim([t[0],t[len(u1)-1]])
+	ax2.plot(t[:np.shape(U)[1]],U[1,:],'g',lw=2)
+	ax2.plot([-1,t[np.shape(U)[1]-1]+1],[0,0],'k--',lw=0.5)
+	ax2.set_xlim([t[0],t[np.shape(U)[1]-1]])
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
 	ax2.set_ylabel(r"$u_2$")
@@ -3448,54 +3684,89 @@ def plot_inputs(t,u1,u2,Return=False,InputString=None):
 		return(fig)
 	else:
 		plt.show()
-def plot_l_m_comparison(t,x1,x2,l_m1 = None, l_m2 = None,\
-						v_m1 = None, v_m2 = None, Return=False, InputString=None):
+def plot_l_m_comparison(t,X,**kwargs):
+
+	"""
+	Takes in a numpy.ndarray for time (t) of shape (N,) and the numpy.ndarray for the input (U) (NOT NECESSARILY THE SAME LENGTH AS t). Returns a plot of the states.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Return - must be a bool. Determines if the function returns a function handle. Default is False.
+
+	2) InputString - must be a string. Input to the DescriptiveTitle that can be used to personalize the title. Default is None.
+
+	"""
 	import numpy as np
 	import matplotlib.pyplot as plt
-	assert (l_m1 != None and l_m2 != None) or (v_m1 != None and v_m2 != None), "Error! Need to input some length/velocity measurement for the muscles."
+
+	assert np.shape(X)[0] >= 2 and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a numpy.ndarray of size (2,x), (4,x), or (8,x) where x must be less than or equal to the length of time t."
+
+	Return = kwargs.get("Return",False)
+	assert type(Return)==bool, "Return must be either True or False."
+
+	InputString = kwargs.get("InputString",None)
+	assert InputString==None or type(InputString)==str, "InputString must either be None or a str."
 	if InputString == None:
 		DescriptiveTitle = "Muscle vs. Musculotendon Lengths"
 	else:
-		assert type(InputString)==str, "InputString must be a string"
 		DescriptiveTitle = "Muscle vs. Musculotendon Lengths\n" + InputString + " Driven"
+
+	L_m = kwargs.get("MuscleLengths",None)
+	assert L_m is None or (type(L_m)==list and np.shape(L_m)==(2,np.shape(X)[1])), "L_m must be a list of two arrays with same length as X or left as None (Default)."
+
+	V_m = kwargs.get("MuscleVelocities",None)
+	assert V_m is None or (type(V_m)==list and np.shape(V_m)==(2,np.shape(X)[1])), "V_m must be a list of two arrays with same length as X or left as None (Default)."
+
+	assert L_m is not None or V_m is not None, "Error! Need to input some length/velocity measurement for the muscles."
 
 	fig,[[ax1,ax2],[ax3,ax4]] = plt.subplots(2,2,figsize = (14,7))
 	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
 
-	if (l_m1 == None or l_m2 == None):
+	if L_m is None:
 		"""
 		This is for the muscle velocity driven controller. These values of initial muscle length are estimates taken to be the optimal muscle lengths. We will need to run some sensitivity analysis to ensure that this does not drastically effect the deviations from the MTU estimate.
 		"""
-		l_m1 = integrate.cumtrapz(v_m1,t[:len(x1)],initial = 0) + np.ones(len(x1))*lo1
-		l_m2 = integrate.cumtrapz(v_m2,t[:len(x1)],initial = 0) + np.ones(len(x1))*lo2
+		l_m1 = integrate.cumtrapz(V_m[0],t[:np.shape(X)[1]],initial = 0) + np.ones(np.shape(X)[1])*lo1
+		l_m2 = integrate.cumtrapz(V_m[1],t[:np.shape(X)[1]],initial = 0) + np.ones(np.shape(X)[1])*lo2
+	else:
+		l_m1 = L_m[0]
+		l_m2 = L_m[1]
 
-	ax1.plot(t[:len(x1)],l_m1,'r',\
-				t[:len(x1)],integrate.cumtrapz(np.array(list(map(lambda x1,x2:\
-							 						v_MTU1([x1,x2]),x1,x2)))\
-														,t[:len(x1)], initial = 0)\
-														 	+ np.ones(len(x1))*l_m1[0],'b')
+	"""
+	Note: X must be transposed in order to run through map()
+	"""
+	ax1.plot(t[:np.shape(X)[1]],l_m1,'r',\
+				t[:np.shape(X)[1]],integrate.cumtrapz(np.array(list(\
+													map(lambda X: v_MTU1(X),X.T)))\
+														,t[:np.shape(X)[1]], initial = 0)\
+														 	+ np.ones(np.shape(X)[1])*l_m1[0],\
+																'b')
 	ax1.set_ylabel(r"$l_{m,1}/l_{MTU,1}$ (m)")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(x1)],l_m1-integrate.cumtrapz(np.array(list(\
-														map(lambda x1,x2: v_MTU1([x1,x2]),x1,x2)))\
-															,t[:len(x1)], initial = 0)\
-															 	- np.ones(len(x1))*l_m1[0],'k')
+	ax2.plot(t[:np.shape(X)[1]],l_m1-integrate.cumtrapz(np.array(list(\
+														map(lambda X: v_MTU1(X),X.T)))\
+															,t[:np.shape(X)[1]], initial = 0)\
+															 	- np.ones(np.shape(X)[1])*l_m1[0],\
+																	'k')
 	ax2.set_ylabel("Error (m)")
 	ax2.set_xlabel("Time (s)")
 
-	ax3.plot(t[:len(x1)],l_m2,'r',\
-				t[:len(x1)],integrate.cumtrapz(np.array(list(map(lambda x1,x2:\
-							 						v_MTU2([x1,x2]),x1,x2)))\
-														,t[:len(x1)], initial = 0)\
-														 	+ np.ones(len(x1))*l_m2[0],'b')
+	ax3.plot(t[:np.shape(X)[1]],l_m2,'r',\
+				t[:np.shape(X)[1]],integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X),X.T)))\
+														,t[:np.shape(X)[1]], initial = 0)\
+														 	+ np.ones(np.shape(X)[1])*l_m2[0],\
+																'b')
 	ax3.set_ylabel(r"$l_{m,2}/l_{MTU,2}$ (m)")
 	ax3.set_xlabel("Time (s)")
 
-	ax4.plot(t[:len(x1)],l_m2-integrate.cumtrapz(np.array(list(\
-														map(lambda x1,x2: v_MTU2([x1,x2]),x1,x2)))\
-															,t[:len(x1)], initial = 0)\
-															 	- np.ones(len(x1))*l_m2[0],'k')
+	ax4.plot(t[:np.shape(X)[1]],l_m2-integrate.cumtrapz(np.array(list(\
+														map(lambda X: v_MTU2(X),X.T)))\
+															,t[:np.shape(X)[1]], initial = 0)\
+															 	- np.ones(np.shape(X)[1])*l_m2[0],\
+																	'k')
 	ax4.set_ylabel("Error (m)")
 	ax4.set_xlabel("Time (s)")
 
@@ -3684,26 +3955,73 @@ if len(x1_1)>50 or len(x1_2)>50 or len(x1_3)>50:
 	elif len(x1_3)>50:
 		plt.legend(["Muscle Activation"],loc='best')
 if len(x1_1)>50:
-	fig1_1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time1,x1_1,InputString = "Tendon Tension")
-	fig2_1 = plot_states(Time1,[x1_1,x2_1],Return=True,InputString = "Tendon Tension")
-	fig3_1 = plot_inputs(Time1,u1_1,u2_1,Return=True,InputString = "Tendon Tension")
+	fig1_1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time1,\
+						np.concatenate([np.array([x1_1],ndmin=2),np.array([x2_1],ndmin=2)],axis=0),\
+							InputString = "Tendon Tension")
+	fig2_1 = plot_states(Time1,\
+						np.concatenate([np.array([x1_1],ndmin=2),np.array([x2_1],ndmin=2)],axis=0),\
+							Return=True,InputString = "Tendon Tension")
+	fig3_1 = plot_inputs(Time1,\
+						np.concatenate([np.array([u1_1],ndmin=2),np.array([u2_1],ndmin=2)],axis=0),\
+							Return=True,InputString = "Tendon Tension")
 if len(x1_2)>50:
-	fig1_2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time2,x1_2,\
-							InputString = "Normalized Muscle Velocities")
-	fig2_2 = plot_states(Time2,[x1_2,x2_2,x3_2,x4_2],\
-							Return=True,InputString = "Normalized Muscle Velocities")
-	fig3_2 = plot_inputs(Time2,np.array(u1_2)/lo1,np.array(u2_2)/lo2,\
-							Return=True,InputString = "Normalized Muscle Velocities")
-	fig4_2 = plot_l_m_comparison(Time2,x1_2,x2_2,v_m1 = u1_2,v_m2 = u2_2,\
-									Return=True, InputString = "Muscle Velocity")
+	fig1_2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time2,\
+												np.concatenate([np.array([x1_2],ndmin=2),\
+																np.array([x2_2],ndmin=2),\
+																np.array([x3_2],ndmin=2),\
+																np.array([x4_2],ndmin=2)],axis=0),\
+													InputString = "Normalized Muscle Velocities")
+	fig2_2 = plot_states(Time2,\
+							np.concatenate([np.array([x1_2],ndmin=2),\
+												np.array([x2_2],ndmin=2),\
+													np.array([x3_2],ndmin=2),\
+														np.array([x4_2],ndmin=2)],axis=0),\
+								Return=True,InputString = "Normalized Muscle Velocities")
+	fig3_2 = plot_inputs(Time2,\
+				np.concatenate([np.array([u1_2],ndmin=2)/lo1,np.array([u2_2],ndmin=2)/lo2],axis=0),\
+					Return=True,InputString = "Normalized Muscle Velocities")
+	fig4_2 = plot_l_m_comparison(Time2,\
+									np.concatenate([np.array([x1_2],ndmin=2),\
+													np.array([x2_2],ndmin=2),\
+													np.array([x3_2],ndmin=2),\
+													np.array([x4_2],ndmin=2)],axis=0),\
+										MuscleVelocities = [u1_2,u2_2],\
+											Return=True, InputString = "Muscle Velocity")
 if len(x1_3)>50:
-	fig1_3,[ax1_3,ax2_3,ax3_3,ax4_3] = plot_MA_values(Time3,x1_3,\
-							InputString = "Muscle Activations")
-	fig2_3 = plot_states(Time3,[x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3],\
+	fig1_3,[ax1_3,ax2_3,ax3_3,ax4_3] = plot_MA_values(Time3,\
+												np.concatenate([np.array([x1_3],ndmin=2),\
+																np.array([x2_3],ndmin=2),\
+																np.array([x3_3],ndmin=2),\
+																np.array([x4_3],ndmin=2),\
+																np.array([x5_3],ndmin=2),\
+																np.array([x6_3],ndmin=2),\
+																np.array([x7_3],ndmin=2),\
+																np.array([x8_3],ndmin=2)],axis=0),\
+													InputString = "Muscle Activations")
+	fig2_3 = plot_states(Time3,\
+							np.concatenate([np.array([x1_3],ndmin=2),\
+											np.array([x2_3],ndmin=2),\
+											np.array([x3_3],ndmin=2),\
+											np.array([x4_3],ndmin=2),\
+											np.array([x5_3],ndmin=2),\
+											np.array([x6_3],ndmin=2),\
+											np.array([x7_3],ndmin=2),\
+											np.array([x8_3],ndmin=2)],axis=0),\
+								Return=True,InputString = "Muscle Activations")
+	fig3_3 = plot_inputs(Time3,\
+						np.concatenate([np.array([u1_3],ndmin=2),np.array([u2_3],ndmin=2)],axis=0),\
 							Return=True,InputString = "Muscle Activations")
-	fig3_3 = plot_inputs(Time3,u1_3,u2_3,Return=True,InputString = "Muscle Activations")
-	fig4_3 = plot_l_m_comparison(Time3,x1_3,x2_3,l_m1 = x5_3,l_m2 = x6_3,\
-									Return=True,InputString = "Muscle Activation")
+	fig4_3 = plot_l_m_comparison(Time3,\
+									np.concatenate([np.array([x1_3],ndmin=2),\
+													np.array([x2_3],ndmin=2),\
+													np.array([x3_3],ndmin=2),\
+													np.array([x4_3],ndmin=2),\
+													np.array([x5_3],ndmin=2),\
+													np.array([x6_3],ndmin=2),\
+													np.array([x7_3],ndmin=2),\
+													np.array([x8_3],ndmin=2)],axis=0),\
+										MuscleLengths = [x5_3,x6_3],\
+											Return=True,InputString = "Muscle Activation")
 
 BaseFileName = "ReferenceTracking_ForcedPendulumExample"
 figs=[manager.canvas.figure
