@@ -2097,7 +2097,7 @@ def return_U_tension_driven(t:float,X,U,**kwargs):
 	next_index = np.random.choice(feasible_index[0])
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
-	return(np.array([u1,u2],ndmin=1))	
+	return(np.array([u1,u2],ndmin=1))
 def return_initial_U_tension_driven(t,X_o,**kwargs):
 	"""
 	Takes in time scalar (float) (t), initial state numpy.ndarray (X_o) of shape (2,) and returns an initial input (2,) numpy.ndarray.
@@ -2114,6 +2114,7 @@ def return_initial_U_tension_driven(t,X_o,**kwargs):
 	Seed = kwargs.get("Seed",None)
 	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
 	np.random.seed(Seed)
+	assert np.shape(X_o) == (2,) and str(type(X_o)) == "<class 'numpy.ndarray'>", "X_o must be a (2,) numpy.ndarray"
 
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_tension_driven(t,X_o)
 	assert np.shape(Tension_Bounds)==(2,2), "Bounds must be (2,2)."
@@ -2146,7 +2147,7 @@ def return_initial_U_tension_driven(t,X_o,**kwargs):
 	index = np.random.choice(range(1000))
 	u1 = FeasibleInput1[index]
 	u2 = FeasibleInput2[index]
-	return(np.arrau([u1,u2]))
+	return(np.array([u1,u2]))
 
 def return_U_muscle_velocity_driven(t,X,U,dt,MaxStep,Bounds,Noise):
 	"""
@@ -3456,7 +3457,7 @@ while AnotherIteration1 == True:
 	dt = Time1[1]-Time1[0]
 
 	x1_1,x2_1 = [Base],[Amp*Freq]
-	U1 = return_initial_U_tension_driven(Time1[1],[x1_1[0],x2_1[0]],Tension_Bounds)
+	U1 = return_initial_U_tension_driven(Time1[1],np.array([x1_1[0],x2_1[0]]))
 	u1_1 = [U1[0]]
 	u2_1 = [U1[1]]
 
@@ -3489,7 +3490,7 @@ while AnotherIteration2 == True:
 	"""
 	l_m1[0] = lo1 and l_m2[0] = lo2. This is a floating parameter that will need sensitivity analysis!
 	"""
-	temp_Tension = return_initial_U_tension_driven(Time1[1],[x1_1[0],x2_1[0]],Tension_Bounds)
+	temp_Tension = return_initial_U_tension_driven(Time1[1],np.array([x1_1[0],x2_1[0]]))
 	x1_2,x2_2,x3_2,x4_2= [Base],[Amp*Freq],[temp_Tension[0]],[temp_Tension[1]]
 	U2 = return_initial_U_muscle_velocity_driven(\
 				Time2[1],[x1_2[0],x2_2[0],x3_2[0],x4_2[0]],MuscleVelocity_Bounds)
@@ -3524,7 +3525,7 @@ while AnotherIteration3 == True:
 	dt = Time3[1]-Time3[0]
 	x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3= [Base],[Amp*Freq],[400],[400],\
 												[lo1],[lo2],[0.1],[0.1]
-	# temp_Tension = return_initial_U_tension_driven(Time3[1],[x1_1[0],x2_1[0]],Tension_Bounds)
+	# temp_Tension = return_initial_U_tension_driven(Time3[1],np.array([x1_1[0],x2_1[0]]))
 	# temp_Vm = return_initial_U_muscle_velocity_driven(\
 	# 			Time3[1],[x1_2[0],x2_2[0],x3_2[0],x4_2[0]],MuscleVelocity_Bounds)
 	# x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3= [Base],[Amp*Freq],\
