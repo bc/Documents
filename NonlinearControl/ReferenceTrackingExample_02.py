@@ -2084,8 +2084,9 @@ def return_U_tension_driven(t:float,X,U,**kwargs):
 	euclid_dist = np.array(list(map(lambda u1,u2: np.sqrt(((U[0]-u1)/Tension_Bounds[0][1])**2 + ((U[1]-u2)/Tension_Bounds[1][1])**2),\
 							FeasibleInput1,FeasibleInput2)))
 
-	if t<10*dt: MaxStep_Tension = 10.0*MaxStep_Tension
-	feasible_index = np.where(euclid_dist<=MaxStep_Tension)
+	# if t<10*dt: MaxStep_Tension = 10.0*MaxStep_Tension
+	feasible_index = np.where(euclid_dist <= \
+									(MaxStep_Tension*(t>=10*dt) + 10.0*MaxStep_Tension*(t<10*dt)))
 	if len(feasible_index[0]) == 0: import ipdb; ipdb.set_trace()
 	next_index = random.choice(feasible_index[0])
 	u1 = FeasibleInput1[next_index]
