@@ -2043,6 +2043,7 @@ def return_U_tension_driven(t:float,X,U,**kwargs):
 	"""
 	import random
 	import numpy as np
+	np.random.seed(0)
 
 	assert np.shape(X) == (2,) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (2,) numpy.ndarray"
 	assert np.shape(U) == (2,) and str(type(U)) == "<class 'numpy.ndarray'>", "U must be a (2,) numpy.ndarray"
@@ -2088,7 +2089,8 @@ def return_U_tension_driven(t:float,X,U,**kwargs):
 	feasible_index = np.where(euclid_dist <= \
 									(MaxStep_Tension*(t>=10*dt) + 10.0*MaxStep_Tension*(t<10*dt)))
 	if len(feasible_index[0]) == 0: import ipdb; ipdb.set_trace()
-	next_index = random.choice(feasible_index[0])
+
+	next_index = np.random.choice(feasible_index[0])
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
 	return(np.array([u1,u2],ndmin=1))
