@@ -2038,19 +2038,24 @@ def return_U_tension_driven(t:float,X,U,**kwargs):
 	**kwargs
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-	1) Noise - must be an array of shape (2,). Default is np.zeros((1,2)).
+	1) Noise - must be an numpy.ndarray of shape (2,). Default is np.zeros((1,2)).
+
+	2) Seed - must be a scalar value. Default is None.
 
 	"""
 	import random
 	import numpy as np
-	np.random.seed(0)
 
 	assert np.shape(X) == (2,) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (2,) numpy.ndarray"
 	assert np.shape(U) == (2,) and str(type(U)) == "<class 'numpy.ndarray'>", "U must be a (2,) numpy.ndarray"
 
 	dt = Time1[1]-Time1[0]
 	Noise = kwargs.get("Noise",np.zeros((2,)))
+	assert np.shape(Noise) == (2,) and str(type(Noise)) == "<class 'numpy.ndarray'>", "Noise must be a (2,) numpy.ndarray"
+	Seed = kwargs.get("Seed",None)
+	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
 
+	np.random.seed(Seed)
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_tension_driven(t,X)
 	assert Tension_Bounds[0][0]<Tension_Bounds[0][1],"Each set of bounds must be in ascending order."
 	assert Tension_Bounds[1][0]<Tension_Bounds[1][1],"Each set of bounds must be in ascending order."
@@ -2089,7 +2094,6 @@ def return_U_tension_driven(t:float,X,U,**kwargs):
 	feasible_index = np.where(euclid_dist <= \
 									(MaxStep_Tension*(t>=10*dt) + 10.0*MaxStep_Tension*(t<10*dt)))
 	if len(feasible_index[0]) == 0: import ipdb; ipdb.set_trace()
-
 	next_index = np.random.choice(feasible_index[0])
 	u1 = FeasibleInput1[next_index]
 	u2 = FeasibleInput2[next_index]
@@ -2433,9 +2437,9 @@ def return_initial_U_muscle_activation_driven(t,X,Bounds):
 def update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray):
 	import numpy as np
 	Method = "Tension"
-	X = [x1_1[-1],x2_1[-1]]
-	U = [u1_1[-1],u2_1[-1]]
-	U = return_U_tension_driven(t,X,U,dt,MaxStep_Tension,Tension_Bounds,NoiseArray[:,int(t/dt)])
+	X = np.array([x1_1[-1],x2_1[-1]])
+	U = np.array([u1_1[-1],u2_1[-1]])
+	U = return_U_tension_driven(t,X,U,Noise = NoiseArray[:,int(t/dt)])
 	u1_1.append(U[0])
 	u2_1.append(U[1])
 	x2_1.append(x2_1[-1] + dX2_dt(X,U=U)*dt)
