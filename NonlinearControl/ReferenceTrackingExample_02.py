@@ -2647,31 +2647,50 @@ def return_concatenated_arrays(t,XorU):
 			newXorU = np.concatenate([newXorU,np.array([XorU[i]],ndmin=2)],axis=0)
 		return(newXorU)
 
-def plot_MA_values(Time,x1,InputString=None):
+def plot_MA_values(t,X,**kwargs):
+	"""
+	Take the numpy.ndarray time array (t) of size (N,) and the state space numpy.ndarray (X) of size (2,x), (4,x), or (8,x) where x is less than or equal to N, and plots the moment are values of the two muscles versus time and along the moment arm functionself.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) InputString - must be a string. Used to alter the figure Title. Default is None.
+	"""
 	import matplotlib.pyplot as plt
 	import numpy as np
 
-	fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2,figsize=(8,6))
-	plt.subplots_adjust(left = 0.15,hspace=0.1,bottom=0.1)
+	assert np.shape(X)[0] in [2,4,8] and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (2,x), (4,x), or (8,x) numpy.ndarray, where x is less than or equal to the length of t."
 
+	assert np.shape(t) == (len(t),) and str(type(t)) == "<class 'numpy.ndarray'>", "t must be a (N,) numpy.ndarray."
+
+	InputString = kwargs.get("InputString",None)
+	assert InputString is None or type(InputString)==str, "InputString must either be a string or None."
 	if InputString == None:
 		DescriptiveTitle = "Moment arm equations"
 	else:
 		assert type(InputString)==str, "InputString must be a string"
 		DescriptiveTitle = "Moment arm equations\n(" + InputString + " Driven)"
 
+	fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2,figsize=(8,6))
+	plt.subplots_adjust(left = 0.15,hspace=0.1,bottom=0.1)
 	plt.suptitle(DescriptiveTitle)
+
 	ax1.plot(np.linspace(0,np.pi*(160/180),1001),\
 				np.array(list(map(lambda x1: R1([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
 				'0.70')
-	ax1.plot(np.linspace(min(x1),max(x1),101),\
-				np.array(list(map(lambda x1: R1([x1]),np.linspace(min(x1),max(x1),101)))),\
+	ax1.plot(np.linspace(min(X[0,:]),max(X[0,:]),101),\
+				np.array(list(map(lambda x1: R1([x1]),np.linspace(min(X[0,:]),max(X[0,:]),101)))),\
 				'g',lw=3)
 	ax1.set_xticks([0,np.pi/4,np.pi/2,3*np.pi/4,np.pi])
 	ax1.set_xticklabels([""]*len(ax1.get_xticks()))
 	ax1.set_ylabel("Moment Arm for\n Muscle 1 (m)")
 
-	ax2.plot(Time[:len(x1)],np.array(list(map(lambda x1: R1([x1]),x1))),'g')
+	"""
+	Note: Need to Transpose X in order for Map to work.
+	"""
+
+	ax2.plot(t[:np.shape(X)[1]],np.array(list(map(lambda X: R1(X),X.T))),'g')
 	ax2.set_ylim(ax1.get_ylim())
 	ax2.set_yticks(ax1.get_yticks())
 	ax2.set_yticklabels([""]*len(ax1.get_yticks()))
@@ -2680,15 +2699,15 @@ def plot_MA_values(Time,x1,InputString=None):
 	ax3.plot(np.linspace(0,np.pi*(160/180),1001),\
 				np.array(list(map(lambda x1: R2([x1]),np.linspace(0,np.pi*(160/180),1001)))),\
 				'0.70')
-	ax3.plot(np.linspace(min(x1),max(x1),101),\
-				np.array(list(map(lambda x1: R2([x1]),np.linspace(min(x1),max(x1),101)))),\
+	ax3.plot(np.linspace(min(X[0,:]),max(X[0,:]),101),\
+				np.array(list(map(lambda x1: R2([x1]),np.linspace(min(X[0,:]),max(X[0,:]),101)))),\
 				'r',lw=3)
 	ax3.set_xticks([0,np.pi/4,np.pi/2,3*np.pi/4,np.pi])
 	ax3.set_xticklabels([r"$0$",r"$\frac{\pi}{4}$",r"$\frac{\pi}{2}$",r"$\frac{3\pi}{4}$",r"$\pi$"])
 	ax3.set_xlabel("Joint Angle (rads)")
 	ax3.set_ylabel("Moment Arm for\n Muscle 2 (m)")
 
-	ax4.plot(Time[:len(x1)],np.array(list(map(lambda x1: R2([x1]),x1))),'r')
+	ax4.plot(t[:np.shape(X)[1]],np.array(list(map(lambda X: R2(X),X.T))),'r')
 	ax4.set_ylim(ax3.get_ylim())
 	ax4.set_yticks(ax3.get_yticks())
 	ax4.set_yticklabels([""]*len(ax3.get_yticks()))
@@ -3539,9 +3558,29 @@ def plot_individual_coefficient1_versus_time_muscle_activation_driven(t,X,**kwar
 	else:
 		plt.show()
 
-def plot_states(t,X,Return=False,InputString=None):
+def plot_states(t,X,**kwargs):
+	"""
+	Takes in a numpy.ndarray for time (t) of shape (N,) and the numpy.ndarray for the state space (X) (NOT NECESSARILY THE SAME LENGTH AS t). Returns a plot of the states.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Return - must be a bool. Determines if the function returns a function handle. Default is False.
+
+	2) InputString - must be a string. Input to the DescriptiveTitle that can be used to personalize the title. Default is None.
+
+	"""
 	import numpy as np
 	import matplotlib.pyplot as plt
+
+	assert np.shape(X)[0] in [2,4,8] and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a numpy.ndarray of shape (2,x), (4,x), or (8,x) where x is less than or equal to the length of time t."
+
+	Return = kwargs.get("Return",False)
+	assert type(Return)==bool, "Return must be either True or False."
+
+	InputString = kwargs.get("InputString",None)
+	assert InputString==None or type(InputString)==str, "InputString must either be None or a str."
 
 	NumStates = np.shape(X)[0]
 	NumRows = int(np.ceil(NumStates/5))
@@ -3565,7 +3604,7 @@ def plot_states(t,X,Return=False,InputString=None):
 		for j in range(NumStates):
 			axes[ColumnNumber[j]].spines['right'].set_visible(False)
 			axes[ColumnNumber[j]].spines['top'].set_visible(False)
-			axes[ColumnNumber[j]].plot(t[:np.shape(X)[1]],X[j])
+			axes[ColumnNumber[j]].plot(t[:np.shape(X)[1]],X[j,:])
 			if ColumnNumber[j]!=0:
 				axes[ColumnNumber[j]].set_xticklabels(\
 									[""]*len(axes[ColumnNumber[j]].get_xticks()))
@@ -3577,13 +3616,13 @@ def plot_states(t,X,Return=False,InputString=None):
 		for j in range(NumStates):
 			axes[RowNumber[j],ColumnNumber[j]].spines['right'].set_visible(False)
 			axes[RowNumber[j],ColumnNumber[j]].spines['top'].set_visible(False)
-			axes[RowNumber[j],ColumnNumber[j]].plot(t[:np.shape(X)[1]],X[j])
+			axes[RowNumber[j],ColumnNumber[j]].plot(t[:np.shape(X)[1]],X[j,:])
 			if not(RowNumber[j] == RowNumber[-1] and ColumnNumber[j]==0):
 				axes[RowNumber[j],ColumnNumber[j]].set_xticklabels(\
 									[""]*len(axes[RowNumber[j],ColumnNumber[j]].get_xticks()))
 			else:
 				axes[RowNumber[j],ColumnNumber[j]].set_xlabel("Time (s)")
-			axes[RowNumber[j],ColumnNumber[j]].set_title(r"$x_{" + str(j+1) + "}$")
+			axes[RowNumber[j],ColumnNumber[j]].set_title(r"$x_{" + str(j+1) + "}$ "+ Units[j])
 		if NumStates%5!=0:
 			[fig.delaxes(axes[RowNumber[-1],el]) for el in range(ColumnNumber[-1]+1,5)]
 
@@ -3591,9 +3630,30 @@ def plot_states(t,X,Return=False,InputString=None):
 		return(fig)
 	else:
 		plt.show()
-def plot_inputs(t,u1,u2,Return=False,InputString=None):
+def plot_inputs(t,U,**kwargs):
+	"""
+	Takes in a numpy.ndarray for time (t) of shape (N,) and the numpy.ndarray for the input (U) (NOT NECESSARILY THE SAME LENGTH AS t). Returns a plot of the states.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Return - must be a bool. Determines if the function returns a function handle. Default is False.
+
+	2) InputString - must be a string. Input to the DescriptiveTitle that can be used to personalize the title. Default is None.
+
+	"""
 	import numpy as np
 	import matplotlib.pyplot as plt
+
+	assert np.shape(U)[0] == 2 and str(type(U)) == "<class 'numpy.ndarray'>", "U must be a numpy.ndarray of size (2,x), where x must be less than or equal to the length of time t."
+
+	Return = kwargs.get("Return",False)
+	assert type(Return)==bool, "Return must be either True or False."
+
+	InputString = kwargs.get("InputString",None)
+	assert InputString==None or type(InputString)==str, "InputString must either be None or a str."
+
 	if InputString == None:
 		DescriptiveTitle = "Plotting Inputs vs. Time"
 	else:
@@ -3603,17 +3663,17 @@ def plot_inputs(t,u1,u2,Return=False,InputString=None):
 	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
 	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
 
-	ax1.plot(t[:len(u1)],u1,'r',lw=2)
-	ax1.plot([-1,t[len(u1)-1]+1],[0,0],'k--',lw=0.5)
-	ax1.set_xlim([t[0],t[len(u1)-1]])
+	ax1.plot(t[:np.shape(U)[1]],U[0,:],'r',lw=2)
+	ax1.plot([-1,t[np.shape(U)[1]-1]+1],[0,0],'k--',lw=0.5)
+	ax1.set_xlim([t[0],t[np.shape(U)[1]-1]])
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_ylabel(r"$u_1$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(u2)],u2,'g',lw=2)
-	ax2.plot([-1,t[len(u2)-1]+1],[0,0],'k--',lw=0.5)
-	ax2.set_xlim([t[0],t[len(u1)-1]])
+	ax2.plot(t[:np.shape(U)[1]],U[1,:],'g',lw=2)
+	ax2.plot([-1,t[np.shape(U)[1]-1]+1],[0,0],'k--',lw=0.5)
+	ax2.set_xlim([t[0],t[np.shape(U)[1]-1]])
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
 	ax2.set_ylabel(r"$u_2$")
@@ -3624,54 +3684,89 @@ def plot_inputs(t,u1,u2,Return=False,InputString=None):
 		return(fig)
 	else:
 		plt.show()
-def plot_l_m_comparison(t,x1,x2,l_m1 = None, l_m2 = None,\
-						v_m1 = None, v_m2 = None, Return=False, InputString=None):
+def plot_l_m_comparison(t,X,**kwargs):
+
+	"""
+	Takes in a numpy.ndarray for time (t) of shape (N,) and the numpy.ndarray for the input (U) (NOT NECESSARILY THE SAME LENGTH AS t). Returns a plot of the states.
+
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	**kwargs
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	1) Return - must be a bool. Determines if the function returns a function handle. Default is False.
+
+	2) InputString - must be a string. Input to the DescriptiveTitle that can be used to personalize the title. Default is None.
+
+	"""
 	import numpy as np
 	import matplotlib.pyplot as plt
-	assert (l_m1 != None and l_m2 != None) or (v_m1 != None and v_m2 != None), "Error! Need to input some length/velocity measurement for the muscles."
+
+	assert np.shape(X)[0] >= 2 and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a numpy.ndarray of size (2,x), (4,x), or (8,x) where x must be less than or equal to the length of time t."
+
+	Return = kwargs.get("Return",False)
+	assert type(Return)==bool, "Return must be either True or False."
+
+	InputString = kwargs.get("InputString",None)
+	assert InputString==None or type(InputString)==str, "InputString must either be None or a str."
 	if InputString == None:
 		DescriptiveTitle = "Muscle vs. Musculotendon Lengths"
 	else:
-		assert type(InputString)==str, "InputString must be a string"
 		DescriptiveTitle = "Muscle vs. Musculotendon Lengths\n" + InputString + " Driven"
+
+	L_m = kwargs.get("MuscleLengths",None)
+	assert L_m is None or (type(L_m)==list and np.shape(L_m)==(2,np.shape(X)[1])), "L_m must be a list of two arrays with same length as X or left as None (Default)."
+
+	V_m = kwargs.get("MuscleVelocities",None)
+	assert V_m is None or (type(V_m)==list and np.shape(V_m)==(2,np.shape(X)[1])), "V_m must be a list of two arrays with same length as X or left as None (Default)."
+
+	assert L_m is not None or V_m is not None, "Error! Need to input some length/velocity measurement for the muscles."
 
 	fig,[[ax1,ax2],[ax3,ax4]] = plt.subplots(2,2,figsize = (14,7))
 	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
 
-	if (l_m1 == None or l_m2 == None):
+	if L_m is None:
 		"""
 		This is for the muscle velocity driven controller. These values of initial muscle length are estimates taken to be the optimal muscle lengths. We will need to run some sensitivity analysis to ensure that this does not drastically effect the deviations from the MTU estimate.
 		"""
-		l_m1 = integrate.cumtrapz(v_m1,t[:len(x1)],initial = 0) + np.ones(len(x1))*lo1
-		l_m2 = integrate.cumtrapz(v_m2,t[:len(x1)],initial = 0) + np.ones(len(x1))*lo2
+		l_m1 = integrate.cumtrapz(V_m[0],t[:np.shape(X)[1]],initial = 0) + np.ones(np.shape(X)[1])*lo1
+		l_m2 = integrate.cumtrapz(V_m[1],t[:np.shape(X)[1]],initial = 0) + np.ones(np.shape(X)[1])*lo2
+	else:
+		l_m1 = L_m[0]
+		l_m2 = L_m[1]
 
-	ax1.plot(t[:len(x1)],l_m1,'r',\
-				t[:len(x1)],integrate.cumtrapz(np.array(list(map(lambda x1,x2:\
-							 						v_MTU1([x1,x2]),x1,x2)))\
-														,t[:len(x1)], initial = 0)\
-														 	+ np.ones(len(x1))*l_m1[0],'b')
+	"""
+	Note: X must be transposed in order to run through map()
+	"""
+	ax1.plot(t[:np.shape(X)[1]],l_m1,'r',\
+				t[:np.shape(X)[1]],integrate.cumtrapz(np.array(list(\
+													map(lambda X: v_MTU1(X),X.T)))\
+														,t[:np.shape(X)[1]], initial = 0)\
+														 	+ np.ones(np.shape(X)[1])*l_m1[0],\
+																'b')
 	ax1.set_ylabel(r"$l_{m,1}/l_{MTU,1}$ (m)")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:len(x1)],l_m1-integrate.cumtrapz(np.array(list(\
-														map(lambda x1,x2: v_MTU1([x1,x2]),x1,x2)))\
-															,t[:len(x1)], initial = 0)\
-															 	- np.ones(len(x1))*l_m1[0],'k')
+	ax2.plot(t[:np.shape(X)[1]],l_m1-integrate.cumtrapz(np.array(list(\
+														map(lambda X: v_MTU1(X),X.T)))\
+															,t[:np.shape(X)[1]], initial = 0)\
+															 	- np.ones(np.shape(X)[1])*l_m1[0],\
+																	'k')
 	ax2.set_ylabel("Error (m)")
 	ax2.set_xlabel("Time (s)")
 
-	ax3.plot(t[:len(x1)],l_m2,'r',\
-				t[:len(x1)],integrate.cumtrapz(np.array(list(map(lambda x1,x2:\
-							 						v_MTU2([x1,x2]),x1,x2)))\
-														,t[:len(x1)], initial = 0)\
-														 	+ np.ones(len(x1))*l_m2[0],'b')
+	ax3.plot(t[:np.shape(X)[1]],l_m2,'r',\
+				t[:np.shape(X)[1]],integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X),X.T)))\
+														,t[:np.shape(X)[1]], initial = 0)\
+														 	+ np.ones(np.shape(X)[1])*l_m2[0],\
+																'b')
 	ax3.set_ylabel(r"$l_{m,2}/l_{MTU,2}$ (m)")
 	ax3.set_xlabel("Time (s)")
 
-	ax4.plot(t[:len(x1)],l_m2-integrate.cumtrapz(np.array(list(\
-														map(lambda x1,x2: v_MTU2([x1,x2]),x1,x2)))\
-															,t[:len(x1)], initial = 0)\
-															 	- np.ones(len(x1))*l_m2[0],'k')
+	ax4.plot(t[:np.shape(X)[1]],l_m2-integrate.cumtrapz(np.array(list(\
+														map(lambda X: v_MTU2(X),X.T)))\
+															,t[:np.shape(X)[1]], initial = 0)\
+															 	- np.ones(np.shape(X)[1])*l_m2[0],\
+																	'k')
 	ax4.set_ylabel("Error (m)")
 	ax4.set_xlabel("Time (s)")
 
@@ -3860,26 +3955,73 @@ if len(x1_1)>50 or len(x1_2)>50 or len(x1_3)>50:
 	elif len(x1_3)>50:
 		plt.legend(["Muscle Activation"],loc='best')
 if len(x1_1)>50:
-	fig1_1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time1,x1_1,InputString = "Tendon Tension")
-	fig2_1 = plot_states(Time1,[x1_1,x2_1],Return=True,InputString = "Tendon Tension")
-	fig3_1 = plot_inputs(Time1,u1_1,u2_1,Return=True,InputString = "Tendon Tension")
+	fig1_1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time1,\
+						np.concatenate([np.array([x1_1],ndmin=2),np.array([x2_1],ndmin=2)],axis=0),\
+							InputString = "Tendon Tension")
+	fig2_1 = plot_states(Time1,\
+						np.concatenate([np.array([x1_1],ndmin=2),np.array([x2_1],ndmin=2)],axis=0),\
+							Return=True,InputString = "Tendon Tension")
+	fig3_1 = plot_inputs(Time1,\
+						np.concatenate([np.array([u1_1],ndmin=2),np.array([u2_1],ndmin=2)],axis=0),\
+							Return=True,InputString = "Tendon Tension")
 if len(x1_2)>50:
-	fig1_2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time2,x1_2,\
-							InputString = "Normalized Muscle Velocities")
-	fig2_2 = plot_states(Time2,[x1_2,x2_2,x3_2,x4_2],\
-							Return=True,InputString = "Normalized Muscle Velocities")
-	fig3_2 = plot_inputs(Time2,np.array(u1_2)/lo1,np.array(u2_2)/lo2,\
-							Return=True,InputString = "Normalized Muscle Velocities")
-	fig4_2 = plot_l_m_comparison(Time2,x1_2,x2_2,v_m1 = u1_2,v_m2 = u2_2,\
-									Return=True, InputString = "Muscle Velocity")
+	fig1_2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time2,\
+												np.concatenate([np.array([x1_2],ndmin=2),\
+																np.array([x2_2],ndmin=2),\
+																np.array([x3_2],ndmin=2),\
+																np.array([x4_2],ndmin=2)],axis=0),\
+													InputString = "Normalized Muscle Velocities")
+	fig2_2 = plot_states(Time2,\
+							np.concatenate([np.array([x1_2],ndmin=2),\
+												np.array([x2_2],ndmin=2),\
+													np.array([x3_2],ndmin=2),\
+														np.array([x4_2],ndmin=2)],axis=0),\
+								Return=True,InputString = "Normalized Muscle Velocities")
+	fig3_2 = plot_inputs(Time2,\
+				np.concatenate([np.array([u1_2],ndmin=2)/lo1,np.array([u2_2],ndmin=2)/lo2],axis=0),\
+					Return=True,InputString = "Normalized Muscle Velocities")
+	fig4_2 = plot_l_m_comparison(Time2,\
+									np.concatenate([np.array([x1_2],ndmin=2),\
+													np.array([x2_2],ndmin=2),\
+													np.array([x3_2],ndmin=2),\
+													np.array([x4_2],ndmin=2)],axis=0),\
+										MuscleVelocities = [u1_2,u2_2],\
+											Return=True, InputString = "Muscle Velocity")
 if len(x1_3)>50:
-	fig1_3,[ax1_3,ax2_3,ax3_3,ax4_3] = plot_MA_values(Time3,x1_3,\
-							InputString = "Muscle Activations")
-	fig2_3 = plot_states(Time3,[x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3],\
+	fig1_3,[ax1_3,ax2_3,ax3_3,ax4_3] = plot_MA_values(Time3,\
+												np.concatenate([np.array([x1_3],ndmin=2),\
+																np.array([x2_3],ndmin=2),\
+																np.array([x3_3],ndmin=2),\
+																np.array([x4_3],ndmin=2),\
+																np.array([x5_3],ndmin=2),\
+																np.array([x6_3],ndmin=2),\
+																np.array([x7_3],ndmin=2),\
+																np.array([x8_3],ndmin=2)],axis=0),\
+													InputString = "Muscle Activations")
+	fig2_3 = plot_states(Time3,\
+							np.concatenate([np.array([x1_3],ndmin=2),\
+											np.array([x2_3],ndmin=2),\
+											np.array([x3_3],ndmin=2),\
+											np.array([x4_3],ndmin=2),\
+											np.array([x5_3],ndmin=2),\
+											np.array([x6_3],ndmin=2),\
+											np.array([x7_3],ndmin=2),\
+											np.array([x8_3],ndmin=2)],axis=0),\
+								Return=True,InputString = "Muscle Activations")
+	fig3_3 = plot_inputs(Time3,\
+						np.concatenate([np.array([u1_3],ndmin=2),np.array([u2_3],ndmin=2)],axis=0),\
 							Return=True,InputString = "Muscle Activations")
-	fig3_3 = plot_inputs(Time3,u1_3,u2_3,Return=True,InputString = "Muscle Activations")
-	fig4_3 = plot_l_m_comparison(Time3,x1_3,x2_3,l_m1 = x5_3,l_m2 = x6_3,\
-									Return=True,InputString = "Muscle Activation")
+	fig4_3 = plot_l_m_comparison(Time3,\
+									np.concatenate([np.array([x1_3],ndmin=2),\
+													np.array([x2_3],ndmin=2),\
+													np.array([x3_3],ndmin=2),\
+													np.array([x4_3],ndmin=2),\
+													np.array([x5_3],ndmin=2),\
+													np.array([x6_3],ndmin=2),\
+													np.array([x7_3],ndmin=2),\
+													np.array([x8_3],ndmin=2)],axis=0),\
+										MuscleLengths = [x5_3,x6_3],\
+											Return=True,InputString = "Muscle Activation")
 
 BaseFileName = "ReferenceTracking_ForcedPendulumExample"
 figs=[manager.canvas.figure
