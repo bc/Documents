@@ -2589,16 +2589,12 @@ def return_initial_U_muscle_activation_driven(t:float,X_o,**kwargs):
 	u2 = FeasibleInput2[index]
 	return(np.array([u1,u2]))
 
-def update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray):
+def update_policy_tension_driven(i,t,X,U,NoiseArray):
 	import numpy as np
 	Method = "Tension"
-	X = np.array([x1_1[-1],x2_1[-1]])
-	U = np.array([u1_1[-1],u2_1[-1]])
-	U = return_U_tension_driven(t,X,U,Noise = NoiseArray[:,int(t/dt)])
-	u1_1.append(U[0])
-	u2_1.append(U[1])
-	x2_1.append(x2_1[-1] + dX2_dt(X,U=U)*dt)
-	x1_1.append(x1_1[-1] + dX1_dt(X)*dt)
+	NextU = return_U_tension_driven(t[i],X[:,i],U[:,i],Noise = NoiseArray[:,i])
+	U[:,i+1] = NextU
+	X[:,i+1] = X[:,i] + np.array([dX1_dt(X[:,i]),dX2_dt(X[:,i],U=U[:,i])])*(t[1]-t[0])
 def update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray):
 	import numpy as np
 	Method = "Muscle Velocity"
@@ -3793,15 +3789,15 @@ def save_figures(BaseFileName,figs):
 
 AnotherIteration1 = True
 AttemptNumber1 = 0
-while AnotherIteration1 == True:
-	N1 = N_seconds*100 + 1
-	Time1 = np.linspace(0,N_seconds,N1)
-	dt = Time1[1]-Time1[0]
+N1 = N_seconds*100 + 1
+Time1 = np.linspace(0,N_seconds,N1)
+dt = Time1[1]-Time1[0]
+X1 = np.zeros((2,len(Time1)))
+X1[:,0] = [Base,Amp*Freq]
+U1 = np.zeros((2,len(Time1)))
 
-	x1_1,x2_1 = [Base],[Amp*Freq]
-	U1 = return_initial_U_tension_driven(Time1[1],np.array([x1_1[0],x2_1[0]]))
-	u1_1 = [U1[0]]
-	u2_1 = [U1[1]]
+while AnotherIteration1 == True:
+	U1[:,0] = return_initial_U_tension_driven(Time1[1],X1[:,0])
 
 	AddNoise1 = False
 	if AddNoise1 == True:
@@ -3812,9 +3808,9 @@ while AnotherIteration1 == True:
 
 	try:
 		StartTime = time.time()
-		for t in Time1[1:]:
-			update_policy_tension_driven(t,x1_1,x2_1,dt,NoiseArray1)
-			statusbar(int(t/dt)-1,len(Time1)-1,StartTime=StartTime,Title="Tension Controlled")
+		for i in range(len(Time1)-1):
+			update_policy_tension_driven(i,Time1,X1,U1,NoiseArray1)
+			statusbar(i,len(Time1)-1,StartTime=StartTime,Title="Tension Controlled")
 		AnotherIteration1 = False
 	except:
 		AttemptNumber1 += 1
