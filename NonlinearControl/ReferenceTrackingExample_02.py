@@ -1032,7 +1032,7 @@ def return_muscle_settings(PreselectedMuscles=None):
 							'PL' : PL_Settings,'ECU' : ECU_Settings, \
 							'EDM' : EDM_Settings, 'EDC' : EDC_Settings,\
 							'AN' : AN_Settings}
-	if PreselectedMuscles==None:
+	if PreselectedMuscles is None:
 		ValidResponse_1 = False
 		while ValidResponse_1 == False:
 			MuscleSelectionType = input("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMuscle Selection:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n (1) - Default\n (2) - Custom\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nResponse: ")
@@ -1181,7 +1181,7 @@ def MA_function(Parameters,θ_PS=None):
 	import numpy as np
 	Parameters = return_primary_source(Parameters)
 	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
-	if θ_PS==None:
+	if θ_PS is None:
 		θ_PS = np.pi
 	else:
 		assert type(θ_PS)==float, "θ_PS must be a float."
@@ -1232,7 +1232,7 @@ def MA_function(Parameters,θ_PS=None):
 									θ**3, (θ**3)*θ_PS, (θ**3)*(θ_PS**2), \
 									θ**4, (θ**4)*θ_PS, (θ**4)*(θ_PS**2),  \
 									θ**5, (θ**5)*θ_PS, (θ**5)*(θ_PS**2)]).T)[0, 0]
-	if threshold == None:
+	if threshold is None:
 		return(MomentArm)
 	else:
 		assert type(threshold) in [int,float], "threshold must be a number."
@@ -1255,7 +1255,7 @@ def MA_deriv(Parameters,θ_PS=None):
 	import numpy as np
 	Parameters = return_primary_source(Parameters)
 	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
-	if θ_PS==None:
+	if θ_PS is None:
 		θ_PS = np.pi
 	else:
 		assert type(θ_PS)==float, "θ_PS must be a float."
@@ -1355,7 +1355,7 @@ def MA_deriv(Parameters,θ_PS=None):
 											(4*θ**3), 			(4*θ**3)*θ_PS,\
 									 		(4*θ**3)*(θ_PS**2),	(5*θ**4),\
 									 		(5*θ**4)*θ_PS, 		(5*θ**4)*(θ_PS**2)]).T)[0, 0]
-	if threshold == None:
+	if threshold is None:
 		return(Derivative)
 	else:
 		assert type(threshold) in [int,float], "threshold must be a number."
@@ -1379,7 +1379,7 @@ def MA_2nd_deriv(Parameters,θ_PS=None):
 	import numpy as np
 	Parameters = return_primary_source(Parameters)
 	assert str(type(Parameters))=="<class '__main__.MA_Settings'>", "Parameters are not in correct namedtuple form."
-	if θ_PS==None:
+	if θ_PS is None:
 		θ_PS = np.pi
 	else:
 		assert type(θ_PS)==float, "θ_PS must be a float."
@@ -1528,7 +1528,7 @@ def MA_2nd_deriv(Parameters,θ_PS=None):
 										(12*θ**2)*(θ_PS**2),	(20*θ**3),\
 										(20*θ**3)*θ_PS, 		(20*θ**3)*(θ_PS**2)\
 										]).T)[0, 0]
-	if threshold == None:
+	if threshold is None:
 		return(SecondDerivative)
 	else:
 		assert type(threshold) in [int,float], "threshold must be a number."
@@ -1875,7 +1875,7 @@ def dX1_dt(X):
 def d2X1_dt2(X):
 	return(dX2_dt(X))
 def dX2_dt(X,U=None):
-	if U==None:
+	if U is None:
 		return(c1*np.sin(X[0]) + c2*R1(X)*X[2] + c2*R2(X)*X[3])
 	else:
 		return(c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1])
@@ -1883,12 +1883,12 @@ def d2X2_dt2(X):
 	return(c1*np.cos(X[0])*dX1_dt(X) + c2*dR1_dx1(X)*dX1_dt(X)*X[2] + c2*R1(X)*dX3_dt(X)\
 			+ c2*dR2_dx1(X)*dX1_dt(X)*X[3] + c2*R2(X)*dX4_dt(X))
 def dX3_dt(X,U=None):
-	if U == None:
+	if U is None:
 		return(KT_1(X)*(v_MTU1(X) - c3*X[6]))
 	else:
 		return(KT_1(X)*(v_MTU1(X) - c3*U[0]))
 def dX4_dt(X,U=None):
-	if U == None:
+	if U is None:
 		return(KT_2(X)*(v_MTU2(X) - c4*X[7]))
 	else:
 		return(KT_2(X)*(v_MTU2(X) - c4*U[1]))
@@ -2059,7 +2059,7 @@ def return_U_tension_driven(t:float,X,U,**kwargs):
 	assert np.shape(Noise) == (2,) and str(type(Noise)) == "<class 'numpy.ndarray'>", "Noise must be a (2,) numpy.ndarray"
 
 	Seed = kwargs.get("Seed",None)
-	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
+	assert type(Seed) in [float,int] or Seed is None, "Seed must be a float or an int or None."
 	np.random.seed(Seed)
 
 	Bounds = kwargs.get("Bounds",Tension_Bounds)
@@ -2127,7 +2127,7 @@ def return_initial_U_tension_driven(t:float,X_o,**kwargs):
 	import numpy as np
 
 	Seed = kwargs.get("Seed",None)
-	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
+	assert type(Seed) in [float,int] or Seed is None, "Seed must be a float or an int or None."
 	np.random.seed(Seed)
 
 	Bounds = kwargs.get("Bounds",Tension_Bounds)
@@ -2202,7 +2202,7 @@ def return_U_muscle_velocity_driven(t:float,X,U,**kwargs):
 	assert np.shape(Noise) == (2,) and str(type(Noise)) == "<class 'numpy.ndarray'>", "Noise must be a (2,) numpy.ndarray"
 
 	Seed = kwargs.get("Seed",None)
-	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
+	assert type(Seed) in [float,int] or Seed is None, "Seed must be a float or an int or None."
 	np.random.seed(Seed)
 
 	Bounds = kwargs.get("Bounds",MuscleVelocity_Bounds)
@@ -2338,7 +2338,7 @@ def return_initial_U_muscle_velocity_driven(t:float,X_o,**kwargs):
 	import numpy as np
 
 	Seed = kwargs.get("Seed",None)
-	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
+	assert type(Seed) in [float,int] or Seed is None, "Seed must be a float or an int or None."
 	np.random.seed(Seed)
 
 	Bounds = kwargs.get("Bounds",MuscleVelocity_Bounds)
@@ -2468,7 +2468,7 @@ def return_U_muscle_activation_driven(t:float,X,U,**kwargs):
 	assert np.shape(Noise) == (2,) and str(type(Noise)) == "<class 'numpy.ndarray'>", "Noise must be a (2,) numpy.ndarray"
 
 	Seed = kwargs.get("Seed",None)
-	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
+	assert type(Seed) in [float,int] or Seed is None, "Seed must be a float or an int or None."
 	np.random.seed(Seed)
 
 	Bounds = kwargs.get("Bounds",Activation_Bounds)
@@ -2543,7 +2543,7 @@ def return_initial_U_muscle_activation_driven(t:float,X_o,**kwargs):
 	import numpy as np
 
 	Seed = kwargs.get("Seed",None)
-	assert type(Seed) in [float,int] or Seed == None, "Seed must be a float or an int or None."
+	assert type(Seed) in [float,int] or Seed is None, "Seed must be a float or an int or None."
 	np.random.seed(Seed)
 
 	Bounds = kwargs.get("Bounds",Activation_Bounds)
@@ -2666,7 +2666,7 @@ def plot_MA_values(t,X,**kwargs):
 
 	InputString = kwargs.get("InputString",None)
 	assert InputString is None or type(InputString)==str, "InputString must either be a string or None."
-	if InputString == None:
+	if InputString is None:
 		DescriptiveTitle = "Moment arm equations"
 	else:
 		assert type(InputString)==str, "InputString must be a string"
@@ -3580,7 +3580,7 @@ def plot_states(t,X,**kwargs):
 	assert type(Return)==bool, "Return must be either True or False."
 
 	InputString = kwargs.get("InputString",None)
-	assert InputString==None or type(InputString)==str, "InputString must either be None or a str."
+	assert InputString is None or type(InputString)==str, "InputString must either be None or a str."
 
 	NumStates = np.shape(X)[0]
 	NumRows = int(np.ceil(NumStates/5))
@@ -3592,7 +3592,7 @@ def plot_states(t,X,**kwargs):
 	ColumnNumber = [el%5 for el in np.arange(0,NumStates,1)]
 	RowNumber = [int(el/5) for el in np.arange(0,NumStates,1)]
 	Units = ["(Rads)","(Rads/s)","(N)","(N)","(m)","(m)","(m/s)","(m/s)"]
-	if InputString == None:
+	if InputString is None:
 		DescriptiveTitle = "Plotting States vs. Time"
 	else:
 		assert type(InputString)==str, "InputString must be a string"
@@ -3652,9 +3652,9 @@ def plot_inputs(t,U,**kwargs):
 	assert type(Return)==bool, "Return must be either True or False."
 
 	InputString = kwargs.get("InputString",None)
-	assert InputString==None or type(InputString)==str, "InputString must either be None or a str."
+	assert InputString is None or type(InputString)==str, "InputString must either be None or a str."
 
-	if InputString == None:
+	if InputString is None:
 		DescriptiveTitle = "Plotting Inputs vs. Time"
 	else:
 		assert type(InputString)==str, "InputString must be a string"
@@ -3707,8 +3707,8 @@ def plot_l_m_comparison(t,X,**kwargs):
 	assert type(Return)==bool, "Return must be either True or False."
 
 	InputString = kwargs.get("InputString",None)
-	assert InputString==None or type(InputString)==str, "InputString must either be None or a str."
-	if InputString == None:
+	assert InputString is None or type(InputString)==str, "InputString must either be None or a str."
+	if InputString is None:
 		DescriptiveTitle = "Muscle vs. Musculotendon Lengths"
 	else:
 		DescriptiveTitle = "Muscle vs. Musculotendon Lengths\n" + InputString + " Driven"
