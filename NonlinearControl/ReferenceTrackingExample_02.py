@@ -2589,42 +2589,6 @@ def return_initial_U_muscle_activation_driven(t:float,X_o,**kwargs):
 	u2 = FeasibleInput2[index]
 	return(np.array([u1,u2]))
 
-def update_policy_tension_driven(i,t,X,U,NoiseArray):
-	import numpy as np
-	Method = "Tension"
-	NextU = return_U_tension_driven(t[i],X[:,i],U[:,i],Noise = NoiseArray[:,i])
-	U[:,i+1] = NextU
-	X[:,i+1] = X[:,i] + np.array([dX1_dt(X[:,i]),dX2_dt(X[:,i],U=U[:,i])])*(t[1]-t[0])
-def update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray):
-	import numpy as np
-	Method = "Muscle Velocity"
-	X = np.array([x1_2[-1],x2_2[-1],x3_2[-1],x4_2[-1]])
-	U = np.array([u1_2[-1],u2_2[-1]])
-	U = return_U_muscle_velocity_driven(t,X,U,Noise = NoiseArray[:,int(t/dt)])
-	u1_2.append(U[0])
-	u2_2.append(U[1])
-	x4_2.append(x4_2[-1] + dX4_dt(X,U=U)*dt)
-	x3_2.append(x3_2[-1] + dX3_dt(X,U=U)*dt)
-	x2_2.append(x2_2[-1] + dX2_dt(X)*dt)
-	x1_2.append(x1_2[-1] + dX1_dt(X)*dt)
-def update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,\
-												dt,NoiseArray):
-	import numpy as np
-	Method = "Muscle Act."
-	X = np.array([x1_3[-1],x2_3[-1],x3_3[-1],x4_3[-1],x5_3[-1],x6_3[-1],x7_3[-1],x8_3[-1]])
-	U = np.array([u1_3[-1],u2_3[-1]])
-	U = return_U_muscle_activation_driven(t,X,U,Noise = NoiseArray[:,int(t/dt)])
-	u1_3.append(U[0])
-	u2_3.append(U[1])
-	x8_3.append(x8_3[-1] + dX8_dt(X,U)*dt)
-	x7_3.append(x7_3[-1] + dX7_dt(X,U)*dt)
-	x6_3.append(x6_3[-1] + dX6_dt(X)*dt)
-	x5_3.append(x5_3[-1] + dX5_dt(X)*dt)
-	x4_3.append(x4_3[-1] + dX4_dt(X)*dt)
-	x3_3.append(x3_3[-1] + dX3_dt(X)*dt)
-	x2_3.append(x2_3[-1] + dX2_dt(X)*dt)
-	x1_3.append(x1_3[-1] + dX1_dt(X)*dt)
-
 def return_concatenated_arrays(t,XorU):
 	"""
 	Takes in a (M,N) list (M lists of length N) and returns an (M,N) array. Time (t) is included to make sure that all lists have the same length N. Make sure that t is a numpy.ndarray of shape (N,).
@@ -3710,10 +3674,10 @@ def plot_l_m_comparison(t,X,**kwargs):
 		DescriptiveTitle = "Muscle vs. Musculotendon Lengths\n" + InputString + " Driven"
 
 	L_m = kwargs.get("MuscleLengths",None)
-	assert L_m is None or (type(L_m)==list and np.shape(L_m)==(2,np.shape(X)[1])), "L_m must be a list of two arrays with same length as X or left as None (Default)."
+	assert L_m is None or (str(type(L_m))=="<class 'numpy.ndarray'>" and np.shape(L_m)==(2,np.shape(X)[1])), "L_m must either be a numpy.ndarray of size (2,N) or left as None (Default)."
 
 	V_m = kwargs.get("MuscleVelocities",None)
-	assert V_m is None or (type(V_m)==list and np.shape(V_m)==(2,np.shape(X)[1])), "V_m must be a list of two arrays with same length as X or left as None (Default)."
+	assert V_m is None or (str(type(V_m))=="<class 'numpy.ndarray'>" and np.shape(V_m)==(2,np.shape(X)[1])), "V_m must either be a numpy.ndarray of size (2,N) or left as None (Default)."
 
 	assert L_m is not None or V_m is not None, "Error! Need to input some length/velocity measurement for the muscles."
 
@@ -3724,11 +3688,11 @@ def plot_l_m_comparison(t,X,**kwargs):
 		"""
 		This is for the muscle velocity driven controller. These values of initial muscle length are estimates taken to be the optimal muscle lengths. We will need to run some sensitivity analysis to ensure that this does not drastically effect the deviations from the MTU estimate.
 		"""
-		l_m1 = integrate.cumtrapz(V_m[0],t[:np.shape(X)[1]],initial = 0) + np.ones(np.shape(X)[1])*lo1
-		l_m2 = integrate.cumtrapz(V_m[1],t[:np.shape(X)[1]],initial = 0) + np.ones(np.shape(X)[1])*lo2
+		l_m1 = integrate.cumtrapz(V_m[0,:],t[:np.shape(X)[1]],initial = 0) + np.ones(np.shape(X)[1])*lo1
+		l_m2 = integrate.cumtrapz(V_m[1,:],t[:np.shape(X)[1]],initial = 0) + np.ones(np.shape(X)[1])*lo2
 	else:
-		l_m1 = L_m[0]
-		l_m2 = L_m[1]
+		l_m1 = L_m[0,:]
+		l_m2 = L_m[1,:]
 
 	"""
 	Note: X must be transposed in order to run through map()
@@ -3789,14 +3753,14 @@ def save_figures(BaseFileName,figs):
 
 AnotherIteration1 = True
 AttemptNumber1 = 0
-N1 = N_seconds*100 + 1
-Time1 = np.linspace(0,N_seconds,N1)
-dt = Time1[1]-Time1[0]
-X1 = np.zeros((2,len(Time1)))
-X1[:,0] = [Base,Amp*Freq]
-U1 = np.zeros((2,len(Time1)))
-
 while AnotherIteration1 == True:
+	N1 = N_seconds*100 + 1
+	Time1 = np.linspace(0,N_seconds,N1)
+	dt = Time1[1]-Time1[0]
+
+	X1 = np.zeros((2,len(Time1)))
+	X1[:,0] = [Base, Amp*Freq]
+	U1 = np.zeros((2,len(Time1)))
 	U1[:,0] = return_initial_U_tension_driven(Time1[1],X1[:,0])
 
 	AddNoise1 = False
@@ -3808,9 +3772,11 @@ while AnotherIteration1 == True:
 
 	try:
 		StartTime = time.time()
-		for i in range(len(Time1)-1):
-			update_policy_tension_driven(i,Time1,X1,U1,NoiseArray1)
-			statusbar(i,len(Time1)-1,StartTime=StartTime,Title="Tension Controlled")
+		for i in range(1,len(Time1)):
+			U1[:,i] = return_U_tension_driven(Time1[i],X1[:,i-1],U1[:,i-1],Noise = NoiseArray1[:,i])
+			X1[:,i] = X1[:,i-1] + dt*np.array([dX1_dt(X1[:,i-1]),\
+												dX2_dt(X1[:,i-1],U=U1[:,i])])
+			statusbar(i-1,len(Time1)-1,StartTime=StartTime,Title="Tension Controlled")
 		AnotherIteration1 = False
 	except:
 		AttemptNumber1 += 1
@@ -3828,12 +3794,11 @@ while AnotherIteration2 == True:
 	"""
 	l_m1[0] = lo1 and l_m2[0] = lo2. This is a floating parameter that will need sensitivity analysis!
 	"""
-	temp_Tension = return_initial_U_tension_driven(Time1[1],np.array([x1_1[0],x2_1[0]]))
-	x1_2,x2_2,x3_2,x4_2= [Base],[Amp*Freq],[temp_Tension[0]],[temp_Tension[1]]
-	U2 = return_initial_U_muscle_velocity_driven(\
-				Time2[1],np.array([x1_2[0],x2_2[0],x3_2[0],x4_2[0]]))
-	u1_2 = [U2[0]]
-	u2_2 = [U2[1]]
+	X2 = np.zeros((4,len(Time2)))
+	U2 = np.zeros((2,len(Time2)))
+	temp_Tension = return_initial_U_tension_driven(Time1[1],X1[:,0])
+	X2[:,0] = [Base, Amp*Freq, temp_Tension[0], temp_Tension[1]]
+	U2[:,0] = return_initial_U_muscle_velocity_driven(Time2[1],X2[:,0])
 
 	AddNoise2 = False
 	if AddNoise2 == True:
@@ -3844,9 +3809,13 @@ while AnotherIteration2 == True:
 
 	try:
 		StartTime = time.time()
-		for t in Time2[1:]:
-			update_policy_muscle_velocity_driven(t,x1_2,x2_2,x3_2,x4_2,dt,NoiseArray2)
-			statusbar(int(t/dt)-1,len(Time2)-1,StartTime=StartTime,Title="Vm Controlled")
+		for i in range(1,len(Time2)):
+			U2[:,i] = return_U_muscle_velocity_driven(Time2[i],X2[:,i-1],U2[:,i-1],Noise = NoiseArray2[:,i])
+			X2[:,i] = X2[:,i-1] + dt*np.array([dX1_dt(X2[:,i-1]),\
+												dX2_dt(X2[:,i-1]),\
+												dX3_dt(X2[:,i-1],U=U2[:,i]),\
+												dX4_dt(X2[:,i-1],U=U2[:,i])])
+			statusbar(i-1,len(Time2)-1,StartTime=StartTime,Title="Vm Controlled")
 		AnotherIteration2 = False
 	except:
 		AttemptNumber2 += 1
@@ -3861,20 +3830,14 @@ while AnotherIteration3 == True:
 	N3 = N_seconds*10000 + 1
 	Time3 = np.linspace(0,N_seconds,N3)
 	dt = Time3[1]-Time3[0]
-	x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3= [Base],[Amp*Freq],[400],[400],\
-												[lo1],[lo2],[0.1],[0.1]
-	# temp_Tension = return_initial_U_tension_driven(Time3[1],np.array([x1_1[0],x2_1[0]]))
-	# temp_Vm = return_initial_U_muscle_velocity_driven(\
-	# 			Time3[1],np.array([x1_2[0],x2_2[0],x3_2[0],x4_2[0]]))
-	# x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3= [Base],[Amp*Freq],\
-	# 											[temp_Tension[0]],[temp_Tension[1]],\
-	# 											[0.8*lo1],[1.2*lo2],[temp_Vm[0]],[temp_Vm[1]]
-	U3 = return_initial_U_muscle_activation_driven(\
-			Time3[1],np.array([x1_3[0],x2_3[0],x3_3[0],x4_3[0],x5_3[0],x6_3[0],x7_3[0],x8_3[0]]))
-	u1_3 = [U3[0]]
-	u2_3 = [U3[1]]
-	# u1_3 = [0.01]
-	# u2_3 = [0.01]
+
+	# temp_Tension = return_initial_U_tension_driven(Time3[1],X1[:,0])
+	# temp_Vm = return_initial_U_muscle_velocity_driven(Time3[1],X2[:,0])
+	# X3[:,0] = [Base, Amp*Freq, temp_Tension[0], temp_Tension[1], 0.8*lo1, 1.2*lo2, temp_Vm[0], temp_Vm[1]]
+	X3 = np.zeros((8,len(Time3)))
+	X3[:,0] = [Base, Amp*Freq, 400, 400, lo1, lo2, 0.1, 0.1]
+	U3 = np.zeros((2,len(Time3)))
+	U3[:,0] = return_initial_U_muscle_activation_driven(Time3[1],X3[:,0])
 
 	AddNoise3 = False
 	if AddNoise3 == True:
@@ -3885,9 +3848,17 @@ while AnotherIteration3 == True:
 
 	try:
 		StartTime = time.time()
-		for t in Time3[1:]:
-			update_policy_muscle_activation_driven(t,x1_3,x2_3,x3_3,x4_3,x5_3,x6_3,x7_3,x8_3,dt,NoiseArray3)
-			statusbar(int(t/dt)-1,len(Time3)-1,StartTime=StartTime,Title="Act. Controlled")
+		for i in range(1,len(Time3)):
+			U3[:,i] = return_U_muscle_activation_driven(Time3[i],X3[:,i-1],U3[:,i-1],Noise = NoiseArray3[:,i])
+			X3[:,i] = X3[:,i-1] + dt*np.array([dX1_dt(X3[:,i-1]),\
+												dX2_dt(X3[:,i-1]),\
+												dX3_dt(X3[:,i-1]),\
+												dX4_dt(X3[:,i-1]),\
+												dX5_dt(X3[:,i-1]),\
+												dX6_dt(X3[:,i-1]),\
+												dX7_dt(X3[:,i-1],U=U3[:,i]),\
+												dX8_dt(X3[:,i-1],U=U3[:,i])])
+			statusbar(i-1,len(Time3)-1,StartTime=StartTime,Title="Act. Controlled")
 		AnotherIteration3 = False
 	except:
 		AttemptNumber3 += 1
@@ -3896,128 +3867,75 @@ while AnotherIteration3 == True:
 		if AttemptNumber3 == 10: AnotherIteration3 = False
 print('\n')
 
-if len(x1_1)>50 or len(x1_2)>50 or len(x1_3)>50:
+if np.shape(X1)[1]>50 or np.shape(X2)[1]>50 or np.shape(X3)[1]>50:
 	plt.figure(figsize = (9,7))
 	plt.title("Underdetermined Forced-Pendulum Example",\
 	                fontsize=16,color='gray')
-	if len(x1_1)>50:
-		plt.plot(Time1[:len(x1_1)],x1_1,'b',lw=2)
-	if len(x1_2)>50:
-		plt.plot(Time2[:len(x1_2)],x1_2,'g',lw=2)
-	if len(x1_3)>50:
-		plt.plot(Time3[:len(x1_3)],x1_3,'k',lw=2)
-	plt.plot(np.linspace(0,max([Time1[len(x1_1)-1],Time2[len(x1_2)-1],Time3[len(x1_3)-1]]),1001),\
-			r(np.linspace(0,max([Time1[len(x1_1)-1],Time2[len(x1_2)-1],Time3[len(x1_3)-1]]),1001)),\
+	if np.shape(X1)[1]>50:
+		plt.plot(Time1[:np.shape(X1)[1]],X1[0,:],'b',lw=2)
+	if np.shape(X2)[1]>50:
+		plt.plot(Time2[:np.shape(X2)[1]],X2[0,:],'g',lw=2)
+	if np.shape(X3)[1]>50:
+		plt.plot(Time3[:np.shape(X3)[1]],X3[0,:],'k',lw=2)
+	plt.plot(np.linspace(0,max([Time1[np.shape(X1)[1]-1],Time2[np.shape(X2)[1]-1],Time3[np.shape(X3)[1]-1]]),1001),\
+			r(np.linspace(0,max([Time1[np.shape(X1)[1]-1],Time2[np.shape(X2)[1]-1],Time3[np.shape(X3)[1]-1]]),1001)),\
 				'r--')
 	plt.xlabel("Time (s)")
 	plt.ylabel("Desired Measure")
-	if len(x1_1)>50 and len(x1_2)>50 and len(x1_3)>50:
+	if np.shape(X1)[1]>50 and np.shape(X2)[1]>50 and np.shape(X3)[1]>50:
 		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (mm Velocity)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif len(x1_1)>50 and len(x1_2)>50:
+	elif np.shape(X1)[1]>50 and np.shape(X2)[1]>50:
 		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (mm Velocity)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif len(x1_2)>50 and len(x1_3)>50:
+	elif np.shape(X2)[1]>50 and np.shape(X3)[1]>50:
 		plt.legend([r"Output $y = x_{1}$ (mm Velocity)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif len(x1_1)>50 and len(x1_3)>50:
+	elif np.shape(X1)[1]>50 and np.shape(X3)[1]>50:
 		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif len(x1_1)>50:
+	elif np.shape(X1)[1]>50:
 		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif len(x1_2)>50:
+	elif np.shape(X2)[1]>50:
 		plt.legend([r"Output $y = x_{1}$ (mm Velocity)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif len(x1_3)>50:
+	elif np.shape(X3)[1]>50:
 		plt.legend([r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-if len(x1_1)>50 or len(x1_2)>50 or len(x1_3)>50:
+if np.shape(X1)[1]>50 or np.shape(X2)[1]>50 or np.shape(X3)[1]>50:
 	plt.figure(figsize = (9,7))
 	plt.title('Error vs. Time')
-	if len(x1_1)>50:
-		plt.plot(Time1[:len(x1_1)], r(Time1[:len(x1_1)])-x1_1,color='b')
-	if len(x1_2)>50:
-		plt.plot(Time2[:len(x1_2)], r(Time2[:len(x1_2)])-x1_2,color='g')
-	if len(x1_3)>50:
-		plt.plot(Time3[:len(x1_3)], r(Time3[:len(x1_3)])-x1_3,color='k')
+	if np.shape(X1)[1]>50:
+		plt.plot(Time1[:np.shape(X1)[1]], r(Time1[:np.shape(X1)[1]])-X1[0,:],color='b')
+	if np.shape(X2)[1]>50:
+		plt.plot(Time2[:np.shape(X2)[1]], r(Time2[:np.shape(X2)[1]])-X2[0,:],color='g')
+	if np.shape(X3)[1]>50:
+		plt.plot(Time3[:np.shape(X3)[1]], r(Time3[:np.shape(X3)[1]])-X3[0,:],color='k')
 	plt.xlabel("Time (s)")
 	plt.ylabel("Error")
-	if len(x1_1)>50 and len(x1_2)>50 and len(x1_3)>50:
+	if np.shape(X1)[1]>50 and np.shape(X2)[1]>50 and np.shape(X3)[1]>50:
 		plt.legend(["Tension Driven","Muscle Velocity Driven","Muscle Activation"],loc='best')
-	elif len(x1_1)>50 and len(x1_2)>50:
+	elif np.shape(X1)[1]>50 and np.shape(X2)[1]>50:
 		plt.legend(["Tension Driven","Muscle Velocity Driven"],loc='best')
-	elif len(x1_2)>50 and len(x1_3)>50:
+	elif np.shape(X2)[1]>50 and np.shape(X3)[1]>50:
 		plt.legend(["Muscle Velocity Driven","Muscle Activation"],loc='best')
-	elif len(x1_1)>50 and len(x1_3)>50:
+	elif np.shape(X1)[1]>50 and np.shape(X3)[1]>50:
 		plt.legend(["Tension Driven","Muscle Activation"],loc='best')
-	elif len(x1_1)>50:
+	elif np.shape(X1)[1]>50:
 		plt.legend(["Tension Driven"],loc='best')
-	elif len(x1_2)>50:
+	elif np.shape(X2)[1]>50:
 		plt.legend(["Muscle Velocity Driven"],loc='best')
-	elif len(x1_3)>50:
+	elif np.shape(X3)[1]>50:
 		plt.legend(["Muscle Activation"],loc='best')
-if len(x1_1)>50:
-	fig1_1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time1,\
-						np.concatenate([np.array([x1_1],ndmin=2),np.array([x2_1],ndmin=2)],axis=0),\
-							InputString = "Tendon Tension")
-	fig2_1 = plot_states(Time1,\
-						np.concatenate([np.array([x1_1],ndmin=2),np.array([x2_1],ndmin=2)],axis=0),\
-							Return=True,InputString = "Tendon Tension")
-	fig3_1 = plot_inputs(Time1,\
-						np.concatenate([np.array([u1_1],ndmin=2),np.array([u2_1],ndmin=2)],axis=0),\
-							Return=True,InputString = "Tendon Tension")
-if len(x1_2)>50:
-	fig1_2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time2,\
-												np.concatenate([np.array([x1_2],ndmin=2),\
-																np.array([x2_2],ndmin=2),\
-																np.array([x3_2],ndmin=2),\
-																np.array([x4_2],ndmin=2)],axis=0),\
-													InputString = "Normalized Muscle Velocities")
-	fig2_2 = plot_states(Time2,\
-							np.concatenate([np.array([x1_2],ndmin=2),\
-												np.array([x2_2],ndmin=2),\
-													np.array([x3_2],ndmin=2),\
-														np.array([x4_2],ndmin=2)],axis=0),\
-								Return=True,InputString = "Normalized Muscle Velocities")
-	fig3_2 = plot_inputs(Time2,\
-				np.concatenate([np.array([u1_2],ndmin=2)/lo1,np.array([u2_2],ndmin=2)/lo2],axis=0),\
-					Return=True,InputString = "Normalized Muscle Velocities")
-	fig4_2 = plot_l_m_comparison(Time2,\
-									np.concatenate([np.array([x1_2],ndmin=2),\
-													np.array([x2_2],ndmin=2),\
-													np.array([x3_2],ndmin=2),\
-													np.array([x4_2],ndmin=2)],axis=0),\
-										MuscleVelocities = [u1_2,u2_2],\
-											Return=True, InputString = "Muscle Velocity")
-if len(x1_3)>50:
-	fig1_3,[ax1_3,ax2_3,ax3_3,ax4_3] = plot_MA_values(Time3,\
-												np.concatenate([np.array([x1_3],ndmin=2),\
-																np.array([x2_3],ndmin=2),\
-																np.array([x3_3],ndmin=2),\
-																np.array([x4_3],ndmin=2),\
-																np.array([x5_3],ndmin=2),\
-																np.array([x6_3],ndmin=2),\
-																np.array([x7_3],ndmin=2),\
-																np.array([x8_3],ndmin=2)],axis=0),\
-													InputString = "Muscle Activations")
-	fig2_3 = plot_states(Time3,\
-							np.concatenate([np.array([x1_3],ndmin=2),\
-											np.array([x2_3],ndmin=2),\
-											np.array([x3_3],ndmin=2),\
-											np.array([x4_3],ndmin=2),\
-											np.array([x5_3],ndmin=2),\
-											np.array([x6_3],ndmin=2),\
-											np.array([x7_3],ndmin=2),\
-											np.array([x8_3],ndmin=2)],axis=0),\
-								Return=True,InputString = "Muscle Activations")
-	fig3_3 = plot_inputs(Time3,\
-						np.concatenate([np.array([u1_3],ndmin=2),np.array([u2_3],ndmin=2)],axis=0),\
-							Return=True,InputString = "Muscle Activations")
-	fig4_3 = plot_l_m_comparison(Time3,\
-									np.concatenate([np.array([x1_3],ndmin=2),\
-													np.array([x2_3],ndmin=2),\
-													np.array([x3_3],ndmin=2),\
-													np.array([x4_3],ndmin=2),\
-													np.array([x5_3],ndmin=2),\
-													np.array([x6_3],ndmin=2),\
-													np.array([x7_3],ndmin=2),\
-													np.array([x8_3],ndmin=2)],axis=0),\
-										MuscleLengths = [x5_3,x6_3],\
-											Return=True,InputString = "Muscle Activation")
+if np.shape(X1)[1]>50:
+	fig1_1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time1,X1,InputString = "Tendon Tension")
+	fig2_1 = plot_states(Time1,X1,Return=True,InputString = "Tendon Tension")
+	fig3_1 = plot_inputs(Time1,U1,Return=True,InputString = "Tendon Tension")
+if np.shape(X2)[1]>50:
+	fig1_2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time2,X2,InputString = "Normalized Muscle Velocities")
+	fig2_2 = plot_states(Time2,X2,Return=True,InputString = "Normalized Muscle Velocities")
+	fig3_2 = plot_inputs(Time2,U2*np.concatenate([np.ones((1,len(Time2)))/lo1,np.ones((1,len(Time2)))/lo2],axis=0),\
+							Return=True,InputString = "Normalized Muscle Velocities")
+	fig4_2 = plot_l_m_comparison(Time2,X2,MuscleVelocities = U2, Return=True, InputString = "Muscle Velocity")
+if np.shape(X3)[1]>50:
+	fig1_3,[ax1_3,ax2_3,ax3_3,ax4_3] = plot_MA_values(Time3,X3,InputString = "Muscle Activations")
+	fig2_3 = plot_states(Time3,X3,Return=True,InputString = "Muscle Activations")
+	fig3_3 = plot_inputs(Time3,U3,Return=True,InputString = "Muscle Activations")
+	fig4_3 = plot_l_m_comparison(Time3,X3,MuscleLengths = X3[4:6,:],Return=True,InputString = "Muscle Activation")
 
 BaseFileName = "ReferenceTracking_ForcedPendulumExample"
 figs=[manager.canvas.figure
