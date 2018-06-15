@@ -2589,24 +2589,6 @@ def return_initial_U_muscle_activation_driven(t:float,X_o,**kwargs):
 	u2 = FeasibleInput2[index]
 	return(np.array([u1,u2]))
 
-def return_concatenated_arrays(t,XorU):
-	"""
-	Takes in a (M,N) list (M lists of length N) and returns an (M,N) array. Time (t) is included to make sure that all lists have the same length N. Make sure that t is a numpy.ndarray of shape (N,).
-	"""
-	import numpy as np
-	assert str(type(t)) == "<class 'numpy.ndarray'>" and np.shape(t) == (len(t),), \
-			"t must be a (N,) numpy array."
-	if np.shape(XorU)[0] == 1:
-		return(np.array(XorU,ndmin=2))
-	else:
-		assert np.array([len(el) == len(t) for el in XorU]).all(), \
-			"State arrays must be the same length"
-		assert np.shape(XorU) == (len(XorU),len(t)), "XorU must be of the shape (M,N), where N is the length of t and M is the number of states."
-		newXorU = np.array([XorU[0]],ndmin=2)
-		for i in range(1,len(XorU)):
-			newXorU = np.concatenate([newXorU,np.array([XorU[i]],ndmin=2)],axis=0)
-		return(newXorU)
-
 def plot_MA_values(t,X,**kwargs):
 	"""
 	Take the numpy.ndarray time array (t) of size (N,) and the state space numpy.ndarray (X) of size (2,x), (4,x), or (8,x) where x is less than or equal to N, and plots the moment are values of the two muscles versus time and along the moment arm functionself.
