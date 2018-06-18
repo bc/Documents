@@ -1662,7 +1662,7 @@ Amp = 7.5*np.pi/180
 Base = 90*np.pi/180
 Freq = 2*np.pi
 
-k1,k2,k3,k4 = 100,100,100,10
+k1,k2 = 100,100
 
 if g == 0:
 	MaxStep_Tension = 0.03 # percentage of positive maximum.

@@ -1648,38 +1648,13 @@ M = 1.6 # kg
 α1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Pennation Angle"])) # rads
 α2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Pennation Angle"])) # rads
 
-m1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Mass"])) # kg
-m2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Mass"])) # kg
-
 """
 There was some debate regarding damping terms. No explicit value was given. Loeb simplifies the equation by utilizing the F_{PE_{2,i}} damping term (η) instead, as this is added to B_{m,i}*(v_{m,i}/l_{o,i}) anyways. This η is very small (0.01), so the damping is not significant. Might need to do sensitivity analysis on these two values (currently set to zero) (06/16/2018).
 """
 
-bm1 = 0.01 # kg/s
-bm2 = 0.01 # kg/s
-
 cT = 27.8
 kT = 0.0047
-LrT = 0.964
-
-β = 1.55
-ω = 0.75
-ρ = 2.12
-
-V_max = -9.15
-cv0 = -5.78
-cv1 = 9.18
-av0 = -1.53
-av1 = 0
-av2 = 0
-bv = 0.69
-
-c_1 = 23.0
-k_1 = 0.046
-L_CE_max_1 = 1.2 # These values must be adjusted (SENSITIVITY ANALYSIS NEEDED!)
-L_CE_max_2 = 1.2 # These values must be adjusted (SENSITIVITY ANALYSIS NEEDED!)
-Lr1 = 1.17
-η = 0.01
+# LrT = 0.964 # Not used in this formulation because of the created ODE.
 
 lo1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Optimal Muscle Length"]))
 lo2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Optimal Muscle Length"]))
@@ -1687,7 +1662,7 @@ lo2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Optimal Mu
 lTo1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Optimal Tendon Length"]))
 lTo2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Optimal Tendon Length"]))
 
-R_Transpose, dR_Transpose, d2R_Transpose = \
+R_Transpose, dR_Transpose, _ = \
 			return_MA_matrix_functions(AllMuscleSettings,ReturnMatrixFunction=False,θ_PS=np.pi/2)
 """
 R_Transpose, dR_Transpose, and d2R_Transpose are of the form (n,m), where n is the number of muscles and m in the number of joints. In order to unpack the two muscles used in this model, we first must get the elbow MA functions R_Transpose[:,1], then change to a 1xn matrix (by the transpose), and then change to an array to reduce the ndmin from 2 to 1.
@@ -1695,7 +1670,6 @@ R_Transpose, dR_Transpose, and d2R_Transpose are of the form (n,m), where n is t
 
 r1,r2 = np.array(R_Transpose[:,1].T)[0]
 dr1_dθ, dr2_dθ = np.array(dR_Transpose[:,1].T)[0]
-d2r1_dθ2, d2r2_dθ2 = np.array(d2R_Transpose[:,1].T)[0]
 
 PCSA1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["PCSA"]))
 PCSA2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["PCSA"]))
@@ -1707,7 +1681,7 @@ Amp = 7.5*np.pi/180
 Base = 90*np.pi/180
 Freq = 2*np.pi
 
-k1,k2,k3,k4 = 100,100,100,10
+k1,k2,k3 = 100,100,100
 
 if g == 0:
 	MaxStep_Tension = 0.03 # percentage of positive maximum.
@@ -1722,22 +1696,11 @@ else:
 	MaxStep_MuscleVelocity = 1 # percentage of positive maximum.
 	MuscleVelocity_Bounds =[[-5*lo1,5*lo1],[-1*lo2,1*lo2]]
 
-MaxStep_Activation = 0.2 # percentage of positive maximum (1)
-Activation_Bounds = [[0,1],[0,1]]
-
 """
 c_{1} &= -\frac{3g}{2L} \\
 c_{2} &= \frac{3}{ML^2} \\
 c_{3} &= \cos(\rho_1) \\
 c_{4} &= \cos(\rho_2)
-c_{5} &= \frac{\cos(\alpha_{1})}{m_1} \\
-c_{6} &= \frac{\cos^2(\alpha_{1})}{m_1} \\
-c_{7} &= \frac{b_{m,1}\cos^2(\alpha_{1})}{m_1} \\
-c_{8} &= \tan^2(\alpha_{1}) \\
-c_{9} &= \frac{\cos(\alpha_{2})}{m_2} \\
-c_{10} &= \frac{\cos^2(\alpha_{2})}{m_2} \\
-c_{11} &= \frac{b_{m,2}\cos^2(\alpha_{2})}{m_2} \\
-c_{12} &= \tan^2(\alpha_{2}) \\
 
 """
 
@@ -1745,14 +1708,6 @@ c1 = -(3*g)/(2*L)
 c2 = 3/(M*L**2)
 c3 = np.cos(α1)
 c4 = np.cos(α2)
-c5 = np.cos(α1)/m1
-c6 = F_MAX1*np.cos(α1)**2/m1
-c7 = F_MAX1*bm1*np.cos(α1)**2/(m1*lo1)
-c8 = np.tan(α1)**2
-c9 = np.cos(α2)/m2
-c10 = F_MAX2*np.cos(α2)**2/m2
-c11 = F_MAX2*bm2*np.cos(α2)**2/(m2*lo2)
-c12 = np.tan(α2)**2
 
 '''
 R_{1} &= r_{1}\left(\theta,\theta_{PS}=\frac{\pi}{2}\right) \\
@@ -1761,63 +1716,27 @@ K_{T,1} &= \frac{F_{max,1}c^{T}}{l_{T,o,1}}\left(1 - \exp{\left(\frac{-T_1}{F_{m
 v_{MTU,1} &= \text{sgn}\left(-r_1(\theta)\right)\cdot\dot{\theta}\cdot\sqrt{\left(\frac{\partial r_1}{\partial\theta}\right)^2 + r_1^2(\theta)} \\
 K_{T,2} &= \frac{F_{max,2}c^{T}}{l_{T,o,2}}\left(1 - \exp{\left(\frac{-T_2}{F_{max,2}c^{T}k^{T}}\right)}\right) \hspace{1em} \text{(Variable stiffness coefficient from Zajac (1989) ODE for tendon force)} \\
 v_{MTU,2} &= \text{sgn}\left(-r_2(\theta)\right)\cdot\dot{\theta}\cdot\sqrt{\left(\frac{\partial r_2}{\partial\theta}\right)^2 + r_2^2(\theta)} \\
-F_{LV,1} &= f_{L,1}(l_{m,1}) \cdot f_{V,1}(l_{m,1},v_{m,1}) \\
-F_{LV,2} &= f_{L,2}(l_{m,2}) \cdot f_{V,2}(l_{m,2},v_{m,2}) \\
-'''
 
-FL = lambda l,lo: np.exp(-abs(((l/lo)**β-1)/ω)**ρ)
-FV = lambda l,v,lo: np.piecewise(v,[v<=0, v>0],\
-	[lambda v: (V_max - v/lo)/(V_max + (cv0 + cv1*(l/lo))*(v/lo)),\
-	lambda v: (bv-(av0 + av1*(l/lo) + av2*(l/lo)**2)*(v/lo))/(bv + (v/lo))])
+'''
 
 def R1(X):
 	return(r1(X[0])) #
 def dR1_dx1(X):
 	return(dr1_dθ(X[0]))
-def d2R1_dx12(X):
-	return(d2r1_dθ2(X[0]))
 def R2(X):
 	return(r2(X[0])) #
 def dR2_dx1(X):
 	return(dr2_dθ(X[0]))
-def d2R2_dx12(X):
-	return(d2r2_dθ2(X[0]))
 def KT_1(X):
 	return((F_MAX1*cT/lTo1)*(1-np.exp(-X[2]/(F_MAX1*cT*kT)))) # NOT NORMALIZED (in N/m)
-def dKT_1_dx3(X):
-	return((1/(kT*lTo1))*np.exp(-X[2]/(F_MAX1*cT*kT))) # NOT NORMALIZED (in N/m)
 def v_MTU1(X):
 	return(np.sign(-R1(X))*X[1]*np.sqrt(dR1_dx1(X)**2 + R1(X)**2)) # NOT NORMALIZED (in m/s)
-def a_MTU1(X):
-	return(np.sign(-R1(X))*(dX2_dt(X)*np.sqrt(dR1_dx1(X)**2 + R1(X)**2) \
-				+ (X[1]**2)*dR1_dx1(X)*(d2R1_dx12(X) + R1(X))/np.sqrt(dR1_dx1(X)**2 + R1(X)**2)))
 def KT_2(X):
 	return((F_MAX2*cT/lTo2)*(1-np.exp(-X[3]/(F_MAX2*cT*kT)))) # NOT NORMALIZED (in N/m)
-def dKT_2_dx4(X):
-	return((1/(kT*lTo2))*np.exp(-X[3]/(F_MAX2*cT*kT))) # NOT NORMALIZED (in N/m)
 def v_MTU2(X):
 	return(np.sign(-R2(X))*X[1]*np.sqrt(dR2_dx1(X)**2 + R2(X)**2)) # NOT NORMALIZED (in m/s)
-def a_MTU2(X):
-	return(np.sign(-R2(X))*(dX2_dt(X)*np.sqrt(dR2_dx1(X)**2 + R2(X)**2) \
-				+ (X[1]**2)*dR2_dx1(X)*(d2R2_dx12(X) + R2(X))/np.sqrt(dR2_dx1(X)**2 + R2(X)**2)))
-def FLV_1(X):
-	return(FL(X[4],lo1)*FV(X[4],X[6],lo1))
-def FLV_2(X):
-	return(FL(X[5],lo2)*FV(X[5],X[7],lo2))
-def F_PE1_1(X):
-	return(c_1*k_1*np.log(np.exp((X[4]/(lo1*L_CE_max_1) - Lr1)/k_1) + 1) + η*(X[6]/lo1))
-def F_PE1_2(X):
-	return(c_1*k_1*np.log(np.exp((X[5]/(lo2*L_CE_max_2) - Lr1)/k_1) + 1) + η*(X[7]/lo2))
 
 """
-################################
-######## Tension Driven ########
-################################
-
-\dot{x}_1 &= x_{2} \\
-\dot{x}_2 &= c_{1}\sin(x_{1}) + c_{2}R_{1}u_{1} - c_{2}R_{2}u_{2} \\
-u_1 &= T_{1} \\
-u_2 &= T_{2} \\
 
 ################################
 #### Muscle Velocity Driven ####
@@ -1829,21 +1748,6 @@ u_2 &= T_{2} \\
 \dot{x}_4 &= K_{T,2}(v_{MTU,2} - c_{4}u_2) \\
 u_1 &= \dot{l}_{m,1} \\
 u_2 &= \dot{l}_{m,2} \\
-
-################################
-### Muscle Activation Driven ###
-################################
-
-\dot{x}_1 &= x_{2} \\
-\dot{x}_2 &= c_{1}\sin(x_{1}) + c_{2}R_{1}x_{3} - c_{2}R_{2}x_{4} \\
-\dot{x}_3 &= K_{T,1}(v_{MTU,1} - c_{3}u_1) \\
-\dot{x}_4 &= K_{T,2}(v_{MTU,2} - c_{4}u_2) \\
-\dot{x}_5 &= x_7 \\
-\dot{x}_6 &= x_8 \\
-\dot{x}_7 &= c_5x_3 - c_6F_{PE,1}(x_5,x_7) - c_7x_7 + \frac{c_{8}x_7^2}{x_5} - c_6F_{LV,1}(x_5,x_7)u_1 \\
-\dot{x}_8 &= c_9x_4 - c_{10}F_{PE,2}(x_6,x_8) - c_{11}x_8 + \frac{c_{12}x_8^2}{x_6} - c_{10}F_{LV,2}(x_6,x_8)u_2 \\
-u_1 &= \alpha_{1} \\
-u_2 &= \alpha_{2} \\
 
 """
 
