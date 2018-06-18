@@ -1,11 +1,7 @@
 import numpy as np
-from scipy.integrate import odeint
 import matplotlib.pyplot as plt
-import sympy as sy
-from sympy.utilities import lambdify
 import time
 from collections import namedtuple
-from scipy import integrate
 import matplotlib._pylab_helpers
 
 def return_primary_source(Settings):
@@ -20,7 +16,7 @@ def return_muscle_settings(PreselectedMuscles=None):
 	Notes:
 	Coefficients from observation, Ramsay; 2009, FVC, Holtzbaur, Pigeon, Kuechle, or Banks. Optimal Muscle Length given in mm. Optimal tendon/muscle lengths and PCSA were taken from Garner and Pandy (2003)
 	"""
-	from sympy.utilities import lambdify
+
 	import numpy as np
 	from numpy import pi
 
@@ -1538,8 +1534,6 @@ def MA_2nd_deriv(Parameters,θ_PS=None):
 		return(PiecewiseSecondDerivative)
 def return_MA_matrix_functions(AllMuscleSettings,ReturnMatrixFunction=False,θ_PS=None):
 	import numpy as np
-	import sympy as sp
-	from sympy.utilities import lambdify
 
 	MuscleList = AllMuscleSettings.keys()
 	if ReturnMatrixFunction == False:
