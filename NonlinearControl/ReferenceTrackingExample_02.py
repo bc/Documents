@@ -3835,8 +3835,9 @@ while AnotherIteration3 == True:
 
 	X3 = np.zeros((8,len(Time3)))
 	# X3[:,0] = [Base, Amp*Freq, 400, 400, lo1, lo2, 0.1, 0.1]
-	temp_Tension = return_initial_U_tension_driven(Time3[0],X1[:,0])
-	temp_Vm = return_initial_U_muscle_velocity_driven(Time3[0],X2[:,0])
+	temp_Tension = return_initial_U_tension_driven(0,np.array([Base,Amp*Freq]))
+	temp_Vm = return_initial_U_muscle_velocity_driven(0,np.array([Base,Amp*Freq,\
+																temp_Tension[0],temp_Tension[1]]))
 	X3[:,0] = [Base, Amp*Freq, temp_Tension[0], temp_Tension[1], 0.8*lo1, 1.2*lo2, temp_Vm[0], temp_Vm[1]]
 	U3 = np.zeros((2,len(Time3)))
 	U3[:,0] = return_initial_U_muscle_activation_driven(Time3[0],X3[:,0])
