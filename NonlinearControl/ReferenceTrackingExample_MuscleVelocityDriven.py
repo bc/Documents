@@ -1729,12 +1729,12 @@ def dR2_dx1(X):
 	return(dr2_dθ(X[0]))
 def KT_1(X):
 	return((F_MAX1*cT/lTo1)*(1-np.exp(-X[2]/(F_MAX1*cT*kT)))) # NOT NORMALIZED (in N/m)
-def v_MTU1(X):
-	return(np.sign(-R1(X))*X[1]*np.sqrt(dR1_dx1(X)**2 + R1(X)**2)) # NOT NORMALIZED (in m/s)
+def v_MTU1(X,r1,dr1_dx1):
+	return(np.sign(-r1)*X[1]*np.sqrt(dr1_dx1**2 + r1**2)) # NOT NORMALIZED (in m/s)
 def KT_2(X):
 	return((F_MAX2*cT/lTo2)*(1-np.exp(-X[3]/(F_MAX2*cT*kT)))) # NOT NORMALIZED (in N/m)
-def v_MTU2(X):
-	return(np.sign(-R2(X))*X[1]*np.sqrt(dR2_dx1(X)**2 + R2(X)**2)) # NOT NORMALIZED (in m/s)
+def v_MTU2(X,r2,dr2_dx1):
+	return(np.sign(-r2)*X[1]*np.sqrt(dr2_dx1**2 + r2**2)) # NOT NORMALIZED (in m/s)
 
 """
 
@@ -1765,14 +1765,14 @@ def d2X2_dt2(X):
 			+ c2*dR2_dx1(X)*dX1_dt(X)*X[3] + c2*R2(X)*dX4_dt(X))
 def dX3_dt(X,U=None):
 	if U is None:
-		return(KT_1(X)*(v_MTU1(X) - c3*X[6]))
+		return(KT_1(X)*(v_MTU1(X,R1(X),dR1_dx1(X)) - c3*X[6]))
 	else:
-		return(KT_1(X)*(v_MTU1(X) - c3*U[0]))
+		return(KT_1(X)*(v_MTU1(X,R1(X),dR1_dx1(X)) - c3*U[0]))
 def dX4_dt(X,U=None):
 	if U is None:
-		return(KT_2(X)*(v_MTU2(X) - c4*X[7]))
+		return(KT_2(X)*(v_MTU2(X,R2(X),dR2_dx1(X)) - c4*X[7]))
 	else:
-		return(KT_2(X)*(v_MTU2(X) - c4*U[1]))
+		return(KT_2(X)*(v_MTU2(X,R2(X),dR2_dx1(X)) - c4*U[1]))
 
 ### Reference Trajectory ###
 
@@ -1808,10 +1808,12 @@ def dA2(t,X):
 	return(dZ1(t,X) + d2A1(t,X) - c1*np.cos(X[0])*dX1_dt(X) - k2*dZ2(t,X))
 def Z3(t,X):
 	return(c2*R1(X)*X[2] + c2*R2(X)*X[3] - A2(t,X))
-def A3(t,X):
+def A3(t,X,r1,r2,kt_1,kt_2):
+	dr1_dx1 = dR1_dx1(X)
+	dr2_dx1 = dR2_dx1(X)
 	return(Z2(t,X) - dA2(t,X) + k3*Z3(t,X) \
-		+ c2*dR1_dx1(X)*dX1_dt(X)*X[2] + 	c2*dR2_dx1(X)*dX1_dt(X)*X[3] \
-			+ c2*R1(X)*KT_1(X)*v_MTU1(X) + c2*R2(X)*KT_2(X)*v_MTU2(X))
+		+ c2*dr1_dx1*dX1_dt(X)*X[2] + 	c2*dr2_dx1*dX1_dt(X)*X[3] \
+			+ c2*r1*kt_1*v_MTU1(X,r1,dr1_dx1) + c2*r2*kt_2*v_MTU2(X,r2,dr2_dx1))
 
 def return_constraint_variables_tension_driven(t,X):
 	Coefficient1 = c2*R1(X)
@@ -1819,9 +1821,13 @@ def return_constraint_variables_tension_driven(t,X):
 	Constraint = A2(t,X)
 	return(Coefficient1,Coefficient2,Constraint)
 def return_constraint_variables_muscle_velocity_driven(t,X):
-	Coefficient1 = c2*c3*R1(X)*KT_1(X)
-	Coefficient2 = c2*c4*R2(X)*KT_2(X)
-	Constraint = A3(t,X)
+	r1 = R1(X)
+	r2 = R2(X)
+	kt_1 = KT_1(X)
+	kt_2 = KT_2(X)
+	Coefficient1 = c2*c3*r1*kt_1
+	Coefficient2 = c2*c4*r2*kt_2
+	Constraint = A3(t,X,r1,r2,kt_1,kt_2)
 	return(Coefficient1,Coefficient2,Constraint)
 
 def return_U_muscle_velocity_driven(t:float,X,U,**kwargs):
@@ -1868,9 +1874,7 @@ def return_U_muscle_velocity_driven(t:float,X,U,**kwargs):
 	assert type(MaxStep) in [int,float], "MaxStep for Muscle Velocity Controller should be an int or float."
 
 	Coefficient1,Coefficient2,Constraint1 = return_constraint_variables_muscle_velocity_driven(t,X)
-	assert np.shape(Bounds)==(2,2), "Bounds must be (2,2)."
-	assert Bounds[0][0]<Bounds[0][1],"Each set of bounds must be in ascending order."
-	assert Bounds[1][0]<Bounds[1][1],"Each set of bounds must be in ascending order."
+
 	if Constraint1 != 0:
 		assert Coefficient1!=0 or Coefficient2!=0, "Error with Coefficients. Shouldn't be zero with nonzero constraint."
 	else:
@@ -2909,22 +2913,22 @@ def plot_l_m_comparison(t,X,**kwargs):
 	"""
 	Note: X must be transposed in order to run through map()
 	"""
-	ax1.plot(t,l_m1,'r',t,integrate.cumtrapz(np.array(list(map(lambda X: v_MTU1(X),X.T))),\
+	ax1.plot(t,l_m1,'r',t,integrate.cumtrapz(np.array(list(map(lambda X: v_MTU1(X,R1(X),dR1_dx1(X)),X.T))),\
 						t,initial=0) + np.ones(len(t))*l_m1[0], 'b')
 	ax1.set_ylabel(r"$l_{m,1}/l_{MTU,1}$ (m)")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t,l_m1-integrate.cumtrapz(np.array(list(map(lambda X: v_MTU1(X),X.T))),\
+	ax2.plot(t,l_m1-integrate.cumtrapz(np.array(list(map(lambda X: v_MTU1(X,R1(X),dR1_dx1(X)),X.T))),\
 						t,initial=0) - np.ones(len(t))*l_m1[0], 'k')
 	ax2.set_ylabel("Error (m)")
 	ax2.set_xlabel("Time (s)")
 
-	ax3.plot(t,l_m2,'r',t,integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X),X.T))),\
+	ax3.plot(t,l_m2,'r',t,integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X,R2(X),dR2_dx1(X)),X.T))),\
 						t,initial=0) + np.ones(len(t))*l_m2[0], 'b')
 	ax3.set_ylabel(r"$l_{m,2}/l_{MTU,2}$ (m)")
 	ax3.set_xlabel("Time (s)")
 
-	ax4.plot(t,l_m2-integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X),X.T))),\
+	ax4.plot(t,l_m2-integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X,R2(X),dR2_dx1(X)),X.T))),\
 						t,initial=0) - np.ones(len(t))*l_m2[0], 'k')
 	ax4.set_ylabel("Error (m)")
 	ax4.set_xlabel("Time (s)")
