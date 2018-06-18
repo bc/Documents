@@ -1643,41 +1643,9 @@ AllMuscleSettings = return_muscle_settings(PreselectedMuscles=[5,6])
 g,L = 0, 0.45 #m/s², m REMOVING GRAVITY
 M = 1.6 # kg
 
-α1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Pennation Angle"])) # rads
-α2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Pennation Angle"])) # rads
-
-m1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Mass"])) # kg
-m2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Mass"])) # kg
-
 """
 There was some debate regarding damping terms. No explicit value was given. Loeb simplifies the equation by utilizing the F_{PE_{2,i}} damping term (η) instead, as this is added to B_{m,i}*(v_{m,i}/l_{o,i}) anyways. This η is very small (0.01), so the damping is not significant. Might need to do sensitivity analysis on these two values (currently set to zero) (06/16/2018).
 """
-
-bm1 = 0.01 # kg/s
-bm2 = 0.01 # kg/s
-
-cT = 27.8
-kT = 0.0047
-LrT = 0.964
-
-β = 1.55
-ω = 0.75
-ρ = 2.12
-
-V_max = -9.15
-cv0 = -5.78
-cv1 = 9.18
-av0 = -1.53
-av1 = 0
-av2 = 0
-bv = 0.69
-
-c_1 = 23.0
-k_1 = 0.046
-L_CE_max_1 = 1.2 # These values must be adjusted (SENSITIVITY ANALYSIS NEEDED!)
-L_CE_max_2 = 1.2 # These values must be adjusted (SENSITIVITY ANALYSIS NEEDED!)
-Lr1 = 1.17
-η = 0.01
 
 lo1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Optimal Muscle Length"]))
 lo2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Optimal Muscle Length"]))
@@ -1685,18 +1653,13 @@ lo2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Optimal Mu
 lTo1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Optimal Tendon Length"]))
 lTo2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Optimal Tendon Length"]))
 
-R_Transpose, dR_Transpose, d2R_Transpose = \
+R_Transpose, _, _ = \
 			return_MA_matrix_functions(AllMuscleSettings,ReturnMatrixFunction=False,θ_PS=np.pi/2)
 """
 R_Transpose, dR_Transpose, and d2R_Transpose are of the form (n,m), where n is the number of muscles and m in the number of joints. In order to unpack the two muscles used in this model, we first must get the elbow MA functions R_Transpose[:,1], then change to a 1xn matrix (by the transpose), and then change to an array to reduce the ndmin from 2 to 1.
 """
 
 r1,r2 = np.array(R_Transpose[:,1].T)[0]
-dr1_dθ, dr2_dθ = np.array(dR_Transpose[:,1].T)[0]
-d2r1_dθ2, d2r2_dθ2 = np.array(d2R_Transpose[:,1].T)[0]
-
-PCSA1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["PCSA"]))
-PCSA2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["PCSA"]))
 
 F_MAX1 = unit_conversion(return_primary_source(AllMuscleSettings["BIC"]["Maximum Isometric Force"]))
 F_MAX2 = unit_conversion(return_primary_source(AllMuscleSettings["TRI"]["Maximum Isometric Force"]))
@@ -1710,153 +1673,42 @@ k1,k2,k3,k4 = 100,100,100,10
 if g == 0:
 	MaxStep_Tension = 0.03 # percentage of positive maximum.
 	Tension_Bounds = [[0,F_MAX1],[0,F_MAX2]]
-
-	MaxStep_MuscleVelocity = 0.05 # percentage of positive maximum.
-	MuscleVelocity_Bounds =[[-5*lo1,5*lo1],[-5*lo2,5*lo2]]
 else:
 	MaxStep_Tension = 0.01 # percentage of positive maximum.
 	Tension_Bounds = [[0,F_MAX1],[0,0.10*F_MAX2]]
 
-	MaxStep_MuscleVelocity = 1 # percentage of positive maximum.
-	MuscleVelocity_Bounds =[[-5*lo1,5*lo1],[-1*lo2,1*lo2]]
-
-MaxStep_Activation = 0.2 # percentage of positive maximum (1)
-Activation_Bounds = [[0,1],[0,1]]
-
 """
 c_{1} &= -\frac{3g}{2L} \\
 c_{2} &= \frac{3}{ML^2} \\
-c_{3} &= \cos(\rho_1) \\
-c_{4} &= \cos(\rho_2)
-c_{5} &= \frac{\cos(\alpha_{1})}{m_1} \\
-c_{6} &= \frac{\cos^2(\alpha_{1})}{m_1} \\
-c_{7} &= \frac{b_{m,1}\cos^2(\alpha_{1})}{m_1} \\
-c_{8} &= \tan^2(\alpha_{1}) \\
-c_{9} &= \frac{\cos(\alpha_{2})}{m_2} \\
-c_{10} &= \frac{\cos^2(\alpha_{2})}{m_2} \\
-c_{11} &= \frac{b_{m,2}\cos^2(\alpha_{2})}{m_2} \\
-c_{12} &= \tan^2(\alpha_{2}) \\
 
 """
 
 c1 = -(3*g)/(2*L)
 c2 = 3/(M*L**2)
-c3 = np.cos(α1)
-c4 = np.cos(α2)
-c5 = np.cos(α1)/m1
-c6 = F_MAX1*np.cos(α1)**2/m1
-c7 = F_MAX1*bm1*np.cos(α1)**2/(m1*lo1)
-c8 = np.tan(α1)**2
-c9 = np.cos(α2)/m2
-c10 = F_MAX2*np.cos(α2)**2/m2
-c11 = F_MAX2*bm2*np.cos(α2)**2/(m2*lo2)
-c12 = np.tan(α2)**2
 
 '''
 R_{1} &= r_{1}\left(\theta,\theta_{PS}=\frac{\pi}{2}\right) \\
 R_{2} &= r_{2}\left(\theta,\theta_{PS}=\frac{\pi}{2}\right)  \\
-K_{T,1} &= \frac{F_{max,1}c^{T}}{l_{T,o,1}}\left(1 - \exp{\left(\frac{-T_1}{F_{max,1}c^{T}k^{T}}\right)}\right) \hspace{1em} \text{(Variable stiffness coefficient from Zajac (1989) ODE for tendon force)} \\
-v_{MTU,1} &= \text{sgn}\left(-r_1(\theta)\right)\cdot\dot{\theta}\cdot\sqrt{\left(\frac{\partial r_1}{\partial\theta}\right)^2 + r_1^2(\theta)} \\
-K_{T,2} &= \frac{F_{max,2}c^{T}}{l_{T,o,2}}\left(1 - \exp{\left(\frac{-T_2}{F_{max,2}c^{T}k^{T}}\right)}\right) \hspace{1em} \text{(Variable stiffness coefficient from Zajac (1989) ODE for tendon force)} \\
-v_{MTU,2} &= \text{sgn}\left(-r_2(\theta)\right)\cdot\dot{\theta}\cdot\sqrt{\left(\frac{\partial r_2}{\partial\theta}\right)^2 + r_2^2(\theta)} \\
-F_{LV,1} &= f_{L,1}(l_{m,1}) \cdot f_{V,1}(l_{m,1},v_{m,1}) \\
-F_{LV,2} &= f_{L,2}(l_{m,2}) \cdot f_{V,2}(l_{m,2},v_{m,2}) \\
 '''
-
-FL = lambda l,lo: np.exp(-abs(((l/lo)**β-1)/ω)**ρ)
-FV = lambda l,v,lo: np.piecewise(v,[v<=0, v>0],\
-	[lambda v: (V_max - v/lo)/(V_max + (cv0 + cv1*(l/lo))*(v/lo)),\
-	lambda v: (bv-(av0 + av1*(l/lo) + av2*(l/lo)**2)*(v/lo))/(bv + (v/lo))])
 
 def R1(X):
 	return(r1(X[0])) #
-def dR1_dx1(X):
-	return(dr1_dθ(X[0]))
-def d2R1_dx12(X):
-	return(d2r1_dθ2(X[0]))
 def R2(X):
 	return(r2(X[0])) #
-def dR2_dx1(X):
-	return(dr2_dθ(X[0]))
-def d2R2_dx12(X):
-	return(d2r2_dθ2(X[0]))
-def KT_1(X):
-	return((F_MAX1*cT/lTo1)*(1-np.exp(-X[2]/(F_MAX1*cT*kT)))) # NOT NORMALIZED (in N/m)
-def dKT_1_dx3(X):
-	return((1/(kT*lTo1))*np.exp(-X[2]/(F_MAX1*cT*kT))) # NOT NORMALIZED (in N/m)
-def v_MTU1(X):
-	return(np.sign(-R1(X))*X[1]*np.sqrt(dR1_dx1(X)**2 + R1(X)**2)) # NOT NORMALIZED (in m/s)
-def a_MTU1(X):
-	return(np.sign(-R1(X))*(dX2_dt(X)*np.sqrt(dR1_dx1(X)**2 + R1(X)**2) \
-				+ (X[1]**2)*dR1_dx1(X)*(d2R1_dx12(X) + R1(X))/np.sqrt(dR1_dx1(X)**2 + R1(X)**2)))
-def KT_2(X):
-	return((F_MAX2*cT/lTo2)*(1-np.exp(-X[3]/(F_MAX2*cT*kT)))) # NOT NORMALIZED (in N/m)
-def dKT_2_dx4(X):
-	return((1/(kT*lTo2))*np.exp(-X[3]/(F_MAX2*cT*kT))) # NOT NORMALIZED (in N/m)
-def v_MTU2(X):
-	return(np.sign(-R2(X))*X[1]*np.sqrt(dR2_dx1(X)**2 + R2(X)**2)) # NOT NORMALIZED (in m/s)
-def a_MTU2(X):
-	return(np.sign(-R2(X))*(dX2_dt(X)*np.sqrt(dR2_dx1(X)**2 + R2(X)**2) \
-				+ (X[1]**2)*dR2_dx1(X)*(d2R2_dx12(X) + R2(X))/np.sqrt(dR2_dx1(X)**2 + R2(X)**2)))
-def FLV_1(X):
-	return(FL(X[4],lo1)*FV(X[4],X[6],lo1))
-def FLV_2(X):
-	return(FL(X[5],lo2)*FV(X[5],X[7],lo2))
-def F_PE1_1(X):
-	return(c_1*k_1*np.log(np.exp((X[4]/(lo1*L_CE_max_1) - Lr1)/k_1) + 1) + η*(X[6]/lo1))
-def F_PE1_2(X):
-	return(c_1*k_1*np.log(np.exp((X[5]/(lo2*L_CE_max_2) - Lr1)/k_1) + 1) + η*(X[7]/lo2))
-
-"""
-################################
-######## Tension Driven ########
-################################
-
-\dot{x}_1 &= x_{2} \\
-\dot{x}_2 &= c_{1}\sin(x_{1}) + c_{2}R_{1}u_{1} - c_{2}R_{2}u_{2} \\
-u_1 &= T_{1} \\
-u_2 &= T_{2} \\
-
-"""
 
 def dX1_dt(X):
 	return(X[1])
-def d2X1_dt2(X):
-	return(dX2_dt(X))
 def dX2_dt(X,U=None):
 	if U is None:
 		return(c1*np.sin(X[0]) + c2*R1(X)*X[2] + c2*R2(X)*X[3])
 	else:
 		return(c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1])
-def d2X2_dt2(X):
-	return(c1*np.cos(X[0])*dX1_dt(X) + c2*dR1_dx1(X)*dX1_dt(X)*X[2] + c2*R1(X)*dX3_dt(X)\
-			+ c2*dR2_dx1(X)*dX1_dt(X)*X[3] + c2*R2(X)*dX4_dt(X))
-def dX3_dt(X,U=None):
-	if U is None:
-		return(KT_1(X)*(v_MTU1(X) - c3*X[6]))
-	else:
-		return(KT_1(X)*(v_MTU1(X) - c3*U[0]))
-def dX4_dt(X,U=None):
-	if U is None:
-		return(KT_2(X)*(v_MTU2(X) - c4*X[7]))
-	else:
-		return(KT_2(X)*(v_MTU2(X) - c4*U[1]))
-def dX5_dt(X):
-	return(X[6])
-def dX6_dt(X):
-	return(X[7])
-def dX7_dt(X,U):
-	return(c5*X[2] - c6*F_PE1_1(X) - c7*X[6] + c8*X[6]**2/X[4] - c6*FLV_1(X)*U[0])
-def dX8_dt(X,U):
-	return(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5] - c10*FLV_2(X)*U[1])
 
 ### Reference Trajectory ###
 
 r = lambda t: Amp*np.sin(Freq*t) + Base
 dr = lambda t: Amp*Freq*np.cos(Freq*t)
 d2r = lambda t: -Amp*Freq**2*np.sin(Freq*t)
-d3r = lambda t: -Amp*Freq**3*np.cos(Freq*t)
-d4r = lambda t: Amp*Freq**4*np.sin(Freq*t)
 
 ############################
 
@@ -1864,104 +1716,14 @@ def Z1(t,X):
 	return(r(t) - X[0])
 def dZ1(t,X):
 	return(dr(t) - dX1_dt(X))
-def d2Z1(t,X):
-	return(d2r(t) - dX2_dt(X))
-def d3Z1(t,X):
-	return(d3r(t) - d2X2_dt2(X))
 def A1(t,X):
 	return(dr(t) + k1*Z1(t,X))
 def dA1(t,X):
 	return(d2r(t) + k1*dZ1(t,X))
-def d2A1(t,X):
-	return(d3r(t) + k1*d2Z1(t,X))
-def d3A1(t,X):
-	return(d4r(t) + k1*d3Z1(t,X))
 def Z2(t,X):
 	return(X[1] - A1(t,X))
-def dZ2(t,X):
-	"""
-	dZ2(t,X,U) = c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1] - dA1(t,X)
-	"""
-	return(dX2_dt(X) - dA1(t,X))
-def d2Z2(t,X):
-	return(d2X2_dt2(X) - d2A1(t,X))
 def A2(t,X):
 	return(Z1(t,X) + dA1(t,X) - c1*np.sin(X[0]) - k2*Z2(t,X))
-def dA2(t,X):
-	return(dZ1(t,X) + d2A1(t,X) - c1*np.cos(X[0])*dX1_dt(X) - k2*dZ2(t,X))
-def d2A2(t,X):
-	return(d2Z1(t,X) + d3A1(t,X) + c1*np.sin(X[0])*(dX1_dt(X)**2) - c1*np.cos(X[0])*d2X1_dt2(X) - k2*d2Z2(t,X))
-def Z3(t,X):
-	return(c2*R1(X)*X[2] + c2*R2(X)*X[3] - A2(t,X))
-def dZ3(t,X):
-	"""
-	dZ3(t,X) = c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
-						+ c2*R1(X)*KT_1(X)*v_MTU1(X) - c2*c3*R1(X)*KT_1(X)*U[0] \
-							+ c2*R2(X)*KT_2(X)*v_MTU2(X) - c2*c4*R2(X)*KT_2(X)*U[1] \
-								- dA2(t,X)
-	"""
-	return(c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
-					+ c2*R1(X)*KT_1(X)*v_MTU1(X) - c2*c3*R1(X)*KT_1(X)*X[6] \
-						+ c2*R2(X)*KT_2(X)*v_MTU2(X) - c2*c4*R2(X)*KT_2(X)*X[7] \
-							- dA2(t,X))
-def A3(t,X):
-	return(Z2(t,X) - dA2(t,X) + k3*Z3(t,X) \
-		+ c2*dR1_dx1(X)*dX1_dt(X)*X[2] + 	c2*dR2_dx1(X)*dX1_dt(X)*X[3] \
-			+ c2*R1(X)*KT_1(X)*v_MTU1(X) + c2*R2(X)*KT_2(X)*v_MTU2(X))
-def dA3(t,X):
-	return(dZ2(t,X) - d2A2(t,X) + k3*dZ3(t,X) \
-		+ c2*d2R1_dx12(X)*(dX1_dt(X)**2)*X[2] \
-			+ c2*dR1_dx1(X)*d2X1_dt2(X)*X[2] \
-	 			+ c2*dR1_dx1(X)*dX1_dt(X)*dX3_dt(X)\
-		 + c2*d2R2_dx12(X)*(dX1_dt(X)**2)*X[3] \
-	 		+ c2*dR2_dx1(X)*d2X1_dt2(X)*X[3] \
-	  			+ c2*dR2_dx1(X)*dX1_dt(X)*dX4_dt(X) \
-		+ c2*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*v_MTU1(X) \
-			+ c2*R1(X)*dKT_1_dx3(X)*dX3_dt(X)*v_MTU1(X) \
-			 	+ c2*R1(X)*KT_1(X)*a_MTU1(X) \
-		+ c2*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*v_MTU2(X) \
-			+ c2*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*v_MTU2(X) \
-				+ c2*R2(X)*KT_2(X)*a_MTU2(X))
-def Z4(t,X):
-	return(c2*c3*R1(X)*KT_1(X)*X[6] + c2*c4*R2(X)*KT_2(X)*X[7] - A3(t,X))
-def dZ4(t,X,U):
-	"""
-	dZ4 = 	c2*c3*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*X[6]\
-				+ c2*c3*R1(X)*dKT_1_dx3(X)*dX3_dt(X)*X[6]\
-					+ c2*c3*R1(X)*KT_1(X)*dX7_dt(X)\
-			+ c2*c4*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*X[7]\
-				+ c2*c4*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*X[7]\
-					+ c2*c4*R2(X)*KT_2(X)*dX8_dt(X)\
-			- dA3(t,X)
-	"""
-	return(	c2*c3*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*X[6] \
-				+ c2*c3*R1(X)*dKT_1_dx3(X)*dX3_dt(X)*X[6] \
-					+ c2*c3*R1(X)*KT_1(X)*(c5*X[2] - c6*F_PE1_1(X) - c7*X[6] + c8*X[6]**2/X[4]) \
-					 	- c2*c3*c6*R1(X)*KT_1(X)*FLV_1(X)*U[0] \
-			+ c2*c4*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*X[7] \
-			 	+ c2*c4*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*X[7] \
-					+ c2*c4*R2(X)*KT_2(X)*(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5]) \
-					 	- c2*c4*c10*R2(X)*KT_2(X)*FLV_2(X)*U[1] \
-			- dA3(t,X))
-def A4(t,X):
-	"""
-	c2*c3*c6*R1(X)*KT_1(X)*FLV_1(X)*U[0] \
-		+ c2*c4*c10*R2(X)*KT_2(X)*FLV_2(X)*U[1] = \
-					c2*c3*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*X[6] \
-					+ c2*c3*R1(X)*dKT_1_dx3(X)*dX3_dt(X)*X[6] \
-					+ c2*c3*R1(X)*KT_1(X)*(c5*X[2] - c6*F_PE1_1(X) - c7*X[6] + c8*X[6]**2/X[4]) \
-					+ c2*c4*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*X[7] \
-					+ c2*c4*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*X[7] \
-					+ c2*c4*R2(X)*KT_2(X)*(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5]) \
-					- dA3(t,X) - Z3(t,X) + k4*Z4(t,X)
-	"""
-	return(c2*c3*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*X[6] \
-				+ c2*c3*R1(X)*dKT_1_dx3(X)*dX3_dt(X)*X[6] \
-					+ c2*c3*R1(X)*KT_1(X)*(c5*X[2] - c6*F_PE1_1(X) - c7*X[6] + c8*X[6]**2/X[4]) \
-			+ c2*c4*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*X[7] \
-			 	+ c2*c4*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*X[7] \
-					+ c2*c4*R2(X)*KT_2(X)*(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5]) \
-			- dA3(t,X) - Z3(t,X) + k4*Z4(t,X))
 
 def return_constraint_variables_tension_driven(t,X):
 	Coefficient1 = c2*R1(X)
@@ -2363,9 +2125,9 @@ while AnotherIteration1 == True:
 		StartTime = time.time()
 		for i in range(len(Time1)-1):
 			U1[:,i+1] = return_U_tension_driven(Time1[i],X1[:,i],U1[:,i],Noise = NoiseArray1[:,i])
-			X1[:,i+1] = X1[:,i] + dt*np.array([dX1_dt(X1[:,i]),\
+			X1[:,i +1] = X1[:,i] + dt*np.array([dX1_dt(X1[:,i]),\
 												dX2_dt(X1[:,i],U=U1[:,i+1])])
-			statusbar(i,len(Time1),StartTime=StartTime,Title="Tension Controlled")
+			statusbar(i,len(Time1)-1,StartTime=StartTime,Title="Tension Controlled")
 		AnotherIteration1 = False
 	except:
 		AttemptNumber1 += 1
@@ -2378,95 +2140,30 @@ U1 = U1[:,:ArrayLength1]
 Time1 = Time1[:ArrayLength1]
 print('\n')
 
-AnotherIteration1 = True
-AttemptNumber1 = 0
-while AnotherIteration1 == True:
-	N1 = N_seconds*100 + 1
-	Time2 = np.linspace(0,N_seconds,N1)
-	dt = Time2[1]-Time2[0]
+if ArrayLength1>50:
+	plt.figure(figsize = (9,7))
+	plt.title("Underdetermined Forced-Pendulum Example",\
+	                fontsize=16,color='gray')
+	plt.plot(Time1,X1[0,:],'b',lw=2)
+	plt.plot(np.linspace(0,Time1[-1],1001),\
+			r(np.linspace(0,Time1[-1],1001)),\
+				'r--')
+	plt.xlabel("Time (s)")
+	plt.ylabel("Desired Measure")
+	plt.legend([r"Output $y = x_{1}$ (Tension)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
 
-	X2 = np.zeros((2,len(Time2)))
-	X2[:,0] = [Base, Amp*Freq]
-	U2 = np.zeros((2,len(Time2)))
-	U2[:,0] = return_initial_U_tension_driven(Time2[1],X2[:,0])
+	plt.figure(figsize = (9,7))
+	plt.title('Error vs. Time')
+	plt.plot(Time1, r(Time1)-X1[0,:],color='b')
+	plt.xlabel("Time (s)")
+	plt.ylabel("Error")
+	plt.legend(["Tension Driven"],loc='best')
 
-	AddNoise1 = False
-	if AddNoise1 == True:
-	    np.random.seed(seed=None)
-	    NoiseArray1 = np.random.normal(loc=0.0,scale=0.2,size=(2,len(Time2)))
-	else:
-	    NoiseArray1 = np.zeros((2,len(Time2)))
+	fig1_1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time1,X1,InputString = "Tendon Tension")
+	fig2_1 = plot_states(Time1,X1,Return=True,InputString = "Tendon Tension")
+	fig3_1 = plot_inputs(Time1,U1,Return=True,InputString = "Tendon Tension")
 
-	try:
-		StartTime = time.time()
-		for i in range(1,len(Time2)):
-			U2[:,i] = return_U_tension_driven(Time2[i],X2[:,i-1],U2[:,i-1],Noise = NoiseArray1[:,i])
-			X2[:,i] = X2[:,i-1] + dt*np.array([dX2_dt(X2[:,i-1]),\
-												dX2_dt(X2[:,i-1],U=U2[:,i])])
-			statusbar(i-1,len(Time2)-1,StartTime=StartTime,Title="Tension Controlled")
-		AnotherIteration1 = False
-	except:
-		AttemptNumber1 += 1
-		print("\n")
-		print("Attempt #" + str(int(AttemptNumber1)) + " Failed.\n")
-		if AttemptNumber1 == 10: AnotherIteration1 = False
-ArrayLength2 = return_length_of_nonzero_array(X2)
-X2 = X2[:,:ArrayLength2]
-U2 = U2[:,:ArrayLength2]
-Time2 = Time2[:ArrayLength2]
-print('\n')
-
-# if ArrayLength1>50:
-# 	plt.figure(figsize = (9,7))
-# 	plt.title("Underdetermined Forced-Pendulum Example",\
-# 	                fontsize=16,color='gray')
-# 	plt.plot(Time1,X1[0,:],'b',lw=2)
-# 	plt.plot(np.linspace(0,Time1[-1],1001),\
-# 			r(np.linspace(0,Time1[-1],1001)),\
-# 				'r--')
-# 	plt.xlabel("Time (s)")
-# 	plt.ylabel("Desired Measure")
-# 	plt.legend([r"Output $y = x_{1}$ (Tension)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-#
-# 	plt.figure(figsize = (9,7))
-# 	plt.title('Error vs. Time')
-# 	plt.plot(Time1, r(Time1)-X1[0,:],color='b')
-# 	plt.xlabel("Time (s)")
-# 	plt.ylabel("Error")
-# 	plt.legend(["Tension Driven"],loc='best')
-#
-# 	fig1_1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time1,X1,InputString = "Tendon Tension")
-# 	fig2_1 = plot_states(Time1,X1,Return=True,InputString = "Tendon Tension")
-# 	fig3_1 = plot_inputs(Time1,U1,Return=True,InputString = "Tendon Tension")
-
-plt.figure(figsize = (9,7))
-plt.title("Underdetermined Forced-Pendulum Example",\
-                fontsize=16,color='gray')
-plt.plot(Time1,X1[0,:],'b',lw=2)
-plt.plot(Time2,X2[0,:],'g',lw=2)
-plt.plot(np.linspace(0,max([Time1[-1],Time2[-1]]),1001),\
-		r(np.linspace(0,max([Time1[-1],Time2[-1]]),1001)),\
-			'r--')
-plt.xlabel("Time (s)")
-plt.ylabel("Desired Measure")
-plt.legend([r"Output $y = x_{1}$ (New)",r"Output $y = x_{1}$ (Old)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-
-plt.figure(figsize = (9,7))
-plt.title('Error vs. Time')
-plt.plot(Time1, r(Time1)-X1[0,:],color='b')
-plt.plot(Time2, r(Time2)-X2[0,:],color='g')
-plt.legend(["New","Old"],loc='best')
-
-fig1_1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time1,X1,InputString = "Tendon Tension (New)")
-fig2_1 = plot_states(Time1,X1,Return=True,InputString = "Tendon Tension (New)")
-fig3_1 = plot_inputs(Time1,U1,Return=True,InputString = "Tendon Tension (New)")
-
-fig1_2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time2,X2,InputString = "Tendon Tension (Old)")
-fig2_2 = plot_states(Time2,X2,Return=True,InputString = "Tendon Tension (Old)")
-fig3_2 = plot_inputs(Time2,U2,Return=True,InputString = "Tendon Tension (Old)")
-
-
-BaseFileName = "ReferenceTracking_TensionDrivenPendulumExample_ComparingIntegrators"
+BaseFileName = "ReferenceTracking_TensionDrivenPendulumExample"
 figs=[manager.canvas.figure
          for manager in matplotlib._pylab_helpers.Gcf.get_all_fig_managers()]
 if len(figs)>=1:
