@@ -3755,7 +3755,7 @@ while AnotherIteration1 == True:
 	X1 = np.zeros((2,len(Time1)))
 	X1[:,0] = [Base, Amp*Freq]
 	U1 = np.zeros((2,len(Time1)))
-	U1[:,0] = return_initial_U_tension_driven(Time1[1],X1[:,0])
+	U1[:,0] = return_initial_U_tension_driven(Time1[0],X1[:,0])
 
 	AddNoise1 = False
 	if AddNoise1 == True:
@@ -3766,11 +3766,11 @@ while AnotherIteration1 == True:
 
 	try:
 		StartTime = time.time()
-		for i in range(1,len(Time1)):
-			U1[:,i] = return_U_tension_driven(Time1[i],X1[:,i-1],U1[:,i-1],Noise = NoiseArray1[:,i])
-			X1[:,i] = X1[:,i-1] + dt*np.array([dX1_dt(X1[:,i-1]),\
-												dX2_dt(X1[:,i-1],U=U1[:,i])])
-			statusbar(i-1,len(Time1)-1,StartTime=StartTime,Title="Tension Controlled")
+		for i in range(len(Time1)-1):
+			U1[:,i+1] = return_U_tension_driven(Time1[i],X1[:,i],U1[:,i],Noise = NoiseArray1[:,i])
+			X1[:,i+1] = X1[:,i] + dt*np.array([dX1_dt(X1[:,i]),\
+												dX2_dt(X1[:,i],U=U1[:,i+1])])
+			statusbar(i,len(Time1)-1,StartTime=StartTime,Title="Tension Controlled")
 		AnotherIteration1 = False
 	except:
 		AttemptNumber1 += 1
@@ -3794,9 +3794,9 @@ while AnotherIteration2 == True:
 	"""
 	X2 = np.zeros((4,len(Time2)))
 	U2 = np.zeros((2,len(Time2)))
-	temp_Tension = return_initial_U_tension_driven(Time1[1],X1[:,0])
+	temp_Tension = return_initial_U_tension_driven(Time1[0],X1[:,0])
 	X2[:,0] = [Base, Amp*Freq, temp_Tension[0], temp_Tension[1]]
-	U2[:,0] = return_initial_U_muscle_velocity_driven(Time2[1],X2[:,0])
+	U2[:,0] = return_initial_U_muscle_velocity_driven(Time2[0],X2[:,0])
 
 	AddNoise2 = False
 	if AddNoise2 == True:
@@ -3807,13 +3807,13 @@ while AnotherIteration2 == True:
 
 	try:
 		StartTime = time.time()
-		for i in range(1,len(Time2)):
-			U2[:,i] = return_U_muscle_velocity_driven(Time2[i],X2[:,i-1],U2[:,i-1],Noise = NoiseArray2[:,i])
-			X2[:,i] = X2[:,i-1] + dt*np.array([dX1_dt(X2[:,i-1]),\
-												dX2_dt(X2[:,i-1]),\
-												dX3_dt(X2[:,i-1],U=U2[:,i]),\
-												dX4_dt(X2[:,i-1],U=U2[:,i])])
-			statusbar(i-1,len(Time2)-1,StartTime=StartTime,Title="Vm Controlled")
+		for i in range(len(Time2)-1):
+			U2[:,i+1] = return_U_muscle_velocity_driven(Time2[i],X2[:,i],U2[:,i],Noise = NoiseArray2[:,i])
+			X2[:,i+1] = X2[:,i] + dt*np.array([dX1_dt(X2[:,i]),\
+												dX2_dt(X2[:,i]),\
+												dX3_dt(X2[:,i],U=U2[:,i+1]),\
+												dX4_dt(X2[:,i],U=U2[:,i+1])])
+			statusbar(i,len(Time2)-1,StartTime=StartTime,Title="Vm Controlled")
 		AnotherIteration2 = False
 	except:
 		AttemptNumber2 += 1
@@ -3833,13 +3833,13 @@ while AnotherIteration3 == True:
 	Time3 = np.linspace(0,N_seconds,N3)
 	dt = Time3[1]-Time3[0]
 
-	# temp_Tension = return_initial_U_tension_driven(Time3[1],X1[:,0])
-	# temp_Vm = return_initial_U_muscle_velocity_driven(Time3[1],X2[:,0])
-	# X3[:,0] = [Base, Amp*Freq, temp_Tension[0], temp_Tension[1], 0.8*lo1, 1.2*lo2, temp_Vm[0], temp_Vm[1]]
 	X3 = np.zeros((8,len(Time3)))
-	X3[:,0] = [Base, Amp*Freq, 400, 400, lo1, lo2, 0.1, 0.1]
+	# X3[:,0] = [Base, Amp*Freq, 400, 400, lo1, lo2, 0.1, 0.1]
+	temp_Tension = return_initial_U_tension_driven(Time3[0],X1[:,0])
+	temp_Vm = return_initial_U_muscle_velocity_driven(Time3[0],X2[:,0])
+	X3[:,0] = [Base, Amp*Freq, temp_Tension[0], temp_Tension[1], 0.8*lo1, 1.2*lo2, temp_Vm[0], temp_Vm[1]]
 	U3 = np.zeros((2,len(Time3)))
-	U3[:,0] = return_initial_U_muscle_activation_driven(Time3[1],X3[:,0])
+	U3[:,0] = return_initial_U_muscle_activation_driven(Time3[0],X3[:,0])
 
 	AddNoise3 = False
 	if AddNoise3 == True:
@@ -3850,17 +3850,17 @@ while AnotherIteration3 == True:
 
 	try:
 		StartTime = time.time()
-		for i in range(1,len(Time3)):
-			U3[:,i] = return_U_muscle_activation_driven(Time3[i],X3[:,i-1],U3[:,i-1],Noise = NoiseArray3[:,i])
-			X3[:,i] = X3[:,i-1] + dt*np.array([dX1_dt(X3[:,i-1]),\
-												dX2_dt(X3[:,i-1]),\
-												dX3_dt(X3[:,i-1]),\
-												dX4_dt(X3[:,i-1]),\
-												dX5_dt(X3[:,i-1]),\
-												dX6_dt(X3[:,i-1]),\
-												dX7_dt(X3[:,i-1],U=U3[:,i]),\
-												dX8_dt(X3[:,i-1],U=U3[:,i])])
-			statusbar(i-1,len(Time3)-1,StartTime=StartTime,Title="Act. Controlled")
+		for i in range(len(Time3)-1):
+			U3[:,i+1] = return_U_muscle_activation_driven(Time3[i],X3[:,i],U3[:,i],Noise = NoiseArray3[:,i])
+			X3[:,i+1] = X3[:,i] + dt*np.array([dX1_dt(X3[:,i]),\
+												dX2_dt(X3[:,i]),\
+												dX3_dt(X3[:,i]),\
+												dX4_dt(X3[:,i]),\
+												dX5_dt(X3[:,i]),\
+												dX6_dt(X3[:,i]),\
+												dX7_dt(X3[:,i],U=U3[:,i+1]),\
+												dX8_dt(X3[:,i],U=U3[:,i+1])])
+			statusbar(i,len(Time3)-1,StartTime=StartTime,Title="Act. Controlled")
 		AnotherIteration3 = False
 	except:
 		AttemptNumber3 += 1
