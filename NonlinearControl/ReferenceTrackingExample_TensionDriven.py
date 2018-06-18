@@ -1723,8 +1723,8 @@ def dA1(t,X):
 def Z2(t,X):
 	return(X[1] - A1(t,X))
 def A2(t,X):
-	# return(Z1(t,X) + dA1(t,X) - c1*np.sin(X[0]) - k2*Z2(t,X))
-	return((1+k1*k2)*r(t) + (k1+k2)*dr(t) + d2r(t) - (1+k1*k2)*X[0] - (k1+k2)*X[1] - c1*np.sin(X[0]))
+	# return((1+k1*k2)*r(t) + (k1+k2)*dr(t) + d2r(t) - (1+k1*k2)*X[0] - (k1+k2)*X[1] - c1*np.sin(X[0]))
+	return(Z1(t,X) + dA1(t,X) - c1*np.sin(X[0]) - k2*Z2(t,X))
 
 def return_constraint_variables_tension_driven(t,X):
 	Coefficient1 = c2*R1(X)
