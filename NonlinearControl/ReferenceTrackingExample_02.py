@@ -1660,7 +1660,7 @@ u_1 &= \alpha_1 \\
 u_2 &= \alpha_2 \\
 
 """
-N_seconds = 10
+N_seconds = 2
 
 AllMuscleSettings = return_muscle_settings(PreselectedMuscles=[5,6])
 
@@ -2591,7 +2591,7 @@ def return_initial_U_muscle_activation_driven(t:float,X_o,**kwargs):
 
 def plot_MA_values(t,X,**kwargs):
 	"""
-	Take the numpy.ndarray time array (t) of size (N,) and the state space numpy.ndarray (X) of size (2,x), (4,x), or (8,x) where x is less than or equal to N, and plots the moment are values of the two muscles versus time and along the moment arm functionself.
+	Take the numpy.ndarray time array (t) of size (N,) and the state space numpy.ndarray (X) of size (2,N), (4,N), or (8,N), and plots the moment are values of the two muscles versus time and along the moment arm function.
 
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	**kwargs
@@ -2602,7 +2602,10 @@ def plot_MA_values(t,X,**kwargs):
 	import matplotlib.pyplot as plt
 	import numpy as np
 
-	assert np.shape(X)[0] in [2,4,8] and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (2,x), (4,x), or (8,x) numpy.ndarray, where x is less than or equal to the length of t."
+	assert (np.shape(X)[0] in [2,4,8]) \
+				and (np.shape(X)[1] == len(t)) \
+					and (str(type(X)) == "<class 'numpy.ndarray'>"), \
+			"X must be a (2,N), (4,N), or (8,N) numpy.ndarray, where N is the length of t."
 
 	assert np.shape(t) == (len(t),) and str(type(t)) == "<class 'numpy.ndarray'>", "t must be a (N,) numpy.ndarray."
 
@@ -2632,7 +2635,7 @@ def plot_MA_values(t,X,**kwargs):
 	Note: Need to Transpose X in order for Map to work.
 	"""
 
-	ax2.plot(t[:np.shape(X)[1]],np.array(list(map(lambda X: R1(X),X.T))),'g')
+	ax2.plot(t,np.array(list(map(lambda X: R1(X),X.T))),'g')
 	ax2.set_ylim(ax1.get_ylim())
 	ax2.set_yticks(ax1.get_yticks())
 	ax2.set_yticklabels([""]*len(ax1.get_yticks()))
@@ -2649,7 +2652,7 @@ def plot_MA_values(t,X,**kwargs):
 	ax3.set_xlabel("Joint Angle (rads)")
 	ax3.set_ylabel("Moment Arm for\n Muscle 2 (m)")
 
-	ax4.plot(t[:np.shape(X)[1]],np.array(list(map(lambda X: R2(X),X.T))),'r')
+	ax4.plot(t,np.array(list(map(lambda X: R2(X),X.T))),'r')
 	ax4.set_ylim(ax3.get_ylim())
 	ax4.set_yticks(ax3.get_yticks())
 	ax4.set_yticklabels([""]*len(ax3.get_yticks()))
@@ -3502,7 +3505,7 @@ def plot_individual_coefficient1_versus_time_muscle_activation_driven(t,X,**kwar
 
 def plot_states(t,X,**kwargs):
 	"""
-	Takes in a numpy.ndarray for time (t) of shape (N,) and the numpy.ndarray for the state space (X) (NOT NECESSARILY THE SAME LENGTH AS t). Returns a plot of the states.
+	Takes in a numpy.ndarray for time (t) of shape (N,) and the numpy.ndarray for the state space (X) of shape (M,N), where M is the number of states and N is the same length as time t. Returns a plot of the states.
 
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	**kwargs
@@ -3516,7 +3519,11 @@ def plot_states(t,X,**kwargs):
 	import numpy as np
 	import matplotlib.pyplot as plt
 
-	assert np.shape(X)[0] in [2,4,8] and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a numpy.ndarray of shape (2,x), (4,x), or (8,x) where x is less than or equal to the length of time t."
+	assert (np.shape(X)[0] in [2,4,8]) \
+				and (np.shape(X)[1] == len(t)) \
+					and (str(type(X)) == "<class 'numpy.ndarray'>"), \
+			"X must be a (2,N), (4,N), or (8,N) numpy.ndarray, where N is the length of t."
+
 
 	Return = kwargs.get("Return",False)
 	assert type(Return)==bool, "Return must be either True or False."
@@ -3546,7 +3553,7 @@ def plot_states(t,X,**kwargs):
 		for j in range(NumStates):
 			axes[ColumnNumber[j]].spines['right'].set_visible(False)
 			axes[ColumnNumber[j]].spines['top'].set_visible(False)
-			axes[ColumnNumber[j]].plot(t[:np.shape(X)[1]],X[j,:])
+			axes[ColumnNumber[j]].plot(t,X[j,:])
 			if ColumnNumber[j]!=0:
 				axes[ColumnNumber[j]].set_xticklabels(\
 									[""]*len(axes[ColumnNumber[j]].get_xticks()))
@@ -3558,7 +3565,7 @@ def plot_states(t,X,**kwargs):
 		for j in range(NumStates):
 			axes[RowNumber[j],ColumnNumber[j]].spines['right'].set_visible(False)
 			axes[RowNumber[j],ColumnNumber[j]].spines['top'].set_visible(False)
-			axes[RowNumber[j],ColumnNumber[j]].plot(t[:np.shape(X)[1]],X[j,:])
+			axes[RowNumber[j],ColumnNumber[j]].plot(t,X[j,:])
 			if not(RowNumber[j] == RowNumber[-1] and ColumnNumber[j]==0):
 				axes[RowNumber[j],ColumnNumber[j]].set_xticklabels(\
 									[""]*len(axes[RowNumber[j],ColumnNumber[j]].get_xticks()))
@@ -3588,7 +3595,10 @@ def plot_inputs(t,U,**kwargs):
 	import numpy as np
 	import matplotlib.pyplot as plt
 
-	assert np.shape(U)[0] == 2 and str(type(U)) == "<class 'numpy.ndarray'>", "U must be a numpy.ndarray of size (2,x), where x must be less than or equal to the length of time t."
+	assert (np.shape(U)[0] == 2) \
+				and (np.shape(U)[1] == len(t)) \
+					and (str(type(U)) == "<class 'numpy.ndarray'>"), \
+			"X must be a (2,N) numpy.ndarray, where N is the length of t."
 
 	Return = kwargs.get("Return",False)
 	assert type(Return)==bool, "Return must be either True or False."
@@ -3605,17 +3615,17 @@ def plot_inputs(t,U,**kwargs):
 	plt.subplots_adjust(top=0.9,hspace=0.4,bottom=0.1,left=0.075,right=0.975)
 	plt.suptitle(DescriptiveTitle,Fontsize=20,y=0.975)
 
-	ax1.plot(t[:np.shape(U)[1]],U[0,:],'r',lw=2)
-	ax1.plot([-1,t[np.shape(U)[1]-1]+1],[0,0],'k--',lw=0.5)
-	ax1.set_xlim([t[0],t[np.shape(U)[1]-1]])
+	ax1.plot(t,U[0,:],'r',lw=2)
+	ax1.plot([-1,t[-1]+1],[0,0],'k--',lw=0.5)
+	ax1.set_xlim([t[0],t[-1]])
 	ax1.spines['right'].set_visible(False)
 	ax1.spines['top'].set_visible(False)
 	ax1.set_ylabel(r"$u_1$")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:np.shape(U)[1]],U[1,:],'g',lw=2)
-	ax2.plot([-1,t[np.shape(U)[1]-1]+1],[0,0],'k--',lw=0.5)
-	ax2.set_xlim([t[0],t[np.shape(U)[1]-1]])
+	ax2.plot(t,U[1,:],'g',lw=2)
+	ax2.plot([-1,t[-1]+1],[0,0],'k--',lw=0.5)
+	ax2.set_xlim([t[0],t[-1]])
 	ax2.spines['right'].set_visible(False)
 	ax2.spines['top'].set_visible(False)
 	ax2.set_ylabel(r"$u_2$")
@@ -3643,7 +3653,10 @@ def plot_l_m_comparison(t,X,**kwargs):
 	import numpy as np
 	import matplotlib.pyplot as plt
 
-	assert np.shape(X)[0] >= 2 and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a numpy.ndarray of size (2,x), (4,x), or (8,x) where x must be less than or equal to the length of time t."
+	assert (np.shape(X)[0] >= 2) \
+				and (np.shape(X)[1] == len(t)) \
+					and (str(type(X)) == "<class 'numpy.ndarray'>"), \
+			"X must be a (M,N) numpy.ndarray, where M is greater than or equal to 2 and N is the length of t."
 
 	Return = kwargs.get("Return",False)
 	assert type(Return)==bool, "Return must be either True or False."
@@ -3656,10 +3669,10 @@ def plot_l_m_comparison(t,X,**kwargs):
 		DescriptiveTitle = "Muscle vs. Musculotendon Lengths\n" + InputString + " Driven"
 
 	L_m = kwargs.get("MuscleLengths",None)
-	assert L_m is None or (str(type(L_m))=="<class 'numpy.ndarray'>" and np.shape(L_m)==(2,np.shape(X)[1])), "L_m must either be a numpy.ndarray of size (2,N) or left as None (Default)."
+	assert (L_m is None) or (str(type(L_m))=="<class 'numpy.ndarray'>" and np.shape(L_m)==(2,len(t))), "L_m must either be a numpy.ndarray of size (2,N) or left as None (Default)."
 
 	V_m = kwargs.get("MuscleVelocities",None)
-	assert V_m is None or (str(type(V_m))=="<class 'numpy.ndarray'>" and np.shape(V_m)==(2,np.shape(X)[1])), "V_m must either be a numpy.ndarray of size (2,N) or left as None (Default)."
+	assert (V_m is None) or (str(type(V_m))=="<class 'numpy.ndarray'>" and np.shape(V_m)==(2,len(t))), "V_m must either be a numpy.ndarray of size (2,N) or left as None (Default)."
 
 	assert L_m is not None or V_m is not None, "Error! Need to input some length/velocity measurement for the muscles."
 
@@ -3670,8 +3683,8 @@ def plot_l_m_comparison(t,X,**kwargs):
 		"""
 		This is for the muscle velocity driven controller. These values of initial muscle length are estimates taken to be the optimal muscle lengths. We will need to run some sensitivity analysis to ensure that this does not drastically effect the deviations from the MTU estimate.
 		"""
-		l_m1 = integrate.cumtrapz(V_m[0,:],t[:np.shape(X)[1]],initial = 0) + np.ones(np.shape(X)[1])*lo1
-		l_m2 = integrate.cumtrapz(V_m[1,:],t[:np.shape(X)[1]],initial = 0) + np.ones(np.shape(X)[1])*lo2
+		l_m1 = integrate.cumtrapz(V_m[0,:],t,initial = 0) + np.ones(len(t))*lo1
+		l_m2 = integrate.cumtrapz(V_m[1,:],t,initial = 0) + np.ones(len(t))*lo2
 	else:
 		l_m1 = L_m[0,:]
 		l_m2 = L_m[1,:]
@@ -3679,36 +3692,23 @@ def plot_l_m_comparison(t,X,**kwargs):
 	"""
 	Note: X must be transposed in order to run through map()
 	"""
-	ax1.plot(t[:np.shape(X)[1]],l_m1,'r',\
-				t[:np.shape(X)[1]],integrate.cumtrapz(np.array(list(\
-													map(lambda X: v_MTU1(X),X.T)))\
-														,t[:np.shape(X)[1]], initial = 0)\
-														 	+ np.ones(np.shape(X)[1])*l_m1[0],\
-																'b')
+	ax1.plot(t,l_m1,'r',t,integrate.cumtrapz(np.array(list(map(lambda X: v_MTU1(X),X.T))),\
+						t,initial=0) + np.ones(len(t))*l_m1[0], 'b')
 	ax1.set_ylabel(r"$l_{m,1}/l_{MTU,1}$ (m)")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t[:np.shape(X)[1]],l_m1-integrate.cumtrapz(np.array(list(\
-														map(lambda X: v_MTU1(X),X.T)))\
-															,t[:np.shape(X)[1]], initial = 0)\
-															 	- np.ones(np.shape(X)[1])*l_m1[0],\
-																	'k')
+	ax2.plot(t,l_m1-integrate.cumtrapz(np.array(list(map(lambda X: v_MTU1(X),X.T))),\
+						t,initial=0) - np.ones(len(t))*l_m1[0], 'k')
 	ax2.set_ylabel("Error (m)")
 	ax2.set_xlabel("Time (s)")
 
-	ax3.plot(t[:np.shape(X)[1]],l_m2,'r',\
-				t[:np.shape(X)[1]],integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X),X.T)))\
-														,t[:np.shape(X)[1]], initial = 0)\
-														 	+ np.ones(np.shape(X)[1])*l_m2[0],\
-																'b')
+	ax3.plot(t,l_m2,'r',t,integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X),X.T))),\
+						t,initial=0) + np.ones(len(t))*l_m2[0], 'b')
 	ax3.set_ylabel(r"$l_{m,2}/l_{MTU,2}$ (m)")
 	ax3.set_xlabel("Time (s)")
 
-	ax4.plot(t[:np.shape(X)[1]],l_m2-integrate.cumtrapz(np.array(list(\
-														map(lambda X: v_MTU2(X),X.T)))\
-															,t[:np.shape(X)[1]], initial = 0)\
-															 	- np.ones(np.shape(X)[1])*l_m2[0],\
-																	'k')
+	ax4.plot(t,l_m2-integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X),X.T))),\
+						t,initial=0) - np.ones(len(t))*l_m2[0], 'k')
 	ax4.set_ylabel("Error (m)")
 	ax4.set_xlabel("Time (s)")
 
@@ -3732,6 +3732,18 @@ def save_figures(BaseFileName,figs):
 	else:
 		[PDFFile.savefig(fig) for fig in figs]
 	PDFFile.close()
+
+def return_length_of_nonzero_array(X):
+	"""
+	Takes in a numpy.ndarray X of shape (m,n) and returns the length of the array that removes any trailing zeros.
+	"""
+	assert str(type(X))=="<class 'numpy.ndarray'>", "X should be a numpy array"
+	assert np.shape(X)[1]!=1, "X should be a wide rectangular array. (m,1) is a column, therefore a nonzero X of this shape will return 1 (trivial solution). Transpose X to properly identify nonzero array length."
+	assert np.shape(X)!=(1,1), "Check input. Should not be of shape (1,1) (trivial solution)."
+	if (X!=np.zeros(np.shape(X))).all():
+		return(np.shape(X)[1])
+	else:
+		return(np.argmax((X == np.zeros(np.shape(X))).sum(axis=0) == np.shape(X)[0]))
 
 AnotherIteration1 = True
 AttemptNumber1 = 0
@@ -3765,6 +3777,10 @@ while AnotherIteration1 == True:
 		print("\n")
 		print("Attempt #" + str(int(AttemptNumber1)) + " Failed.\n")
 		if AttemptNumber1 == 10: AnotherIteration1 = False
+ArrayLength1 = return_length_of_nonzero_array(X1)
+X1 = X1[:,:ArrayLength1]
+U1 = U1[:,:ArrayLength1]
+Time1 = Time1[:ArrayLength1]
 print('\n')
 
 AnotherIteration2 = True
@@ -3804,6 +3820,10 @@ while AnotherIteration2 == True:
 		print("\n")
 		print("Attempt #" + str(int(AttemptNumber2)) + " Failed.\n")
 		if AttemptNumber2 == 20: AnotherIteration2 = False
+ArrayLength2 = return_length_of_nonzero_array(X2)
+X2 = X2[:,:ArrayLength2]
+U2 = U2[:,:ArrayLength2]
+Time2 = Time2[:ArrayLength2]
 print('\n')
 
 AnotherIteration3 = True
@@ -3847,73 +3867,77 @@ while AnotherIteration3 == True:
 		print("\n")
 		print("Attempt #" + str(int(AttemptNumber3)) + " Failed.\n")
 		if AttemptNumber3 == 10: AnotherIteration3 = False
+	ArrayLength3 = return_length_of_nonzero_array(X3)
+X3 = X3[:,:ArrayLength3]
+U3 = U3[:,:ArrayLength3]
+Time3 = Time3[:ArrayLength3]
 print('\n')
 
-if np.shape(X1)[1]>50 or np.shape(X2)[1]>50 or np.shape(X3)[1]>50:
+if ArrayLength1>50 or ArrayLength2>50 or ArrayLength3>50:
 	plt.figure(figsize = (9,7))
 	plt.title("Underdetermined Forced-Pendulum Example",\
 	                fontsize=16,color='gray')
-	if np.shape(X1)[1]>50:
-		plt.plot(Time1[:np.shape(X1)[1]],X1[0,:],'b',lw=2)
-	if np.shape(X2)[1]>50:
-		plt.plot(Time2[:np.shape(X2)[1]],X2[0,:],'g',lw=2)
-	if np.shape(X3)[1]>50:
-		plt.plot(Time3[:np.shape(X3)[1]],X3[0,:],'k',lw=2)
-	plt.plot(np.linspace(0,max([Time1[np.shape(X1)[1]-1],Time2[np.shape(X2)[1]-1],Time3[np.shape(X3)[1]-1]]),1001),\
-			r(np.linspace(0,max([Time1[np.shape(X1)[1]-1],Time2[np.shape(X2)[1]-1],Time3[np.shape(X3)[1]-1]]),1001)),\
+	if ArrayLength1>50:
+		plt.plot(Time1,X1[0,:],'b',lw=2)
+	if ArrayLength2>50:
+		plt.plot(Time2,X2[0,:],'g',lw=2)
+	if ArrayLength3>50:
+		plt.plot(Time3,X3[0,:],'k',lw=2)
+	plt.plot(np.linspace(0,max([Time1[-1],Time2[-1],Time3[-1]]),1001),\
+			r(np.linspace(0,max([Time1[-1],Time2[-1],Time3[-1]]),1001)),\
 				'r--')
 	plt.xlabel("Time (s)")
 	plt.ylabel("Desired Measure")
-	if np.shape(X1)[1]>50 and np.shape(X2)[1]>50 and np.shape(X3)[1]>50:
+	if ArrayLength1>50 and ArrayLength2>50 and ArrayLength3>50:
 		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (mm Velocity)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif np.shape(X1)[1]>50 and np.shape(X2)[1]>50:
+	elif ArrayLength1>50 and ArrayLength2>50:
 		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (mm Velocity)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif np.shape(X2)[1]>50 and np.shape(X3)[1]>50:
+	elif ArrayLength2>50 and ArrayLength3>50:
 		plt.legend([r"Output $y = x_{1}$ (mm Velocity)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif np.shape(X1)[1]>50 and np.shape(X3)[1]>50:
+	elif ArrayLength1>50 and ArrayLength3>50:
 		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif np.shape(X1)[1]>50:
+	elif ArrayLength1>50:
 		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif np.shape(X2)[1]>50:
+	elif ArrayLength2>50:
 		plt.legend([r"Output $y = x_{1}$ (mm Velocity)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif np.shape(X3)[1]>50:
+	elif ArrayLength3>50:
 		plt.legend([r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-if np.shape(X1)[1]>50 or np.shape(X2)[1]>50 or np.shape(X3)[1]>50:
+if ArrayLength1>50 or ArrayLength2>50 or ArrayLength3>50:
 	plt.figure(figsize = (9,7))
 	plt.title('Error vs. Time')
-	if np.shape(X1)[1]>50:
-		plt.plot(Time1[:np.shape(X1)[1]], r(Time1[:np.shape(X1)[1]])-X1[0,:],color='b')
-	if np.shape(X2)[1]>50:
-		plt.plot(Time2[:np.shape(X2)[1]], r(Time2[:np.shape(X2)[1]])-X2[0,:],color='g')
-	if np.shape(X3)[1]>50:
-		plt.plot(Time3[:np.shape(X3)[1]], r(Time3[:np.shape(X3)[1]])-X3[0,:],color='k')
+	if ArrayLength1>50:
+		plt.plot(Time1, r(Time1)-X1[0,:],color='b')
+	if ArrayLength2>50:
+		plt.plot(Time2, r(Time2)-X2[0,:],color='g')
+	if ArrayLength3>50:
+		plt.plot(Time3, r(Time3)-X3[0,:],color='k')
 	plt.xlabel("Time (s)")
 	plt.ylabel("Error")
-	if np.shape(X1)[1]>50 and np.shape(X2)[1]>50 and np.shape(X3)[1]>50:
+	if ArrayLength1>50 and ArrayLength2>50 and ArrayLength3>50:
 		plt.legend(["Tension Driven","Muscle Velocity Driven","Muscle Activation"],loc='best')
-	elif np.shape(X1)[1]>50 and np.shape(X2)[1]>50:
+	elif ArrayLength1>50 and ArrayLength2>50:
 		plt.legend(["Tension Driven","Muscle Velocity Driven"],loc='best')
-	elif np.shape(X2)[1]>50 and np.shape(X3)[1]>50:
+	elif ArrayLength2>50 and ArrayLength3>50:
 		plt.legend(["Muscle Velocity Driven","Muscle Activation"],loc='best')
-	elif np.shape(X1)[1]>50 and np.shape(X3)[1]>50:
+	elif ArrayLength1>50 and ArrayLength3>50:
 		plt.legend(["Tension Driven","Muscle Activation"],loc='best')
-	elif np.shape(X1)[1]>50:
+	elif ArrayLength1>50:
 		plt.legend(["Tension Driven"],loc='best')
-	elif np.shape(X2)[1]>50:
+	elif ArrayLength2>50:
 		plt.legend(["Muscle Velocity Driven"],loc='best')
-	elif np.shape(X3)[1]>50:
+	elif ArrayLength3>50:
 		plt.legend(["Muscle Activation"],loc='best')
-if np.shape(X1)[1]>50:
+if ArrayLength1>50:
 	fig1_1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time1,X1,InputString = "Tendon Tension")
 	fig2_1 = plot_states(Time1,X1,Return=True,InputString = "Tendon Tension")
 	fig3_1 = plot_inputs(Time1,U1,Return=True,InputString = "Tendon Tension")
-if np.shape(X2)[1]>50:
+if ArrayLength2>50:
 	fig1_2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time2,X2,InputString = "Normalized Muscle Velocities")
 	fig2_2 = plot_states(Time2,X2,Return=True,InputString = "Normalized Muscle Velocities")
 	fig3_2 = plot_inputs(Time2,U2*np.concatenate([np.ones((1,len(Time2)))/lo1,np.ones((1,len(Time2)))/lo2],axis=0),\
 							Return=True,InputString = "Normalized Muscle Velocities")
 	fig4_2 = plot_l_m_comparison(Time2,X2,MuscleVelocities = U2, Return=True, InputString = "Muscle Velocity")
-if np.shape(X3)[1]>50:
+if ArrayLength3>50:
 	fig1_3,[ax1_3,ax2_3,ax3_3,ax4_3] = plot_MA_values(Time3,X3,InputString = "Muscle Activations")
 	fig2_3 = plot_states(Time3,X3,Return=True,InputString = "Muscle Activations")
 	fig3_3 = plot_inputs(Time3,U3,Return=True,InputString = "Muscle Activations")
