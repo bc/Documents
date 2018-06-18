@@ -1,8 +1,5 @@
 import numpy as np
-from scipy.integrate import odeint
 import matplotlib.pyplot as plt
-import sympy as sy
-from sympy.utilities import lambdify
 import time
 from collections import namedtuple
 from scipy import integrate
@@ -20,7 +17,7 @@ def return_muscle_settings(PreselectedMuscles=None):
 	Notes:
 	Coefficients from observation, Ramsay; 2009, FVC, Holtzbaur, Pigeon, Kuechle, or Banks. Optimal Muscle Length given in mm. Optimal tendon/muscle lengths and PCSA were taken from Garner and Pandy (2003)
 	"""
-	from sympy.utilities import lambdify
+
 	import numpy as np
 	from numpy import pi
 
@@ -1539,7 +1536,7 @@ def MA_2nd_deriv(Parameters,θ_PS=None):
 def return_MA_matrix_functions(AllMuscleSettings,ReturnMatrixFunction=False,θ_PS=None):
 	import numpy as np
 	import sympy as sp
-	from sympy.utilities import lambdify
+
 
 	MuscleList = AllMuscleSettings.keys()
 	if ReturnMatrixFunction == False:
@@ -1624,25 +1621,6 @@ def statusbar(i,N,**kwargs):
 		print(statusbar + '{0:1.1f}'.format((i+1)/N*100) + '% complete           \r',end = '')
 
 """
-################################
-######## Tension Driven ########
-################################
-
-x_1 &= \theta \\
-x_2 &= \dot{\theta} \\
-u_1 &= T_{1} \\
-u_2 &= T_{2} \\
-
-################################
-#### Muscle Velocity Driven ####
-################################
-
-x_1 &= \theta \\
-x_2 &= \dot{\theta} \\
-x_3 &= T_{1} \\
-x_4 &= T_{2} \\
-u_1 &= l_{m,1} \\
-u_2 &= l_{m,2} \\
 
 ################################
 ###### Activation Driven #######
@@ -1809,20 +1787,20 @@ def KT_1(X):
 	return((F_MAX1*cT/lTo1)*(1-np.exp(-X[2]/(F_MAX1*cT*kT)))) # NOT NORMALIZED (in N/m)
 def dKT_1_dx3(X):
 	return((1/(kT*lTo1))*np.exp(-X[2]/(F_MAX1*cT*kT))) # NOT NORMALIZED (in N/m)
-def v_MTU1(X):
-	return(np.sign(-R1(X))*X[1]*np.sqrt(dR1_dx1(X)**2 + R1(X)**2)) # NOT NORMALIZED (in m/s)
-def a_MTU1(X):
-	return(np.sign(-R1(X))*(dX2_dt(X)*np.sqrt(dR1_dx1(X)**2 + R1(X)**2) \
-				+ (X[1]**2)*dR1_dx1(X)*(d2R1_dx12(X) + R1(X))/np.sqrt(dR1_dx1(X)**2 + R1(X)**2)))
+def v_MTU1(X,r1,dr1_dx1):
+	return(np.sign(-r1)*X[1]*np.sqrt(dr1_dx1**2 + r1**2)) # NOT NORMALIZED (in m/s)
+def a_MTU1(X,r1,dr1_dx1,d2r1_dx12,r2):
+	return(np.sign(-r1)*(dX2_dt(X,r1,r2)*np.sqrt(dr1_dx1**2 + r1**2) \
+				+ (X[1]**2)*dr1_dx1*(d2r1_dx12 + r1)/np.sqrt(dr1_dx1**2 + r1**2)))
 def KT_2(X):
 	return((F_MAX2*cT/lTo2)*(1-np.exp(-X[3]/(F_MAX2*cT*kT)))) # NOT NORMALIZED (in N/m)
 def dKT_2_dx4(X):
 	return((1/(kT*lTo2))*np.exp(-X[3]/(F_MAX2*cT*kT))) # NOT NORMALIZED (in N/m)
-def v_MTU2(X):
-	return(np.sign(-R2(X))*X[1]*np.sqrt(dR2_dx1(X)**2 + R2(X)**2)) # NOT NORMALIZED (in m/s)
-def a_MTU2(X):
-	return(np.sign(-R2(X))*(dX2_dt(X)*np.sqrt(dR2_dx1(X)**2 + R2(X)**2) \
-				+ (X[1]**2)*dR2_dx1(X)*(d2R2_dx12(X) + R2(X))/np.sqrt(dR2_dx1(X)**2 + R2(X)**2)))
+def v_MTU2(X,r2,dr2_dx1):
+	return(np.sign(-r2)*X[1]*np.sqrt(dr2_dx1**2 + r2**2)) # NOT NORMALIZED (in m/s)
+def a_MTU2(X,r2,dr2_dx1,d2r2_dx12,r1):
+	return(np.sign(-r2)*(dX2_dt(X,r1,r2)*np.sqrt(dr2_dx1**2 + r2**2) \
+				+ (X[1]**2)*dr2_dx1*(d2r2_dx12 + r2)/np.sqrt(dr2_dx1**2 + r2**2)))
 def FLV_1(X):
 	return(FL(X[4],lo1)*FV(X[4],X[6],lo1))
 def FLV_2(X):
@@ -1872,26 +1850,26 @@ u_2 &= \alpha_{2} \\
 
 def dX1_dt(X):
 	return(X[1])
-def d2X1_dt2(X):
-	return(dX2_dt(X))
-def dX2_dt(X,U=None):
+def d2X1_dt2(X,r1,r2):
+	return(dX2_dt(X,r1,r2))
+def dX2_dt(X,r1,r2,U=None):
 	if U is None:
-		return(c1*np.sin(X[0]) + c2*R1(X)*X[2] + c2*R2(X)*X[3])
+		return(c1*np.sin(X[0]) + c2*r1*X[2] + c2*r2*X[3])
 	else:
-		return(c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1])
-def d2X2_dt2(X):
-	return(c1*np.cos(X[0])*dX1_dt(X) + c2*dR1_dx1(X)*dX1_dt(X)*X[2] + c2*R1(X)*dX3_dt(X)\
-			+ c2*dR2_dx1(X)*dX1_dt(X)*X[3] + c2*R2(X)*dX4_dt(X))
-def dX3_dt(X,U=None):
+		return(c1*np.sin(X[0]) + c2*r1*U[0] + c2*r2*U[1])
+def d2X2_dt2(X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1):
+	return(c1*np.cos(X[0])*dX1_dt(X) + c2*dr1_dx1*dX1_dt(X)*X[2] + c2*r1*dX3_dt(X,kt_1,r1,dr1_dx1)\
+			+ c2*dr2_dx1*dX1_dt(X)*X[3] + c2*r2*dX4_dt(X,kt_2,r2,dr2_dx1))
+def dX3_dt(X,kt_1,r1,dr1_dx1,U=None):
 	if U is None:
-		return(KT_1(X)*(v_MTU1(X) - c3*X[6]))
+		return(kt_1*(v_MTU1(X,r1,dr1_dx1) - c3*X[6]))
 	else:
-		return(KT_1(X)*(v_MTU1(X) - c3*U[0]))
-def dX4_dt(X,U=None):
+		return(kt_1*(v_MTU1(X,r1,dr1_dx1) - c3*U[0]))
+def dX4_dt(X,kt_2,r2,dr2_dx1,U=None):
 	if U is None:
-		return(KT_2(X)*(v_MTU2(X) - c4*X[7]))
+		return(kt_2*(v_MTU2(X,r2,dr2_dx1) - c4*X[7]))
 	else:
-		return(KT_2(X)*(v_MTU2(X) - c4*U[1]))
+		return(kt_2*(v_MTU2(X,r2,dr2_dx1) - c4*U[1]))
 def dX5_dt(X):
 	return(X[6])
 def dX6_dt(X):
@@ -1915,66 +1893,76 @@ def Z1(t,X):
 	return(r(t) - X[0])
 def dZ1(t,X):
 	return(dr(t) - dX1_dt(X))
-def d2Z1(t,X):
-	return(d2r(t) - dX2_dt(X))
-def d3Z1(t,X):
-	return(d3r(t) - d2X2_dt2(X))
+def d2Z1(t,X,r1,r2):
+	return(d2r(t) - dX2_dt(X,r1,r2))
+def d3Z1(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1):
+	return(d3r(t) - d2X2_dt2(X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1))
 def A1(t,X):
 	return(dr(t) + k1*Z1(t,X))
 def dA1(t,X):
 	return(d2r(t) + k1*dZ1(t,X))
-def d2A1(t,X):
-	return(d3r(t) + k1*d2Z1(t,X))
-def d3A1(t,X):
-	return(d4r(t) + k1*d3Z1(t,X))
+def d2A1(t,X,r1,r2):
+	return(d3r(t) + k1*d2Z1(t,X,r1,r2))
+def d3A1(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1):
+	return(d4r(t) + k1*d3Z1(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1))
 def Z2(t,X):
 	return(X[1] - A1(t,X))
-def dZ2(t,X):
+def dZ2(t,X,r1,r2):
 	"""
 	dZ2(t,X,U) = c1*np.sin(X[0]) + c2*R1(X)*U[0] + c2*R2(X)*U[1] - dA1(t,X)
 	"""
-	return(dX2_dt(X) - dA1(t,X))
-def d2Z2(t,X):
-	return(d2X2_dt2(X) - d2A1(t,X))
+	return(dX2_dt(X,r1,r2) - dA1(t,X))
+def d2Z2(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1):
+	return(d2X2_dt2(X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1) - d2A1(t,X,r1,r2))
 def A2(t,X):
 	return(Z1(t,X) + dA1(t,X) - c1*np.sin(X[0]) - k2*Z2(t,X))
-def dA2(t,X):
-	return(dZ1(t,X) + d2A1(t,X) - c1*np.cos(X[0])*dX1_dt(X) - k2*dZ2(t,X))
-def d2A2(t,X):
-	return(d2Z1(t,X) + d3A1(t,X) + c1*np.sin(X[0])*(dX1_dt(X)**2) - c1*np.cos(X[0])*d2X1_dt2(X) - k2*d2Z2(t,X))
-def Z3(t,X):
-	return(c2*R1(X)*X[2] + c2*R2(X)*X[3] - A2(t,X))
-def dZ3(t,X):
+def dA2(t,X,r1,r2):
+	return(dZ1(t,X) + d2A1(t,X,r1,r2) - c1*np.cos(X[0])*dX1_dt(X) - k2*dZ2(t,X,r1,r2))
+def d2A2(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1):
+	return(d2Z1(t,X,r1,r2) + d3A1(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1) + c1*np.sin(X[0])*(dX1_dt(X)**2) - c1*np.cos(X[0])*d2X1_dt2(X,r1,r2) \
+						- k2*d2Z2(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1))
+def Z3(t,X,r1,r2):
+	return(c2*r1*X[2] + c2*r2*X[3] - A2(t,X))
+def dZ3(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1):
 	"""
 	dZ3(t,X) = c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
 						+ c2*R1(X)*KT_1(X)*v_MTU1(X) - c2*c3*R1(X)*KT_1(X)*U[0] \
 							+ c2*R2(X)*KT_2(X)*v_MTU2(X) - c2*c4*R2(X)*KT_2(X)*U[1] \
 								- dA2(t,X)
 	"""
-	return(c2*dR1_dx1(X)*X[1]*X[2] + c2*dR2_dx1(X)*X[1]*X[3] \
-					+ c2*R1(X)*KT_1(X)*v_MTU1(X) - c2*c3*R1(X)*KT_1(X)*X[6] \
-						+ c2*R2(X)*KT_2(X)*v_MTU2(X) - c2*c4*R2(X)*KT_2(X)*X[7] \
-							- dA2(t,X))
-def A3(t,X):
-	return(Z2(t,X) - dA2(t,X) + k3*Z3(t,X) \
-		+ c2*dR1_dx1(X)*dX1_dt(X)*X[2] + 	c2*dR2_dx1(X)*dX1_dt(X)*X[3] \
-			+ c2*R1(X)*KT_1(X)*v_MTU1(X) + c2*R2(X)*KT_2(X)*v_MTU2(X))
-def dA3(t,X):
-	return(dZ2(t,X) - d2A2(t,X) + k3*dZ3(t,X) \
-		+ c2*d2R1_dx12(X)*(dX1_dt(X)**2)*X[2] \
-			+ c2*dR1_dx1(X)*d2X1_dt2(X)*X[2] \
-	 			+ c2*dR1_dx1(X)*dX1_dt(X)*dX3_dt(X)\
-		 + c2*d2R2_dx12(X)*(dX1_dt(X)**2)*X[3] \
-	 		+ c2*dR2_dx1(X)*d2X1_dt2(X)*X[3] \
-	  			+ c2*dR2_dx1(X)*dX1_dt(X)*dX4_dt(X) \
-		+ c2*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*v_MTU1(X) \
-			+ c2*R1(X)*dKT_1_dx3(X)*dX3_dt(X)*v_MTU1(X) \
-			 	+ c2*R1(X)*KT_1(X)*a_MTU1(X) \
-		+ c2*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*v_MTU2(X) \
-			+ c2*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*v_MTU2(X) \
-				+ c2*R2(X)*KT_2(X)*a_MTU2(X))
-def Z4(t,X):
-	return(c2*c3*R1(X)*KT_1(X)*X[6] + c2*c4*R2(X)*KT_2(X)*X[7] - A3(t,X))
+	return(c2*dr1_dx1*X[1]*X[2] + c2*dr2_dx1*X[1]*X[3] \
+					+ c2*r1*kt_1*v_MTU1(X,r1,dr1_dx1) - c2*c3*r1*kt_1*X[6] \
+						+ c2*r2*kt_2*v_MTU2(X,r2,dr2_dx1) - c2*c4*r2*kt_2*X[7] \
+							- dA2(t,X,r1,r2))
+def A3(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1):
+	return(Z2(t,X) - dA2(t,X,r1,r2) + k3*Z3(t,X,r1,r2) \
+		+ c2*dr1_dx1*dX1_dt(X)*X[2] + c2*dr2_dx1*dX1_dt(X)*X[3] \
+			+ c2*r1*kt_1*v_MTU1(X,r1,dr1_dx1) + c2*r2*kt_2*v_MTU2(X,r2,dr2_dx1))
+def dA3(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1):
+	d2x1_dt2 = d2X1_dt2(X,r1,r2)
+	d2r1_dx12 = d2R1_dx12(X)
+	d2r2_dx12 = d2R2_dx12(X)
+	V_MTU1 = v_MTU1(X,r1,dr1_dx1)
+	V_MTU2 = v_MTU2(X,r2,dr2_dx1)
+	dx3_dt = dX3_dt(X,kt_1,r1,dr1_dx1)
+	dx4_dt = dX4_dt(X,kt_2,r2,dr2_dx1)
+	return(dZ2(t,X,r1,r2) \
+				- d2A2(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1) \
+					+ k3*dZ3(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1) \
+		+ c2*d2r1_dx12*(dX1_dt(X)**2)*X[2] \
+			+ c2*dr1_dx1*d2x1_dt2*X[2] \
+	 			+ c2*dr1_dx1*dX1_dt(X)*dx3_dt\
+		 + c2*d2r2_dx12*(dX1_dt(X)**2)*X[3] \
+	 		+ c2*dr2_dx1*d2x1_dt2*X[3] \
+	  			+ c2*dr2_dx1*dX1_dt(X)*dx4_dt \
+		+ c2*dr1_dx1*dX1_dt(X)*kt_1*V_MTU1 \
+			+ c2*r1*dKT_1_dx3(X)*dx3_dt*V_MTU1 \
+			 	+ c2*r1*kt_1*a_MTU1(X,r1,dr1_dx1,d2r1_dx12,r2) \
+		+ c2*dr2_dx1*dX1_dt(X)*kt_2*V_MTU2 \
+			+ c2*r2*dKT_2_dx4(X)*dx4_dt*V_MTU2 \
+				+ c2*r2*kt_2*a_MTU2(X,r2,dr2_dx1,d2r2_dx12,r1))
+def Z4(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1):
+	return(c2*c3*r1*kt_1*X[6] + c2*c4*r2*kt_2*X[7] - A3(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1))
 def dZ4(t,X,U):
 	"""
 	dZ4 = 	c2*c3*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*X[6]\
@@ -1994,7 +1982,7 @@ def dZ4(t,X,U):
 					+ c2*c4*R2(X)*KT_2(X)*(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5]) \
 					 	- c2*c4*c10*R2(X)*KT_2(X)*FLV_2(X)*U[1] \
 			- dA3(t,X))
-def A4(t,X):
+def A4(t,X,r1,r2,kt_1,kt_2):
 	"""
 	c2*c3*c6*R1(X)*KT_1(X)*FLV_1(X)*U[0] \
 		+ c2*c4*c10*R2(X)*KT_2(X)*FLV_2(X)*U[1] = \
@@ -2006,13 +1994,16 @@ def A4(t,X):
 					+ c2*c4*R2(X)*KT_2(X)*(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5]) \
 					- dA3(t,X) - Z3(t,X) + k4*Z4(t,X)
 	"""
-	return(c2*c3*dR1_dx1(X)*dX1_dt(X)*KT_1(X)*X[6] \
-				+ c2*c3*R1(X)*dKT_1_dx3(X)*dX3_dt(X)*X[6] \
-					+ c2*c3*R1(X)*KT_1(X)*(c5*X[2] - c6*F_PE1_1(X) - c7*X[6] + c8*X[6]**2/X[4]) \
-			+ c2*c4*dR2_dx1(X)*dX1_dt(X)*KT_2(X)*X[7] \
-			 	+ c2*c4*R2(X)*dKT_2_dx4(X)*dX4_dt(X)*X[7] \
-					+ c2*c4*R2(X)*KT_2(X)*(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5]) \
-			- dA3(t,X) - Z3(t,X) + k4*Z4(t,X))
+	dr1_dx1 = dR1_dx1(X)
+	dr2_dx1 = dR2_dx1(X)
+	return(c2*c3*dr1_dx1*dX1_dt(X)*kt_1*X[6] \
+				+ c2*c3*r1*dKT_1_dx3(X)*dX3_dt(X,kt_1,r1,dr1_dx1)*X[6] \
+					+ c2*c3*r1*kt_1*(c5*X[2] - c6*F_PE1_1(X) - c7*X[6] + c8*X[6]**2/X[4]) \
+			+ c2*c4*dr2_dx1*dX1_dt(X)*kt_2*X[7] \
+			 	+ c2*c4*r2*dKT_2_dx4(X)*dX4_dt(X,kt_2,r2,dr2_dx1)*X[7] \
+					+ c2*c4*r2*kt_2*(c9*X[3] - c10*F_PE1_2(X) - c11*X[7] + c12*X[7]**2/X[5]) \
+			- dA3(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1) \
+				- Z3(t,X,r1,r2) + k4*Z4(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1))
 
 def return_constraint_variables_tension_driven(t,X):
 	Coefficient1 = c2*R1(X)
@@ -2020,14 +2011,26 @@ def return_constraint_variables_tension_driven(t,X):
 	Constraint = A2(t,X)
 	return(Coefficient1,Coefficient2,Constraint)
 def return_constraint_variables_muscle_velocity_driven(t,X):
-	Coefficient1 = c2*c3*R1(X)*KT_1(X)
-	Coefficient2 = c2*c4*R2(X)*KT_2(X)
-	Constraint = A3(t,X)
+	r1 = R1(X)
+	dr1_dx1 = dR1_dx1(X)
+	kt_1 = KT_1(X)
+
+	r2 = R2(X)
+	dr2_dx1 = dR2_dx1(X)
+	kt_2 = KT_2(X)
+
+	Coefficient1 = c2*c3*r1*kt_1
+	Coefficient2 = c2*c4*r2*kt_2
+	Constraint = A3(t,X,kt_1,kt_2,r1,r2,dr1_dx1,dr2_dx1)
 	return(Coefficient1,Coefficient2,Constraint)
 def return_constraint_variables_muscle_activation_driven(t,X):
-	Coefficient1 = c2*c3*c6*R1(X)*KT_1(X)*FLV_1(X)
-	Coefficient2 = c2*c4*c10*R2(X)*KT_2(X)*FLV_2(X)
-	Constraint = A4(t,X)
+	r1 = R1(X)
+	kt_1 = KT_1(X)
+	r2 = R2(X)
+	kt_2 = KT_2(X)
+	Coefficient1 = c2*c3*c6*r1*kt_1*FLV_1(X)
+	Coefficient2 = c2*c4*c10*r2*kt_2*FLV_2(X)
+	Constraint = A4(t,X,r1,r2,kt_1,kt_2)
 	return(Coefficient1,Coefficient2,Constraint)
 
 def return_U_tension_driven(t:float,X,U,**kwargs):
@@ -2437,7 +2440,7 @@ def return_initial_U_muscle_velocity_driven(t:float,X_o,**kwargs):
 	u2 = FeasibleInput2[index]
 	return(np.array([u1,u2]))
 
-def return_U_muscle_activation_driven(t:float,X,U,**kwargs):
+def return_U_muscle_activation_driven(dt,t:float,X,U,**kwargs):
 	"""
 	Takes in time scalar (float) (t), state numpy.ndarray (X) of shape (8,), and previous input numpy.ndarray (U) of shape (2,) and returns the input for this time step.
 
@@ -2462,7 +2465,7 @@ def return_U_muscle_activation_driven(t:float,X,U,**kwargs):
 	assert np.shape(X) == (8,) and str(type(X)) == "<class 'numpy.ndarray'>", "X must be a (8,) numpy.ndarray"
 	assert np.shape(U) == (2,) and str(type(U)) == "<class 'numpy.ndarray'>", "U must be a (2,) numpy.ndarray"
 
-	dt = Time3[1]-Time3[0]
+	# dt = Time3[1]-Time3[0]
 
 	Noise = kwargs.get("Noise",np.zeros((2,)))
 	assert np.shape(Noise) == (2,) and str(type(Noise)) == "<class 'numpy.ndarray'>", "Noise must be a (2,) numpy.ndarray"
@@ -3692,22 +3695,22 @@ def plot_l_m_comparison(t,X,**kwargs):
 	"""
 	Note: X must be transposed in order to run through map()
 	"""
-	ax1.plot(t,l_m1,'r',t,integrate.cumtrapz(np.array(list(map(lambda X: v_MTU1(X),X.T))),\
+	ax1.plot(t,l_m1,'r',t,integrate.cumtrapz(np.array(list(map(lambda X: v_MTU1(X,R1(X),dR1_dx1(X)),X.T))),\
 						t,initial=0) + np.ones(len(t))*l_m1[0], 'b')
 	ax1.set_ylabel(r"$l_{m,1}/l_{MTU,1}$ (m)")
 	ax1.set_xlabel("Time (s)")
 
-	ax2.plot(t,l_m1-integrate.cumtrapz(np.array(list(map(lambda X: v_MTU1(X),X.T))),\
+	ax2.plot(t,l_m1-integrate.cumtrapz(np.array(list(map(lambda X: v_MTU1(X,R1(X),dR1_dx1(X)),X.T))),\
 						t,initial=0) - np.ones(len(t))*l_m1[0], 'k')
 	ax2.set_ylabel("Error (m)")
 	ax2.set_xlabel("Time (s)")
 
-	ax3.plot(t,l_m2,'r',t,integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X),X.T))),\
+	ax3.plot(t,l_m2,'r',t,integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X,R2(X),dR2_dx1(X)),X.T))),\
 						t,initial=0) + np.ones(len(t))*l_m2[0], 'b')
 	ax3.set_ylabel(r"$l_{m,2}/l_{MTU,2}$ (m)")
 	ax3.set_xlabel("Time (s)")
 
-	ax4.plot(t,l_m2-integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X),X.T))),\
+	ax4.plot(t,l_m2-integrate.cumtrapz(np.array(list(map(lambda X: v_MTU2(X,R2(X),dR2_dx1(X)),X.T))),\
 						t,initial=0) - np.ones(len(t))*l_m2[0], 'k')
 	ax4.set_ylabel("Error (m)")
 	ax4.set_xlabel("Time (s)")
@@ -3745,87 +3748,6 @@ def return_length_of_nonzero_array(X):
 	else:
 		return(np.argmax((X == np.zeros(np.shape(X))).sum(axis=0) == np.shape(X)[0]))
 
-AnotherIteration1 = True
-AttemptNumber1 = 0
-while AnotherIteration1 == True:
-	N1 = N_seconds*100 + 1
-	Time1 = np.linspace(0,N_seconds,N1)
-	dt = Time1[1]-Time1[0]
-
-	X1 = np.zeros((2,len(Time1)))
-	X1[:,0] = [Base, Amp*Freq]
-	U1 = np.zeros((2,len(Time1)))
-	U1[:,0] = return_initial_U_tension_driven(Time1[0],X1[:,0])
-
-	AddNoise1 = False
-	if AddNoise1 == True:
-	    np.random.seed(seed=None)
-	    NoiseArray1 = np.random.normal(loc=0.0,scale=0.2,size=(2,len(Time1)))
-	else:
-	    NoiseArray1 = np.zeros((2,len(Time1)))
-
-	try:
-		StartTime = time.time()
-		for i in range(len(Time1)-1):
-			U1[:,i+1] = return_U_tension_driven(Time1[i],X1[:,i],U1[:,i],Noise = NoiseArray1[:,i])
-			X1[:,i+1] = X1[:,i] + dt*np.array([dX1_dt(X1[:,i]),\
-												dX2_dt(X1[:,i],U=U1[:,i+1])])
-			statusbar(i,len(Time1)-1,StartTime=StartTime,Title="Tension Controlled")
-		AnotherIteration1 = False
-	except:
-		AttemptNumber1 += 1
-		print("\n")
-		print("Attempt #" + str(int(AttemptNumber1)) + " Failed.\n")
-		if AttemptNumber1 == 10: AnotherIteration1 = False
-ArrayLength1 = return_length_of_nonzero_array(X1)
-X1 = X1[:,:ArrayLength1]
-U1 = U1[:,:ArrayLength1]
-Time1 = Time1[:ArrayLength1]
-print('\n')
-
-AnotherIteration2 = True
-AttemptNumber2 = 0
-while AnotherIteration2 == True:
-	N2 = N_seconds*100 + 1
-	Time2 = np.linspace(0,N_seconds,N2)
-	dt = Time2[1]-Time2[0]
-	"""
-	l_m1[0] = lo1 and l_m2[0] = lo2. This is a floating parameter that will need sensitivity analysis!
-	"""
-	X2 = np.zeros((4,len(Time2)))
-	U2 = np.zeros((2,len(Time2)))
-	temp_Tension = return_initial_U_tension_driven(Time1[0],X1[:,0])
-	X2[:,0] = [Base, Amp*Freq, temp_Tension[0], temp_Tension[1]]
-	U2[:,0] = return_initial_U_muscle_velocity_driven(Time2[0],X2[:,0])
-
-	AddNoise2 = False
-	if AddNoise2 == True:
-	    np.random.seed(seed=None)
-	    NoiseArray2 = np.random.normal(loc=0.0,scale=0.2,size=(2,len(Time2)))
-	else:
-	    NoiseArray2 = np.zeros((2,len(Time2)))
-
-	try:
-		StartTime = time.time()
-		for i in range(len(Time2)-1):
-			U2[:,i+1] = return_U_muscle_velocity_driven(Time2[i],X2[:,i],U2[:,i],Noise = NoiseArray2[:,i])
-			X2[:,i+1] = X2[:,i] + dt*np.array([dX1_dt(X2[:,i]),\
-												dX2_dt(X2[:,i]),\
-												dX3_dt(X2[:,i],U=U2[:,i+1]),\
-												dX4_dt(X2[:,i],U=U2[:,i+1])])
-			statusbar(i,len(Time2)-1,StartTime=StartTime,Title="Vm Controlled")
-		AnotherIteration2 = False
-	except:
-		AttemptNumber2 += 1
-		print("\n")
-		print("Attempt #" + str(int(AttemptNumber2)) + " Failed.\n")
-		if AttemptNumber2 == 20: AnotherIteration2 = False
-ArrayLength2 = return_length_of_nonzero_array(X2)
-X2 = X2[:,:ArrayLength2]
-U2 = U2[:,:ArrayLength2]
-Time2 = Time2[:ArrayLength2]
-print('\n')
-
 AnotherIteration3 = True
 AttemptNumber3 = 0
 while AnotherIteration3 == True:
@@ -3835,8 +3757,9 @@ while AnotherIteration3 == True:
 
 	X3 = np.zeros((8,len(Time3)))
 	# X3[:,0] = [Base, Amp*Freq, 400, 400, lo1, lo2, 0.1, 0.1]
-	temp_Tension = return_initial_U_tension_driven(Time3[0],X1[:,0])
-	temp_Vm = return_initial_U_muscle_velocity_driven(Time3[0],X2[:,0])
+	temp_Tension = return_initial_U_tension_driven(0,np.array([Base,Amp*Freq]))
+	temp_Vm = return_initial_U_muscle_velocity_driven(0,np.array([Base,Amp*Freq,\
+																temp_Tension[0],temp_Tension[1]]))
 	X3[:,0] = [Base, Amp*Freq, temp_Tension[0], temp_Tension[1], 0.8*lo1, 1.2*lo2, temp_Vm[0], temp_Vm[1]]
 	U3 = np.zeros((2,len(Time3)))
 	U3[:,0] = return_initial_U_muscle_activation_driven(Time3[0],X3[:,0])
@@ -3851,11 +3774,17 @@ while AnotherIteration3 == True:
 	try:
 		StartTime = time.time()
 		for i in range(len(Time3)-1):
-			U3[:,i+1] = return_U_muscle_activation_driven(Time3[i],X3[:,i],U3[:,i],Noise = NoiseArray3[:,i])
+			U3[:,i+1] = return_U_muscle_activation_driven(dt,Time3[i],X3[:,i],U3[:,i],Noise = NoiseArray3[:,i])
+			kt_1 = KT_1(X3[:,i])
+			r1 = R1(X3[:,i])
+			dr1_dx1 = dR1_dx1(X3[:,i])
+			kt_2 = KT_2(X3[:,i])
+			r2 = R2(X3[:,i])
+			dr2_dx1 = dR2_dx1(X3[:,i])
 			X3[:,i+1] = X3[:,i] + dt*np.array([dX1_dt(X3[:,i]),\
-												dX2_dt(X3[:,i]),\
-												dX3_dt(X3[:,i]),\
-												dX4_dt(X3[:,i]),\
+												dX2_dt(X3[:,i],r1,r2),\
+												dX3_dt(X3[:,i],kt_1,r1,dr1_dx1),\
+												dX4_dt(X3[:,i],kt_2,r2,dr2_dx1),\
 												dX5_dt(X3[:,i]),\
 												dX6_dt(X3[:,i]),\
 												dX7_dt(X3[:,i],U=U3[:,i+1]),\
@@ -3873,77 +3802,31 @@ U3 = U3[:,:ArrayLength3]
 Time3 = Time3[:ArrayLength3]
 print('\n')
 
-if ArrayLength1>50 or ArrayLength2>50 or ArrayLength3>50:
+if ArrayLength3>50:
 	plt.figure(figsize = (9,7))
 	plt.title("Underdetermined Forced-Pendulum Example",\
 	                fontsize=16,color='gray')
-	if ArrayLength1>50:
-		plt.plot(Time1,X1[0,:],'b',lw=2)
-	if ArrayLength2>50:
-		plt.plot(Time2,X2[0,:],'g',lw=2)
-	if ArrayLength3>50:
-		plt.plot(Time3,X3[0,:],'k',lw=2)
-	plt.plot(np.linspace(0,max([Time1[-1],Time2[-1],Time3[-1]]),1001),\
-			r(np.linspace(0,max([Time1[-1],Time2[-1],Time3[-1]]),1001)),\
+	plt.plot(Time3,X3[0,:],'k',lw=2)
+	plt.plot(np.linspace(0,Time3[-1],1001),\
+			r(np.linspace(0,Time3[-1],1001)),\
 				'r--')
 	plt.xlabel("Time (s)")
 	plt.ylabel("Desired Measure")
-	if ArrayLength1>50 and ArrayLength2>50 and ArrayLength3>50:
-		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (mm Velocity)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif ArrayLength1>50 and ArrayLength2>50:
-		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (mm Velocity)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif ArrayLength2>50 and ArrayLength3>50:
-		plt.legend([r"Output $y = x_{1}$ (mm Velocity)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif ArrayLength1>50 and ArrayLength3>50:
-		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif ArrayLength1>50:
-		plt.legend([r"Output $y = x_{1}$ (Tension)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif ArrayLength2>50:
-		plt.legend([r"Output $y = x_{1}$ (mm Velocity)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-	elif ArrayLength3>50:
-		plt.legend([r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
-if ArrayLength1>50 or ArrayLength2>50 or ArrayLength3>50:
+	plt.legend([r"Output $y = x_{1}$ (Activation)",r"Reference $r(t) = \frac{\pi}{24}\sin(2\pi t) + \frac{\pi}{2}$"],loc='best')
+
 	plt.figure(figsize = (9,7))
 	plt.title('Error vs. Time')
-	if ArrayLength1>50:
-		plt.plot(Time1, r(Time1)-X1[0,:],color='b')
-	if ArrayLength2>50:
-		plt.plot(Time2, r(Time2)-X2[0,:],color='g')
-	if ArrayLength3>50:
-		plt.plot(Time3, r(Time3)-X3[0,:],color='k')
+	plt.plot(Time3, r(Time3)-X3[0,:],color='k')
 	plt.xlabel("Time (s)")
 	plt.ylabel("Error")
-	if ArrayLength1>50 and ArrayLength2>50 and ArrayLength3>50:
-		plt.legend(["Tension Driven","Muscle Velocity Driven","Muscle Activation"],loc='best')
-	elif ArrayLength1>50 and ArrayLength2>50:
-		plt.legend(["Tension Driven","Muscle Velocity Driven"],loc='best')
-	elif ArrayLength2>50 and ArrayLength3>50:
-		plt.legend(["Muscle Velocity Driven","Muscle Activation"],loc='best')
-	elif ArrayLength1>50 and ArrayLength3>50:
-		plt.legend(["Tension Driven","Muscle Activation"],loc='best')
-	elif ArrayLength1>50:
-		plt.legend(["Tension Driven"],loc='best')
-	elif ArrayLength2>50:
-		plt.legend(["Muscle Velocity Driven"],loc='best')
-	elif ArrayLength3>50:
-		plt.legend(["Muscle Activation"],loc='best')
-if ArrayLength1>50:
-	fig1_1,[ax1_1,ax2_1,ax3_1,ax4_1] = plot_MA_values(Time1,X1,InputString = "Tendon Tension")
-	fig2_1 = plot_states(Time1,X1,Return=True,InputString = "Tendon Tension")
-	fig3_1 = plot_inputs(Time1,U1,Return=True,InputString = "Tendon Tension")
-if ArrayLength2>50:
-	fig1_2,[ax1_2,ax2_2,ax3_2,ax4_2] = plot_MA_values(Time2,X2,InputString = "Normalized Muscle Velocities")
-	fig2_2 = plot_states(Time2,X2,Return=True,InputString = "Normalized Muscle Velocities")
-	fig3_2 = plot_inputs(Time2,U2*np.concatenate([np.ones((1,len(Time2)))/lo1,np.ones((1,len(Time2)))/lo2],axis=0),\
-							Return=True,InputString = "Normalized Muscle Velocities")
-	fig4_2 = plot_l_m_comparison(Time2,X2,MuscleVelocities = U2, Return=True, InputString = "Muscle Velocity")
-if ArrayLength3>50:
+	plt.legend(["Muscle Activation"],loc='best')
+
 	fig1_3,[ax1_3,ax2_3,ax3_3,ax4_3] = plot_MA_values(Time3,X3,InputString = "Muscle Activations")
 	fig2_3 = plot_states(Time3,X3,Return=True,InputString = "Muscle Activations")
 	fig3_3 = plot_inputs(Time3,U3,Return=True,InputString = "Muscle Activations")
 	fig4_3 = plot_l_m_comparison(Time3,X3,MuscleLengths = X3[4:6,:],Return=True,InputString = "Muscle Activation")
 
-BaseFileName = "ReferenceTracking_ForcedPendulumExample"
+BaseFileName = "ReferenceTracking_ActivationDrivenPendulumExample"
 figs=[manager.canvas.figure
          for manager in matplotlib._pylab_helpers.Gcf.get_all_fig_managers()]
 if len(figs)>=1:
